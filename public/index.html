@@ -12,31 +12,66 @@
   #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; color: #eef3fa; }
 
   /* ---------- 로비 ---------- */
-  #lobby {
+  #lobby, #room-lobby {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: radial-gradient(ellipse at 50% 30%, #1c2a3d 0%, #0f1620 70%);
     pointer-events: auto;
   }
-  #lobby .panel { width: 460px; max-width: 92vw; }
-  #lobby h1 { font-size: 22px; font-weight: 600; letter-spacing: .06em; margin-bottom: 4px; }
-  #lobby .tag { font-size: 11px; color: #7e90a8; letter-spacing: .16em; margin-bottom: 28px; }
+  #lobby .panel { width: 760px; max-width: 94vw; max-height: 94vh; overflow-y: auto; padding: 4px; }
+  #room-lobby .panel { width: 520px; max-width: 92vw; }
+  #lobby h1, #room-lobby h2 { font-size: 22px; font-weight: 600; letter-spacing: .06em; margin-bottom: 4px; }
+  #lobby .tag, #room-lobby .tag { font-size: 11px; color: #7e90a8; letter-spacing: .16em; margin-bottom: 24px; }
   #lobby label { display: block; font-size: 10px; letter-spacing: .18em; color: #8ea1b8; margin-bottom: 7px; }
-  #lobby input {
-    width: 100%; padding: 11px 13px; margin-bottom: 22px;
+  #lobby input, #room-lobby input {
+    width: 100%; padding: 11px 13px;
     background: rgba(255,255,255,.06); border: 1px solid #2b3a4f; border-radius: 6px;
     color: #eef3fa; font: inherit; font-size: 14px; outline: none;
   }
-  #lobby input:focus { border-color: #5aa9d6; }
-  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .mode {
-    padding: 17px 15px; border: 1px solid #2b3a4f; border-radius: 8px;
+  #lobby input:focus, #room-lobby input:focus { border-color: #5aa9d6; }
+  .lobby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .lobby-section { min-width: 0; }
+  .section-title { font-size: 10px; letter-spacing: .18em; color: #8ea1b8; margin: 20px 0 9px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button.mode {
+    display: block; width: 100%; padding: 15px 12px; text-align: left; color: #eef3fa;
+    border: 1px solid #2b3a4f; border-radius: 8px; font: inherit;
     background: rgba(255,255,255,.035); cursor: pointer; transition: all .15s;
   }
-  .mode:hover { border-color: #5aa9d6; background: rgba(90,169,214,.08); transform: translateY(-2px); }
-  .mode b { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-  .mode span { font-size: 10.5px; line-height: 1.65; color: #93a5bc; }
-  .mode .icon { font-size: 20px; margin-bottom: 8px; display: block; }
-  #lob-status { margin-top: 20px; font-size: 11px; color: #ff8b7e; min-height: 16px; }
+  button.mode:hover { border-color: #5aa9d6; background: rgba(90,169,214,.08); transform: translateY(-2px); }
+  .mode b { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  .mode span { font-size: 10px; line-height: 1.55; color: #93a5bc; }
+  .mode .icon { font-size: 19px; margin-bottom: 7px; display: block; }
+  .button-row, .code-row { display: flex; gap: 8px; }
+  .code-row input { text-transform: uppercase; letter-spacing: .18em; }
+  .action-btn {
+    padding: 10px 14px; border: 1px solid #36516d; border-radius: 6px; white-space: nowrap;
+    color: #dce5f0; background: rgba(90,169,214,.1); font: inherit; font-size: 11px; cursor: pointer;
+  }
+  .action-btn:hover { border-color: #5aa9d6; background: rgba(90,169,214,.2); }
+  .action-btn.primary { background: #2d759d; border-color: #5aa9d6; color: white; }
+  .action-btn.danger { background: transparent; border-color: #5a3540; color: #dca0a8; }
+  .visibility { display: flex !important; align-items: center; gap: 8px; margin-top: 10px; letter-spacing: .06em !important; }
+  .visibility input { width: auto !important; accent-color: #5aa9d6; }
+  #room-list { min-height: 156px; max-height: 240px; overflow-y: auto; border: 1px solid #253448; border-radius: 7px; }
+  .room-empty { padding: 28px 14px; text-align: center; color: #71849d; font-size: 11px; }
+  .room-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .room-item:last-child { border-bottom: 0; }
+  .room-item b { display: block; font-size: 12px; margin-bottom: 4px; }
+  .room-item span { color: #8496ad; font-size: 10px; }
+  #lob-status, #room-status { margin-top: 14px; font-size: 11px; color: #ff8b7e; min-height: 16px; }
+  .room-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .room-code-box { margin: 18px 0; padding: 13px; border: 1px solid #2b3a4f; border-radius: 7px; background: rgba(255,255,255,.035); }
+  .room-code-box small { display: block; color: #8496ad; font-size: 9px; letter-spacing: .16em; margin-bottom: 5px; }
+  #room-code-display { font-size: 22px; letter-spacing: .2em; color: #8fe3c4; }
+  #room-player-list { margin: 12px 0 18px; border: 1px solid #253448; border-radius: 7px; }
+  .room-player { display: flex; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 11px; }
+  .room-player:last-child { border-bottom: 0; }
+  .host-badge { color: #ffc861; font-size: 9px; letter-spacing: .1em; }
+
+  @media (max-width: 680px) {
+    .lobby-grid { grid-template-columns: 1fr; }
+    #lobby .panel { max-height: 96vh; }
+  }
 
   /* ---------- 게임 HUD ---------- */
   .hide { display: none !important; }
@@ -65,6 +100,7 @@
   #board .row.dead { opacity: .38; text-decoration: line-through; }
   #board .row.me .nm { color: #8fe3c4; }
   #board .sc { color: #dce5f0; }
+  #game-leave-btn { position: absolute; right: 22px; bottom: 92px; pointer-events: auto; }
 
   #gauge { position: absolute; bottom: 26px; left: 22px; width: 190px; }
   #gauge .track { height: 5px; background: rgba(255,255,255,.13); border-radius: 3px; overflow: hidden; position: relative; }
@@ -130,22 +166,61 @@
   <div id="lobby">
     <div class="panel">
       <h1>종이비행기 온라인</h1>
-      <div class="tag">PAPER PLANE MULTIPLAYER</div>
-      <label>조종사 이름</label>
+      <div class="tag">PAPER PLANE MULTIPLAYER · 방 목록과 초대 코드</div>
+      <label for="lob-name">조종사 이름</label>
       <input id="lob-name" maxlength="12" placeholder="이름을 입력하세요" autocomplete="off">
-      <div class="modes">
-        <div class="mode" data-mode="DIST">
-          <span class="icon">🏁</span>
-          <b>멀리 날기</b>
-          <span>직선 협곡을 따라 장애물을 뚫고<br>가장 먼 거리를 기록하세요</span>
-        </div>
-        <div class="mode" data-mode="ARENA">
-          <span class="icon">⚔️</span>
-          <b>오래 날기</b>
-          <span>아레나에서 다트를 쏘아 서로를<br>격추 — 최후의 1인이 승리</span>
-        </div>
+
+      <div class="lobby-grid">
+        <section class="lobby-section">
+          <div class="section-title">빠른 참가</div>
+          <div class="modes">
+            <button class="mode" data-mode="DIST">
+              <span class="icon">🏁</span><b>멀리 날기</b>
+              <span>공개 대기방에 참가하거나 새 방 생성</span>
+            </button>
+            <button class="mode" data-mode="ARENA">
+              <span class="icon">⚔️</span><b>오래 날기</b>
+              <span>방장이 시작하는 생존 아레나</span>
+            </button>
+          </div>
+
+          <div class="section-title">새 방 만들기</div>
+          <div class="button-row">
+            <button class="action-btn" data-create-mode="DIST">멀리 날기 방</button>
+            <button class="action-btn" data-create-mode="ARENA">오래 날기 방</button>
+          </div>
+          <label class="visibility"><input id="private-room" type="checkbox"> 비공개 — 목록에서 숨기고 코드로만 초대</label>
+
+          <div class="section-title">초대 코드로 참가</div>
+          <div class="code-row">
+            <input id="room-code" maxlength="6" placeholder="6자리 코드" autocomplete="off">
+            <button id="join-code-btn" class="action-btn">참가</button>
+          </div>
+        </section>
+
+        <section class="lobby-section">
+          <div class="section-title room-head"><span>공개 멀티 방</span><button id="refresh-rooms-btn" class="action-btn">새로고침</button></div>
+          <div id="room-list"><div class="room-empty">방 목록을 불러오는 중…</div></div>
+        </section>
       </div>
       <div id="lob-status"></div>
+    </div>
+  </div>
+
+  <div id="room-lobby" class="hide">
+    <div class="panel">
+      <div class="room-head"><div><h2 id="room-mode-title">멀리 날기</h2><div class="tag" id="room-visibility">PUBLIC ROOM</div></div><span id="room-count">1 / 8</span></div>
+      <div class="room-code-box">
+        <small>초대 코드</small>
+        <div class="room-head"><strong id="room-code-display">------</strong><button id="copy-code-btn" class="action-btn">코드 복사</button></div>
+      </div>
+      <div class="section-title">참가 조종사</div>
+      <div id="room-player-list"></div>
+      <div class="button-row">
+        <button id="room-start-btn" class="action-btn primary">라운드 시작</button>
+        <button id="room-leave-btn" class="action-btn danger">방 나가기</button>
+      </div>
+      <div id="room-status"></div>
     </div>
   </div>
 
@@ -162,6 +237,7 @@
     <div id="timer">--:--</div>
 
     <div id="board"><div class="h" id="b-title">플레이어</div><div id="b-rows"></div></div>
+    <button id="game-leave-btn" class="action-btn danger">방 나가기</button>
 
     <div id="ammo" class="hide"><i></i><i></i><i></i></div>
 
@@ -188,7 +264,7 @@
       <div class="box">
         <h2 id="r-title">라운드 결과</h2>
         <table><tbody id="r-body"></tbody></table>
-        <div class="next">잠시 후 다음 라운드가 시작됩니다</div>
+        <div class="next">결과 확인 후 방장이 다음 라운드를 시작합니다</div>
         <button id="leave-btn">로비로 나가기</button>
       </div>
     </div>
@@ -204,10 +280,12 @@
 }
 </script>
 <script src="./input-policy.js"></script>
+<script src="./room-state.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
 const { shouldCaptureGameKey } = window.inputPolicy;
+const { getLocalRoundRole } = window.roomStatePolicy;
 
 /* ============================================================
    유틸
@@ -235,84 +313,161 @@ function idColor(id) {
    네트워크
    ============================================================ */
 const net = {
-  ws: null, id: null,
+  ws: null, id: null, room: null,
   players: new Map(),   // id -> { name, wins, alive, score, remote(3D) }
-  connected: false
+  leaderboard: [], rooms: [], pendingAction: null,
+  connected: false, helloSent: false
 };
 
-function connect(name, mode) {
+function connect() {
+  if (net.ws && (net.ws.readyState === WebSocket.OPEN || net.ws.readyState === WebSocket.CONNECTING)) return;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}`);
   net.ws = ws;
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({ t: 'hello', token: localStorage.getItem('pp_token'), name }));
+    net.connected = true;
+    send({ t: 'list' });
+    if (net.pendingAction) sendHello();
   };
 
-  ws.onmessage = (ev) => {
-    let m; try { m = JSON.parse(ev.data); } catch { return; }
-    handle(m, mode);
+  ws.onmessage = ev => {
+    let message;
+    try { message = JSON.parse(ev.data); } catch { return; }
+    handle(message);
   };
 
   ws.onclose = () => {
+    const wasInRoom = !!net.room;
     net.connected = false;
-    enterLobby('서버와의 연결이 끊어졌습니다');
+    net.helloSent = false;
+    net.pendingAction = null;
+    net.id = null;
+    net.room = null;
+    net.ws = null;
+    if (wasInRoom) enterLobby('서버와의 연결이 끊어졌습니다');
+    else $('lob-status').textContent = '서버 연결이 끊어졌습니다 — 새로고침을 눌러 주세요';
   };
   ws.onerror = () => { $('lob-status').textContent = '서버에 연결할 수 없습니다'; };
 }
 
 function send(obj) {
-  if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(obj));
+  if (net.ws && net.ws.readyState === WebSocket.OPEN) net.ws.send(JSON.stringify(obj));
 }
 
-function handle(m, wantMode) {
+function sendHello() {
+  if (net.helloSent || !net.pendingAction || !net.ws || net.ws.readyState !== WebSocket.OPEN) return;
+  net.helloSent = true;
+  send({ t: 'hello', token: localStorage.getItem('pp_token'), name: $('lob-name').value.trim() });
+}
+
+function withSession(action) {
+  const name = $('lob-name').value.trim();
+  if (!name) {
+    $('lob-status').textContent = '이름을 입력하세요';
+    $('lob-name').focus();
+    return;
+  }
+  localStorage.setItem('pp_name', name);
+  net.pendingAction = action;
+  $('lob-status').textContent = '서버에 연결 중…';
+  if (net.id) {
+    myName = name;
+    send({ t: 'rename', name });
+    net.pendingAction = null;
+    action();
+  } else if (net.ws && net.ws.readyState === WebSocket.OPEN) {
+    sendHello();
+  } else {
+    connect();
+  }
+}
+
+function clearRemotePlayers() {
+  for (const player of net.players.values()) scene.remove(player.remote.group);
+  net.players.clear();
+}
+
+function syncRoomPlayers(players) {
+  clearRemotePlayers();
+  for (const player of players) if (player.id !== net.id) addRemote(player);
+}
+
+function handle(m) {
   switch (m.t) {
-    case 'hello':
+    case 'hello': {
       net.id = m.id;
+      net.helloSent = true;
+      myName = m.name;
       localStorage.setItem('pp_token', m.token);
       $('s-wins').textContent = m.wins;
-      net.connected = true;
-      send({ t: 'join', mode: wantMode });
+      const action = net.pendingAction;
+      net.pendingAction = null;
+      if (action) action();
+      break;
+    }
+
+    case 'rooms':
+      net.rooms = Array.isArray(m.rooms) ? m.rooms : [];
+      renderRoomList(net.rooms);
       break;
 
     case 'room':
+      net.room = m;
       game.mode = m.mode;
-      net.players.clear();
-      for (const pl of m.players) if (pl.id !== net.id) addRemote(pl);
-      enterGame();
-      applyPhase(m); // waiting / 진행 중이던 라운드 상태 반영
+      const self = (m.players || []).find(player => player.id === net.id);
+      if (self) $('s-wins').textContent = self.wins;
+      if (m.phase === 'waiting') net.leaderboard = [];
+      syncRoomPlayers(m.players || []);
+      if (m.phase === 'waiting') enterRoomLobby(m);
+      else {
+        enterGame();
+        applyPhase(m);
+      }
       break;
 
     case 'pj': addRemote(m.pl); refreshBoard(); break;
 
     case 'pl': {
-      const p = net.players.get(m.id);
-      if (p) { scene.remove(p.remote.group); net.players.delete(m.id); }
+      const player = net.players.get(m.id);
+      if (player) { scene.remove(player.remote.group); net.players.delete(m.id); }
       refreshBoard();
       break;
     }
 
-    case 'phase': applyPhase(m); break;
+    case 'phase':
+      if (m.phase === 'countdown') enterGame();
+      if (net.room) net.room.phase = m.phase;
+      applyPhase(m);
+      break;
 
-    case 'ss':
-      for (const [id, p, r, alive, score] of m.a) {
-        if (id === net.id) continue;
-        const pl = net.players.get(id);
-        if (!pl) continue;
-        pl.alive = !!alive;
-        pl.score = score;
-        pl.remote.tp.set(p[0], p[1], p[2]);
-        pl.remote.tr.set(r[0], r[1], r[2]);
-        pl.remote.seen = true;
+    case 'leaderboard':
+      net.leaderboard = Array.isArray(m.rows) ? m.rows : [];
+      for (const row of net.leaderboard) {
+        const player = net.players.get(row.id);
+        if (player) { player.score = row.score; player.alive = row.alive; }
       }
       refreshBoard();
       break;
 
+    case 'ss':
+      for (const [id, p, r, alive, score] of m.a) {
+        if (id === net.id) continue;
+        const player = net.players.get(id);
+        if (!player) continue;
+        player.alive = !!alive;
+        player.score = score;
+        player.remote.tp.set(p[0], p[1], p[2]);
+        player.remote.tr.set(r[0], r[1], r[2]);
+        player.remote.seen = true;
+      }
+      break;
+
     case 'shot': {
-      const pl = net.players.get(m.id);
+      const player = net.players.get(m.id);
       spawnDart(
         new THREE.Vector3(...m.o), new THREE.Vector3(...m.v),
-        m.id, pl ? pl.remote.color : 0xffffff
+        m.id, player ? player.remote.color : 0xffffff
       );
       break;
     }
@@ -322,13 +477,23 @@ function handle(m, wantMode) {
         if (me.alive) dieLocal(false);
         if (m.by) showKill(`${m.by} 님에게 격추되었습니다`);
       } else {
-        const pl = net.players.get(m.id);
-        if (pl) { pl.alive = false; pl.remote.group.visible = false; }
-        if (m.by === myName) showKill(`${pl ? pl.name : '?'} 격추!`);
+        const player = net.players.get(m.id);
+        if (player) { player.alive = false; player.remote.group.visible = false; }
+        if (m.by === myName) showKill(`${player ? player.name : '?'} 격추!`);
       }
       refreshBoard();
       break;
     }
+
+    case 'left':
+      net.room = null;
+      net.leaderboard = [];
+      enterLobby();
+      break;
+
+    case 'error':
+      showNetworkError(m.message || '요청을 처리할 수 없습니다');
+      break;
   }
 }
 
@@ -339,38 +504,116 @@ let myName = '';
 
 function enterLobby(msg) {
   $('lobby').classList.remove('hide');
+  $('room-lobby').classList.add('hide');
   $('hud').classList.add('hide');
+  $('results').classList.add('hide');
   $('lob-status').textContent = msg || '';
   clearWorld();
-  for (const p of net.players.values()) scene.remove(p.remote.group);
-  net.players.clear();
-  if (net.ws) { net.ws.onclose = null; net.ws.close(); net.ws = null; }
+  clearRemotePlayers();
   game.phase = 'lobby';
+  send({ t: 'list' });
+}
+
+function enterRoomLobby(room) {
+  $('lobby').classList.add('hide');
+  $('hud').classList.add('hide');
+  $('room-lobby').classList.remove('hide');
+  $('results').classList.add('hide');
+  game.phase = 'waiting';
+  game.frozen = true;
+  clearWorld();
+  $('room-mode-title').textContent = room.mode === 'ARENA' ? '오래 날기' : '멀리 날기';
+  $('room-visibility').textContent = room.visibility === 'private' ? 'PRIVATE · CODE ONLY' : 'PUBLIC ROOM';
+  $('room-code-display').textContent = room.code;
+  $('room-count').textContent = `${room.players.length} / ${room.maxPlayers}`;
+  $('room-player-list').innerHTML = room.players.map(player =>
+    `<div class="room-player"><span>${escapeHtml(player.name)} · ${player.wins}승</span>` +
+    `<span class="host-badge">${player.id === room.hostId ? '방장' : ''}</span></div>`).join('');
+  const isHost = room.hostId === net.id;
+  $('room-start-btn').classList.toggle('hide', !isHost);
+  $('room-status').textContent = isHost
+    ? '참가자를 확인한 뒤 라운드를 시작하세요'
+    : '방장이 라운드를 시작하기를 기다리는 중입니다';
 }
 
 function enterGame() {
   $('lobby').classList.add('hide');
+  $('room-lobby').classList.add('hide');
   $('hud').classList.remove('hide');
   const arena = game.mode === 'ARENA';
   $('s-cap').textContent = arena ? '생존 시간' : '직선 거리';
   $('s-unit').textContent = arena ? 's' : 'm';
   $('ammo').classList.toggle('hide', !arena);
   $('keys-fire').classList.toggle('hide', !arena);
-  $('b-title').textContent = arena ? '생존자' : '순위';
+  $('b-title').textContent = '실시간 리더보드';
+}
+
+function showNetworkError(message) {
+  const inRoomLobby = !$('room-lobby').classList.contains('hide');
+  $(inRoomLobby ? 'room-status' : 'lob-status').textContent = message;
+}
+
+function renderRoomList(rooms) {
+  if (!rooms.length) {
+    $('room-list').innerHTML = '<div class="room-empty">현재 공개된 방이 없습니다<br>새 방을 만들어 보세요</div>';
+    return;
+  }
+  const modeName = mode => mode === 'ARENA' ? '오래 날기' : '멀리 날기';
+  const phaseName = phase => ({ waiting: '대기 중', countdown: '시작 중', playing: '진행 중', results: '결과' })[phase] || phase;
+  $('room-list').innerHTML = rooms.map(room =>
+    `<div class="room-item"><div><b>${escapeHtml(room.hostName)}님의 ${modeName(room.mode)}</b>` +
+    `<span>${phaseName(room.phase)} · ${room.players}/${room.maxPlayers}명 · ${room.code}</span></div>` +
+    `<button class="action-btn" data-join-code="${room.code}" ${room.joinable ? '' : 'disabled'}>` +
+    `${room.phase === 'playing' ? '관전 참가' : '참가'}</button></div>`).join('');
+}
+
+function joinByCode(code) {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!/^[A-HJ-NP-Z2-9]{6}$/.test(normalized)) {
+    $('lob-status').textContent = '6자리 방 코드를 확인해 주세요';
+    return;
+  }
+  withSession(() => send({ t: 'join', code: normalized }));
 }
 
 $('lob-name').value = localStorage.getItem('pp_name') || '';
-document.querySelectorAll('.mode').forEach(el => {
-  el.addEventListener('click', () => {
-    const name = $('lob-name').value.trim();
-    if (!name) { $('lob-status').textContent = '이름을 입력하세요'; return; }
-    localStorage.setItem('pp_name', name);
-    myName = name;
-    $('lob-status').textContent = '연결 중…';
-    connect(name, el.dataset.mode);
-  });
+document.querySelectorAll('[data-mode]').forEach(button => {
+  button.addEventListener('click', () => withSession(() => send({ t: 'join', mode: button.dataset.mode })));
 });
-$('leave-btn').addEventListener('click', () => enterLobby());
+document.querySelectorAll('[data-create-mode]').forEach(button => {
+  button.addEventListener('click', () => withSession(() => send({
+    t: 'create', mode: button.dataset.createMode,
+    visibility: $('private-room').checked ? 'private' : 'public'
+  })));
+});
+$('join-code-btn').addEventListener('click', () => joinByCode($('room-code').value));
+$('room-code').addEventListener('keydown', event => {
+  if (event.key === 'Enter') joinByCode(event.currentTarget.value);
+});
+$('room-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-join-code]');
+  if (button && !button.disabled) joinByCode(button.dataset.joinCode);
+});
+$('refresh-rooms-btn').addEventListener('click', () => {
+  connect();
+  send({ t: 'list' });
+});
+$('room-start-btn').addEventListener('click', () => {
+  $('room-status').textContent = '라운드를 시작하는 중…';
+  send({ t: 'start' });
+});
+$('room-leave-btn').addEventListener('click', () => send({ t: 'leave' }));
+$('game-leave-btn').addEventListener('click', () => send({ t: 'leave' }));
+$('leave-btn').addEventListener('click', () => send({ t: 'leave' }));
+$('copy-code-btn').addEventListener('click', async () => {
+  const code = $('room-code-display').textContent;
+  try {
+    await navigator.clipboard.writeText(code);
+    $('room-status').textContent = `초대 코드 ${code}를 복사했습니다`;
+  } catch {
+    $('room-status').textContent = `초대 코드: ${code}`;
+  }
+});
 
 /* ============================================================
    Three.js 기본
@@ -826,6 +1069,7 @@ function applyPhase(m) {
 
   if (m.phase === 'countdown') {
     game.phase = 'countdown';
+    net.leaderboard = [];
     game.seed = m.seed;
     game.ends = m.ends;
     game.order = m.order || [];
@@ -846,14 +1090,22 @@ function applyPhase(m) {
     game.phase = 'playing';
     game.ends = m.ends;
     game.frozen = false;
-    // 라운드 도중 입장 → 관전
     if (m.t === 'room') {
-      if (!world.children.length) (game.mode === 'ARENA' ? buildArena : buildDistance)(m.seed);
-      me.alive = false;
-      showCenter(null, '라운드 진행 중', '다음 라운드부터 참가합니다');
+      const role = getLocalRoundRole(m, net.id);
+      if (role === 'spectator') {
+        if (!world.children.length) (game.mode === 'ARENA' ? buildArena : buildDistance)(m.seed);
+        me.alive = false;
+        showCenter(null, '라운드 진행 중', '다음 라운드부터 참가합니다');
+      } else if (role === 'crashed') {
+        me.alive = false;
+        showCenter('비행 종료', '관전 중', '다음 라운드를 기다리세요');
+      } else {
+        me.alive = true;
+        hideCenter();
+      }
     } else {
-      hideCenter();
       me.alive = true;
+      hideCenter();
     }
     return;
   }
@@ -931,20 +1183,23 @@ function showResults(results) {
 }
 
 function refreshBoard() {
-  const rows = [];
-  const mine = {
-    name: myName, score: game.mode === 'ARENA' ? Math.floor(me.surv) : Math.floor(me.dist),
-    alive: me.alive || game.phase !== 'playing', me: true
-  };
-  const all = [mine, ...[...net.players.values()].map(p => ({
-    name: p.name, score: p.score, alive: p.alive, me: false
-  }))];
-  all.sort((a, b) => b.score - a.score);
+  let rows = net.leaderboard.map(row => ({
+    id: row.id, name: row.name, score: row.score, alive: row.alive
+  }));
+  if (!rows.length) {
+    rows = [{
+      id: net.id, name: myName,
+      score: game.mode === 'ARENA' ? Math.floor(me.surv) : Math.floor(me.dist),
+      alive: me.alive || game.phase !== 'playing'
+    }, ...[...net.players.entries()].map(([id, player]) => ({
+      id, name: player.name, score: player.score, alive: player.alive
+    }))].sort((a, b) => b.score - a.score);
+  }
   const unit = game.mode === 'ARENA' ? 's' : 'm';
-  $('b-rows').innerHTML = all.map(p =>
-    `<div class="row ${p.alive ? '' : 'dead'} ${p.me ? 'me' : ''}">
-       <span class="nm">${escapeHtml(p.name)}</span><span class="sc">${p.score}${unit}</span>
-     </div>`).join('');
+  $('b-rows').innerHTML = rows.map((player, index) =>
+    `<div class="row ${player.alive ? '' : 'dead'} ${player.id === net.id ? 'me' : ''}">` +
+    `<span class="nm">${index + 1}. ${escapeHtml(player.name)}</span>` +
+    `<span class="sc">${player.score}${unit}</span></div>`).join('');
 }
 
 /* ============================================================
@@ -957,7 +1212,10 @@ addEventListener('keydown', e => {
   e.preventDefault();
   if (e.code === 'Space') shoot();
 });
-addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('keyup', e => {
+  if (!shouldCaptureGameKey(e)) return;
+  keys[e.code] = false;
+});
 
 /* ============================================================
    메인 루프
@@ -1174,6 +1432,9 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+/* 로비가 보이는 즉시 공개 방 목록을 요청합니다. 이름은 방 참가 시에만 전송합니다. */
+connect();
 </script>
 </body>
 </html>

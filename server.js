@@ -60,12 +60,28 @@ const sessions = new Map(); // token -> { name, wins }
 /* ---------- 방 ---------- */
 const ROUND_SEC = { DIST: 150, ARENA: 180 };
 const MAX_PLAYERS = 8;
+const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let roomSeq = 0;
 const rooms = new Map();
+let roomListCache = null;
+let roomListBroadcastTimer = null;
 
-function makeRoom(mode) {
+function makeRoomCode() {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    let code = '';
+    for (let i = 0; i < 6; i++) code += ROOM_CODE_ALPHABET[crypto.randomInt(ROOM_CODE_ALPHABET.length)];
+    if (![...rooms.values()].some(room => room.code === code)) return code;
+  }
+  throw new Error('unable to allocate room code');
+}
+
+function makeRoom(mode, visibility = 'public') {
   const room = {
     id: 'r' + (++roomSeq),
+    code: makeRoomCode(),
+    visibility: visibility === 'private' ? 'private' : 'public',
+    hostId: null,
+    createdAt: Date.now(),
     mode,
     players: new Map(),   // id -> player
     phase: 'waiting',
@@ -74,6 +90,7 @@ function makeRoom(mode) {
     order: [],            // 이번 라운드 참가자 (스폰 순서 결정)
     startedAt: 0,
     startedWith: 0,
+    results: [],
     timer: null
   };
   rooms.set(room.id, room);
@@ -81,9 +98,11 @@ function makeRoom(mode) {
 }
 
 function findRoom(mode) {
-  for (const r of rooms.values())
-    if (r.mode === mode && r.players.size < MAX_PLAYERS) return r;
-  return makeRoom(mode);
+  for (const room of rooms.values()) {
+    if (room.visibility === 'public' && room.mode === mode && room.phase === 'waiting' &&
+        room.players.size < MAX_PLAYERS) return room;
+  }
+  return makeRoom(mode, 'public');
 }
 
 function bcast(room, msg, exceptId) {
@@ -118,31 +137,114 @@ function expectedSpawn(room, playerId) {
   return [Math.cos(angle) * 130, 130, Math.sin(angle) * 130];
 }
 
+function roomSummary(room) {
+  const host = room.players.get(room.hostId);
+  return {
+    code: room.code,
+    mode: room.mode,
+    phase: room.phase,
+    players: room.players.size,
+    maxPlayers: MAX_PLAYERS,
+    hostName: host ? host.name : '무명',
+    joinable: room.players.size < MAX_PLAYERS
+  };
+}
+
+function roomListMessage() {
+  return {
+    t: 'rooms',
+    rooms: [...rooms.values()]
+      .filter(room => room.visibility === 'public' && room.players.size > 0)
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map(roomSummary)
+  };
+}
+
+function serializedRoomList() {
+  if (roomListCache === null) roomListCache = JSON.stringify(roomListMessage());
+  return roomListCache;
+}
+
+function sendSerialized(ws, message) {
+  if (ws.readyState !== 1) return;
+  if (ws.bufferedAmount > 256 * 1024) {
+    ws.terminate();
+    return;
+  }
+  ws.send(message);
+}
+
+function sendJson(ws, message) {
+  if (ws.readyState === 1 && ws.bufferedAmount <= 256 * 1024) ws.send(JSON.stringify(message));
+}
+
+function broadcastRoomList() {
+  roomListCache = null;
+  if (roomListBroadcastTimer) return;
+  roomListBroadcastTimer = setTimeout(() => {
+    roomListBroadcastTimer = null;
+    const message = serializedRoomList();
+    for (const client of wss.clients) {
+      if (client.roomListSubscribed) sendSerialized(client, message);
+    }
+  }, 100);
+  roomListBroadcastTimer.unref();
+}
+
 function snapshot(room) {
   return {
     t: 'room',
+    id: room.id,
+    code: room.code,
+    visibility: room.visibility,
+    hostId: room.hostId,
+    maxPlayers: MAX_PLAYERS,
     mode: room.mode,
     phase: room.phase,
     seed: room.seed,
     ends: room.phaseEnds,
     order: room.order,
+    results: room.results,
     players: [...room.players.values()].map(p => ({
       id: p.id, name: p.name, wins: p.wins, alive: p.alive
     }))
   };
 }
 
-/* ---------- 라운드 흐름 ---------- */
-function tryStart(room) {
-  if (room.phase === 'waiting' && room.players.size > 0) startCountdown(room);
+function removePlayerFromRoom(room, player) {
+  room.players.delete(player.id);
+  room.order = room.order.filter(id => id !== player.id);
+  bcast(room, { t: 'pl', id: player.id });
+  if (room.hostId === player.id) room.hostId = room.players.keys().next().value || null;
+  if (room.players.size === 0) {
+    clearTimeout(room.timer);
+    rooms.delete(room.id);
+  } else {
+    bcast(room, snapshot(room));
+    checkEarlyEnd(room);
+  }
+  broadcastRoomList();
 }
 
+function resetPlayerForRoom(player) {
+  player.alive = false;
+  player.score = 0;
+  player.state = null;
+  player.stateAt = 0;
+  player.movementBudget = 40;
+  player.movementAt = Date.now();
+  player.shots = [];
+  player.lastShotAt = 0;
+}
+
+/* ---------- 라운드 흐름 ---------- */
 function startCountdown(room) {
   clearTimeout(room.timer);
   room.phase = 'countdown';
   room.seed = (Math.random() * 0x7fffffff) | 0;
   room.phaseEnds = Date.now() + 4000;
   room.order = [...room.players.keys()];
+  room.results = [];
   for (const p of room.players.values()) {
     p.alive = true;
     p.score = 0;
@@ -163,6 +265,7 @@ function startPlaying(room) {
   room.startedWith = room.order.filter(id => room.players.has(id)).length;
   room.phaseEnds = Date.now() + ROUND_SEC[room.mode] * 1000;
   bcast(room, { t: 'phase', phase: 'playing', ends: room.phaseEnds });
+  broadcastRoomList();
   room.timer = setTimeout(() => endRound(room), ROUND_SEC[room.mode] * 1000);
 }
 
@@ -193,9 +296,19 @@ function endRound(room) {
     }
   }
 
+  room.results = results;
   room.phaseEnds = Date.now() + 7000;
   bcast(room, { t: 'phase', phase: 'results', results, ends: room.phaseEnds });
-  room.timer = setTimeout(() => { room.phase = 'waiting'; tryStart(room); }, 7000);
+  broadcastRoomList();
+  room.timer = setTimeout(() => {
+    room.phase = 'waiting';
+    room.phaseEnds = 0;
+    room.order = [];
+    room.results = [];
+    for (const player of room.players.values()) player.alive = false;
+    bcast(room, snapshot(room));
+    broadcastRoomList();
+  }, 7000);
 }
 
 function onCrash(room, player, byName) {
@@ -224,6 +337,26 @@ function checkEarlyEnd(room) {
   }
 }
 
+function leaderboardMessage(room, now = Date.now()) {
+  const rows = room.order
+    .map(id => room.players.get(id))
+    .filter(Boolean)
+    .map(player => {
+      const liveScore = room.mode === 'ARENA' && room.phase === 'playing' && player.alive
+        ? (now - room.startedAt) / 1000
+        : player.score;
+      return {
+        id: player.id,
+        name: player.name,
+        score: Math.round(liveScore * 10) / 10,
+        alive: player.alive,
+        wins: player.wins
+      };
+    })
+    .sort((a, b) => b.score - a.score || Number(b.alive) - Number(a.alive));
+  return { t: 'leaderboard', rows };
+}
+
 /* ---------- 접속 ---------- */
 wss.on('connection', (ws) => {
   if (wss.clients.size > 1000) {
@@ -234,6 +367,8 @@ wss.on('connection', (ws) => {
   let room = null;
   let messageWindowStarted = Date.now();
   let messageCount = 0;
+  ws.roomListSubscribed = false;
+  ws.lastRoomListSentAt = 0;
 
   ws.on('error', (err) => {
     if (err.code !== 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH')
@@ -254,6 +389,16 @@ wss.on('connection', (ws) => {
     let m;
     try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m !== 'object' || Array.isArray(m)) return;
+
+    /* -- 공개 방 목록은 세션 확립 전에도 조회할 수 있습니다 -- */
+    if (m.t === 'list') {
+      ws.roomListSubscribed = true;
+      if (now - ws.lastRoomListSentAt >= 1000) {
+        ws.lastRoomListSentAt = now;
+        sendSerialized(ws, serializedRoomList());
+      }
+      return;
+    }
 
     /* -- 세션 확립 -- */
     if (m.t === 'hello') {
@@ -287,44 +432,95 @@ wss.on('connection', (ws) => {
     }
     if (!me) return;
 
-    /* -- 방 입장 -- */
-    if (m.t === 'join') {
+    /* -- 로비/대기방 이름 변경 -- */
+    if (m.t === 'rename') {
+      const name = String(m.name || '').slice(0, 12).trim();
+      if (!name) return;
+      me.name = name;
+      const session = sessions.get(me.token);
+      if (session) session.name = name;
       if (room) {
-        room.players.delete(me.id);
-        if (room.phase === 'countdown') room.order = room.order.filter(id => id !== me.id);
-        bcast(room, { t: 'pl', id: me.id });
-        checkEarlyEnd(room);
+        bcast(room, snapshot(room));
+        if (room.visibility === 'public' && room.hostId === me.id) broadcastRoomList();
       }
-      room = findRoom(m.mode === 'ARENA' ? 'ARENA' : 'DIST');
-      me.alive = false;
-      me.score = 0;
-      me.state = null;
-      me.stateAt = 0;
-      me.movementBudget = 40;
-      me.movementAt = Date.now();
-      me.shots = [];
-      me.lastShotAt = 0;
-      room.players.set(me.id, me);
-
-      // 카운트다운 중이면 이번 라운드에 합류시킵니다
-      if (room.phase === 'countdown') {
-        room.order.push(me.id);
-        me.alive = true;
-      }
-
-      // 스냅샷(모드 포함)을 먼저 보낸 뒤 페이즈를 알립니다
-      ws.send(JSON.stringify(snapshot(room)));
-      if (room.phase === 'countdown') {
-        bcast(room, {
-          t: 'phase', phase: 'countdown',
-          seed: room.seed, ends: room.phaseEnds, order: room.order
-        });
-      }
-      bcast(room, { t: 'pj', pl: { id: me.id, name: me.name, wins: me.wins } }, me.id);
-      tryStart(room);
       return;
     }
+
+    /* -- 새 방 생성 -- */
+    if (m.t === 'create') {
+      ws.roomListSubscribed = false;
+      if (room) removePlayerFromRoom(room, me);
+      room = makeRoom(m.mode === 'ARENA' ? 'ARENA' : 'DIST', m.visibility);
+      room.hostId = me.id;
+      resetPlayerForRoom(me);
+      room.players.set(me.id, me);
+      sendJson(ws, snapshot(room));
+      broadcastRoomList();
+      return;
+    }
+
+    /* -- 방 입장(코드) 또는 빠른 참가(모드) -- */
+    if (m.t === 'join') {
+      let targetRoom;
+      if (typeof m.code === 'string' && m.code.trim()) {
+        const code = m.code.trim().toUpperCase();
+        targetRoom = [...rooms.values()].find(candidate => candidate.code === code);
+        if (!targetRoom) {
+          sendJson(ws, { t: 'error', code: 'ROOM_NOT_FOUND', message: '방 코드를 확인해 주세요' });
+          return;
+        }
+      } else {
+        targetRoom = findRoom(m.mode === 'ARENA' ? 'ARENA' : 'DIST');
+      }
+      if (targetRoom.players.size >= MAX_PLAYERS && !targetRoom.players.has(me.id)) {
+        sendJson(ws, { t: 'error', code: 'ROOM_FULL', message: '방이 가득 찼습니다' });
+        return;
+      }
+      ws.roomListSubscribed = false;
+      if (room === targetRoom) {
+        sendJson(ws, snapshot(room));
+        return;
+      }
+
+      if (room) removePlayerFromRoom(room, me);
+
+      room = targetRoom;
+      resetPlayerForRoom(me);
+      room.players.set(me.id, me);
+      if (!room.hostId) room.hostId = me.id;
+
+      bcast(room, snapshot(room));
+      bcast(room, { t: 'pj', pl: { id: me.id, name: me.name, wins: me.wins } }, me.id);
+      broadcastRoomList();
+      return;
+    }
+
+    /* -- 연결을 유지한 채 방에서 나가기 -- */
+    if (m.t === 'leave') {
+      if (room) removePlayerFromRoom(room, me);
+      room = null;
+      me.alive = false;
+      me.state = null;
+      sendJson(ws, { t: 'left' });
+      return;
+    }
+
     if (!room) return;
+
+    /* -- 라운드 시작은 현재 방장만 요청할 수 있습니다 -- */
+    if (m.t === 'start') {
+      if (room.hostId !== me.id) {
+        sendJson(ws, { t: 'error', code: 'NOT_HOST', message: '방장만 시작할 수 있습니다' });
+        return;
+      }
+      if (room.phase !== 'waiting') {
+        sendJson(ws, { t: 'error', code: 'ROOM_NOT_WAITING', message: '대기 중인 방만 시작할 수 있습니다' });
+        return;
+      }
+      startCountdown(room);
+      broadcastRoomList();
+      return;
+    }
 
     /* -- 비행 상태 (클라이언트 → 15Hz) -- */
     if (m.t === 's') {
@@ -396,14 +592,8 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (!room || !me) return;
-    room.players.delete(me.id);
-    bcast(room, { t: 'pl', id: me.id });
-    if (room.players.size === 0) {
-      clearTimeout(room.timer);
-      rooms.delete(room.id);
-    } else {
-      checkEarlyEnd(room);
-    }
+    removePlayerFromRoom(room, me);
+    room = null;
   });
 });
 
@@ -418,6 +608,14 @@ const stateBroadcastTimer = setInterval(() => {
   }
 }, 50);
 stateBroadcastTimer.unref();
+
+const leaderboardBroadcastTimer = setInterval(() => {
+  const now = Date.now();
+  for (const room of rooms.values()) {
+    if (room.phase === 'playing') bcast(room, leaderboardMessage(room, now));
+  }
+}, 250);
+leaderboardBroadcastTimer.unref();
 
 if (require.main === module) {
   httpServer.listen(PORT, () => {

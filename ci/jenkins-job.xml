@@ -1,0 +1,248 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+  <actions/>
+  <description>Webhook-driven deployment skeleton for don-t-land/dev to dontland. Uses Jenkins credentials, password-only SSH, immutable releases, and optional deploy verification scripts.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.46.0">
+      <projectUrl>https://github.com/don-t-land/dev/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.BooleanParameterDefinition>
+          <name>VERIFY_ONLY</name>
+          <description>Verify Jenkins-to-dontland SSH authentication without checking out or deploying source.</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>ENABLE_LINGER</name>
+          <description>One-time: enable the dontland user systemd manager at boot via sudo.</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>30</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </org.jenkinsci.plugins.workflow.job.properties.BuildDiscarderProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+      <abortPrevious>false</abortPrevious>
+    </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.46.0">
+          <spec></spec>
+        </com.cloudbees.jenkins.GitHubPushTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+    <script><![CDATA[pipeline {
+  agent any
+
+  options {
+    timestamps()
+    skipDefaultCheckout(true)
+  }
+
+  environment {
+    DEPLOY_HOST = '14.57.213.247'
+    DEPLOY_PORT = '51292'
+    DEPLOY_ROOT = '/home/ovily/appdata/dev'
+  }
+
+  stages {
+    stage('Verify dontland SSH') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dontland-idpw', usernameVariable: 'DONTLAND_USER', passwordVariable: 'DONTLAND_PASSWORD')]) {
+          sh '''
+            set -eu
+            ASKPASS=$(mktemp)
+            cleanup() { rm -f "$ASKPASS"; }
+            trap cleanup EXIT HUP INT TERM
+            printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "$DONTLAND_PASSWORD"' > "$ASKPASS"
+            chmod 700 "$ASKPASS"
+            export SSH_ASKPASS="$ASKPASS" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
+            setsid -w ssh \
+              -o BatchMode=no \
+              -o PreferredAuthentications=password,keyboard-interactive \
+              -o PubkeyAuthentication=no \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile=/var/jenkins_home/.ssh/known_hosts \
+              -o ConnectTimeout=10 \
+              -p "$DEPLOY_PORT" \
+              "$DONTLAND_USER@$DEPLOY_HOST" \
+              'set -eu; mkdir -p "$HOME/appdata/dev/releases" "$HOME/appdata/dev/shared"; test -w "$HOME/appdata/dev"; linger=$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || printf unknown); printf "dontland-ssh-ok host=%s user=%s linger=%s\\n" "$(hostname)" "$(id -un)" "$linger"'
+          '''
+        }
+      }
+    }
+
+    stage('Enable persistent user service') {
+      when { expression { params.ENABLE_LINGER } }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dontland-idpw', usernameVariable: 'DONTLAND_USER', passwordVariable: 'DONTLAND_PASSWORD')]) {
+          sh '''
+            set -eu
+            ASKPASS=$(mktemp)
+            cleanup() { rm -f "$ASKPASS"; }
+            trap cleanup EXIT HUP INT TERM
+            printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "$DONTLAND_PASSWORD"' > "$ASKPASS"
+            chmod 700 "$ASKPASS"
+            export SSH_ASKPASS="$ASKPASS" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
+            set +x
+            printf '%s\n' "$DONTLAND_PASSWORD" | setsid -w ssh \
+              -o BatchMode=no \
+              -o PreferredAuthentications=password,keyboard-interactive \
+              -o PubkeyAuthentication=no \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile=/var/jenkins_home/.ssh/known_hosts \
+              -o ConnectTimeout=10 \
+              -p "$DEPLOY_PORT" \
+              "$DONTLAND_USER@$DEPLOY_HOST" \
+              'sudo -S -p "" loginctl enable-linger "$(id -un)" && test "$(loginctl show-user "$(id -un)" -p Linger --value)" = yes'
+            set -x
+            echo 'dontland-user-linger-enabled'
+          '''
+        }
+      }
+    }
+
+    stage('Verify GitHub checkout auth') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'github-dontland-dev-idpw', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+          sh '''
+            set -eu
+            ASKPASS=$(mktemp)
+            cleanup() { rm -f "$ASKPASS"; }
+            trap cleanup EXIT HUP INT TERM
+            printf '%s\n' '#!/bin/sh' 'case "$1" in' '*Username*) printf "%s\\n" "$GITHUB_USER" ;;' '*) printf "%s\\n" "$GITHUB_TOKEN" ;;' 'esac' > "$ASKPASS"
+            chmod 700 "$ASKPASS"
+            GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 git ls-remote https://github.com/don-t-land/dev.git >/dev/null
+            echo 'github-checkout-auth-ok repo=don-t-land/dev'
+          '''
+        }
+      }
+    }
+
+    stage('Checkout main') {
+      when { expression { !params.VERIFY_ONLY } }
+      steps {
+        deleteDir()
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: '*/main']],
+          extensions: [[$class: 'CloneOption', shallow: true, depth: 20, noTags: false, timeout: 10]],
+          userRemoteConfigs: [[
+            url: 'https://github.com/don-t-land/dev.git',
+            credentialsId: 'github-dontland-dev-idpw'
+          ]]
+        ])
+        sh 'git rev-parse HEAD > .deployed-commit'
+      }
+    }
+
+    stage('Test') {
+      when { expression { !params.VERIFY_ONLY } }
+      steps {
+        sh '''
+          set -eu
+          NODE_VERSION=v24.19.0
+          case "$(uname -m)" in
+            x86_64)
+              NODE_ARCH=x64
+              NODE_SHA256=f625d97cd707df4ff96254916fbc5ff014f09c09effe5a1e0ca8f6d41a8789d4
+              ;;
+            aarch64|arm64)
+              NODE_ARCH=arm64
+              NODE_SHA256=d28c8a5bf0a808f0ed434a1dce8c54ae98f0371c0bd86ac58abc613f73e6643f
+              ;;
+            *) echo "Unsupported Jenkins architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          NODE_DIST="node-$NODE_VERSION-linux-$NODE_ARCH"
+          NODE_HOME="/var/jenkins_home/tools/$NODE_DIST"
+          if [ ! -x "$NODE_HOME/bin/node" ]; then
+            tmp=$(mktemp -d)
+            trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+            base="https://nodejs.org/dist/$NODE_VERSION"
+            curl -fsSLo "$tmp/$NODE_DIST.tar.gz" "$base/$NODE_DIST.tar.gz"
+            actual=$(sha256sum "$tmp/$NODE_DIST.tar.gz" | cut -d' ' -f1)
+            [ "$actual" = "$NODE_SHA256" ]
+            mkdir -p /var/jenkins_home/tools
+            tar -xzf "$tmp/$NODE_DIST.tar.gz" -C /var/jenkins_home/tools
+            rm -rf "$tmp"
+            trap - EXIT HUP INT TERM
+          fi
+          export PATH="$NODE_HOME/bin:$PATH"
+          node --version
+          npm ci --no-audit --no-fund
+          npm test
+        '''
+      }
+    }
+
+    stage('Deploy immutable release') {
+      when { expression { !params.VERIFY_ONLY } }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dontland-idpw', usernameVariable: 'DONTLAND_USER', passwordVariable: 'DONTLAND_PASSWORD')]) {
+          sh '''
+            set -eu
+            ASKPASS=$(mktemp)
+            cleanup() { rm -f "$ASKPASS"; }
+            trap cleanup EXIT HUP INT TERM
+            printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "$DONTLAND_PASSWORD"' > "$ASKPASS"
+            chmod 700 "$ASKPASS"
+            export SSH_ASKPASS="$ASKPASS" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
+            SSH_BASE="-o BatchMode=no -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/var/jenkins_home/.ssh/known_hosts -o ConnectTimeout=10 -p $DEPLOY_PORT"
+            RELEASE="$DEPLOY_ROOT/releases/$BUILD_NUMBER"
+
+            setsid -w ssh $SSH_BASE "$DONTLAND_USER@$DEPLOY_HOST" "set -eu; rm -rf '$RELEASE'; mkdir -p '$RELEASE'"
+            tar --exclude='.git' --exclude='./.git' --exclude='node_modules' --exclude='./node_modules' -czf - . | setsid -w ssh $SSH_BASE "$DONTLAND_USER@$DEPLOY_HOST" "tar -xzf - -C '$RELEASE'"
+            setsid -w ssh $SSH_BASE "$DONTLAND_USER@$DEPLOY_HOST" "DEPLOY_ROOT='$DEPLOY_ROOT' RELEASE='$RELEASE' BUILD_NUMBER='$BUILD_NUMBER' sh -s" <<'REMOTE'
+set -eu
+previous=$(readlink "$DEPLOY_ROOT/current" 2>/dev/null || true)
+if [ -x "$RELEASE/deploy/dontland.sh" ]; then
+  DEPLOY_ROOT="$DEPLOY_ROOT" DEPLOY_PHASE=prepare "$RELEASE/deploy/dontland.sh"
+fi
+ln -sfn "$RELEASE" "$DEPLOY_ROOT/current.next"
+mv -Tf "$DEPLOY_ROOT/current.next" "$DEPLOY_ROOT/current"
+rollback() {
+  if [ -n "$previous" ] && [ -d "$previous" ]; then
+    ln -sfn "$previous" "$DEPLOY_ROOT/current.rollback"
+    mv -Tf "$DEPLOY_ROOT/current.rollback" "$DEPLOY_ROOT/current"
+  fi
+}
+if [ -x "$RELEASE/deploy/dontland.sh" ]; then
+  if ! DEPLOY_ROOT="$DEPLOY_ROOT" DEPLOY_PHASE=activate PREVIOUS_RELEASE="$previous" "$RELEASE/deploy/dontland.sh"; then rollback; exit 1; fi
+elif [ -x "$RELEASE/deploy.sh" ]; then
+  if ! PREVIOUS_RELEASE="$previous" "$RELEASE/deploy.sh"; then rollback; exit 1; fi
+else
+  echo 'No deploy hook found; source release activated only.'
+fi
+printf 'deployed_release=%s\n' "$RELEASE"
+REMOTE
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs(deleteDirs: true, notFailBuild: true)
+    }
+  }
+}
+]]></script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

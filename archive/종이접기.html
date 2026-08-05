@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>접는 방 · 종이비행기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#151b2b;
+  --ink-soft:#5a6478;
+  --paper:#fbf8f1;
+  --field:#e6eaf1;
+  --line:#c9d1de;
+  --valley:#2f4bd8;   /* 골접기 — 도면에서 파선 */
+  --mountain:#d1503c; /* 산접기 — 도면에서 일점쇄선 */
+  --gold:#b98a2e;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--field);
+  font-family:'IBM Plex Sans KR',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  color:var(--ink);-webkit-font-smoothing:antialiased}
+canvas{display:block;position:fixed;inset:0;touch-action:none;cursor:none}
+
+.panel{position:fixed;background:rgba(255,255,255,.82);backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);border:1px solid rgba(21,27,43,.10);
+  border-radius:4px;box-shadow:0 10px 34px -18px rgba(21,27,43,.5)}
+
+/* ── 머리말 ── */
+#head{top:16px;left:16px;padding:12px 16px 11px}
+#head h1{margin:0;font-family:'Gowun Batang',serif;font-size:19px;font-weight:700;letter-spacing:-.01em}
+#head p{margin:3px 0 0;font-size:11.5px;color:var(--ink-soft);letter-spacing:.02em}
+#stat{margin-top:8px;display:flex;gap:14px;font-size:10.5px;color:var(--ink-soft);
+  border-top:1px solid rgba(21,27,43,.08);padding-top:7px}
+#stat b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ── 도구 ── */
+#right{position:fixed;top:16px;right:16px;width:250px;display:flex;flex-direction:column;gap:10px;
+  max-height:calc(100vh - 32px)}
+#tools{position:relative;top:auto;right:auto;padding:14px;flex:0 0 auto}
+.lab{font-size:10px;letter-spacing:.14em;color:var(--ink-soft);margin:0 0 6px;text-transform:uppercase}
+.seg{display:flex;gap:6px;margin-bottom:13px}
+.seg button{flex:1;padding:8px 4px;border:1px solid var(--line);background:#fff;border-radius:3px;
+  font:inherit;font-size:11.5px;color:var(--ink-soft);cursor:pointer;transition:.15s;line-height:1.35}
+.seg button span{display:block;font-size:9.5px;opacity:.7;margin-top:1px}
+.seg button:hover{border-color:var(--ink-soft)}
+.seg button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.seg button.on.v{background:var(--valley);border-color:var(--valley)}
+.seg button.on.m{background:var(--mountain);border-color:var(--mountain)}
+.row{display:flex;gap:6px}
+.btn{flex:1;padding:9px 6px;border:1px solid var(--line);background:#fff;border-radius:3px;
+  font:inherit;font-size:12px;cursor:pointer;transition:.15s;color:var(--ink)}
+.btn:hover{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn:disabled{opacity:.35;cursor:default}
+.btn:disabled:hover{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn.hero{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
+.btn.hero:hover{background:#a67a24;border-color:#a67a24}
+.chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);
+  margin:12px 0 0;cursor:pointer;user-select:none}
+.chk input{accent-color:var(--valley);width:15px;height:15px}
+hr{border:0;border-top:1px solid rgba(21,27,43,.09);margin:13px 0}
+
+/* ── 도면(가이드) ── */
+#guide{position:relative;top:auto;right:auto;padding:14px;min-height:0;overflow:auto;flex:0 1 auto}
+#guide h2{margin:0 0 2px;font-family:'Gowun Batang',serif;font-size:15px;font-weight:700}
+#guide .sub{font-size:11px;color:var(--ink-soft);margin:0 0 11px}
+.step{display:flex;gap:9px;padding:7px 8px;border-radius:3px;margin:0 -8px;cursor:pointer;transition:.15s}
+.step:hover{background:rgba(21,27,43,.04)}
+.step .n{font-family:'IBM Plex Sans KR';font-size:10px;font-weight:600;color:var(--line);
+  padding-top:2px;font-variant-numeric:tabular-nums;min-width:15px}
+.step .t{font-size:12px;line-height:1.45}
+.step .d{font-size:10.5px;color:var(--ink-soft);line-height:1.5;margin-top:2px;display:none}
+.step.cur{background:rgba(47,75,216,.07)}
+.step.cur .n{color:var(--valley)}
+.step.cur .t{font-weight:600}
+.step.cur .d{display:block}
+.step.done .t{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--line)}
+.step.done .n{color:var(--gold)}
+
+/* ── 완성 패널 ── */
+#finish{left:16px;bottom:16px;width:250px;padding:14px;display:none}
+#finish h2{margin:0 0 10px;font-family:'Gowun Batang',serif;font-size:15px}
+.sl{margin-bottom:11px}
+.sl label{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-bottom:5px}
+.sl label b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.sl input{width:100%;accent-color:var(--gold);margin:0}
+
+/* ── 안내 ── */
+#hint{left:50%;transform:translateX(-50%);bottom:18px;padding:9px 18px;font-size:12px;color:var(--ink-soft);
+  border-radius:100px;pointer-events:none}
+#hint b{color:var(--ink);font-weight:600}
+#toast{left:50%;transform:translateX(-50%);top:76px;padding:10px 18px;font-size:12.5px;
+  background:var(--ink);color:#fff;border:0;border-radius:100px;opacity:0;transition:.25s;pointer-events:none}
+#toast.on{opacity:1}
+#tag{position:fixed;pointer-events:none;padding:3px 8px;border-radius:2px;font-size:10px;
+  letter-spacing:.06em;background:var(--ink);color:#fff;opacity:0;transition:opacity .12s;z-index:5}
+#tag.on{opacity:.92}
+
+@media (max-width:820px){
+  #head{top:8px;left:8px;padding:8px 12px}#head h1{font-size:15px}#head p,#stat{display:none}
+  #right{top:auto;bottom:8px;left:8px;right:8px;width:auto;flex-direction:column-reverse;max-height:56vh}
+  #tools{padding:11px}
+  .lab{margin-bottom:5px}.seg{margin-bottom:9px}
+  #guide{padding:11px 12px}
+  #guide h2,#guide .sub{display:none}
+  .step{display:none;margin:0;padding:0}.step.cur{display:flex;background:none}
+  #hint{display:none}#finish{left:8px;right:8px;bottom:8px;width:auto}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="panel" id="head">
+  <h1>접는 방</h1>
+  <p>종이 한 장 · 접고 싶은 대로</p>
+  <div id="stat"><span>접은 횟수 <b id="sFold">0</b></span><span>겹 <b id="sLayer">1</b></span></div>
+</div>
+
+<div id="right">
+<div class="panel" id="tools">
+  <div class="grp">
+    <p class="lab">접는 방향</p>
+    <div class="seg" id="segDir">
+      <button data-v="1" class="on v">골접기<span>앞으로</span></button>
+      <button data-v="-1">산접기<span>뒤로</span></button>
+    </div>
+  </div>
+  <div class="grp">
+    <p class="lab">접는 범위</p>
+    <div class="seg" id="segMode">
+      <button data-v="all" class="on">전체<span>모든 겹</span></button>
+      <button data-v="wing">날개<span>위·아래 따로</span></button>
+    </div>
+  </div>
+  <div class="grp">
+    <hr>
+    <div class="row">
+      <button class="btn" id="bUndo">한 번 펴기</button>
+      <button class="btn" id="bReset">새 종이</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn" id="bView">시점 되돌리기</button>
+      <button class="btn hero" id="bFinish">완성하기</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="cSnap" checked> 모서리에 자석처럼 붙이기</label>
+  </div>
+</div>
+
+<div class="panel" id="guide">
+  <h2>종이비행기 도면</h2>
+  <p class="sub">빛나는 점을 잡고 표시된 곳까지 끌어요</p>
+  <div id="steps"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn" id="bAuto">이 단계 접어주기</button>
+    <button class="btn" id="bFree" style="flex:0 0 82px">도면 끄기</button>
+  </div>
+</div>
+</div>
+
+<div class="panel" id="finish">
+  <h2>날개 펴기</h2>
+  <div id="sliders"></div>
+  <div class="row">
+    <button class="btn" id="bFly">날리기</button>
+    <button class="btn" id="bEdit">다시 접기</button>
+  </div>
+</div>
+
+<div class="panel" id="hint"><b>끌어서</b> 접기 · 커서가 <b>꼭짓점·중점·교차점</b>에 달라붙어요</div>
+<div class="panel" id="toast"></div>
+<div id="tag"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+const TH = 0.0075;              // 겹 두께
+const PW = 2.0, PH = 2.8;       // 종이 크기
+
+/* ══════════ 장면 ══════════ */
+const canvas = $('#c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e6eaf1');
+
+const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+camera.up.set(0,0,1);
+const CAM0 = {r:7.4, th:-Math.PI/2, ph:0.42};
+let cam = Object.assign({}, CAM0);
+function placeCam(){
+  camera.position.set(
+    cam.r*Math.sin(cam.ph)*Math.cos(cam.th),
+    cam.r*Math.sin(cam.ph)*Math.sin(cam.th),
+    cam.r*Math.cos(cam.ph));
+  camera.lookAt(0,0,0);
+}
+placeCam();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa6b8, 0.62));
+const key = new THREE.DirectionalLight(0xfff6e8, 0.8);
+key.position.set(3.5,-5,8); key.castShadow = true;
+key.shadow.mapSize.set(1024,1024);
+const sc = key.shadow.camera;
+sc.left=-3.6; sc.right=3.6; sc.top=3.6; sc.bottom=-3.6; sc.near=1; sc.far=22;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xdce7ff, 0.28);
+fill.position.set(-5,4,4); scene.add(fill);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40,40),
+  new THREE.ShadowMaterial({opacity:0.15}));
+ground.position.z = -0.5; ground.receiveShadow = true; scene.add(ground);
+
+const model = new THREE.Group(); scene.add(model);
+
+const matFront = new THREE.MeshStandardMaterial({color:0xfbf8f1, roughness:.94, metalness:0,
+  side:THREE.FrontSide, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1});
+const matBack  = new THREE.MeshStandardMaterial({color:0xb9c9e2, roughness:.94, metalness:0,
+  side:THREE.BackSide,  polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1});
+const matEdge  = new THREE.LineBasicMaterial({color:0x151b2b, transparent:true, opacity:.22});
+
+let meshF, meshB, meshE;
+
+/* ══════════ 상태 ══════════ */
+// face: {poly:[[x,y]…], layer:int, folds:[foldIndex…]}
+// fold: {A:[x,y], d:[dx,dy], dir:+1|-1}   ※ 왼쪽법선 n=(-dy,dx)이 접히는 쪽
+let faces=[], folds=[], history=[], angles={}, anim=null, flying=null, snapCache=null;
+let dirSel=1, modeSel='all', snap=true, guideOn=true, gi=0, finished=false;
+
+function newPaper(){
+  faces=[{poly:[[-PW/2,-PH/2],[PW/2,-PH/2],[PW/2,PH/2],[-PW/2,PH/2]], layer:0, folds:[]}];
+  folds=[]; history=[]; angles={}; anim=null; gi=0; finished=false; snapCache=null;
+  model.position.set(0,0,0); model.rotation.set(0,0,0);
+  $('#finish').style.display='none'; $('#right').style.display='';
+  refresh(); drawSteps(); stats();
+}
+
+/* ── 기하 도우미 ── */
+function area(p){let a=0;for(let i=0;i<p.length;i++){const j=(i+1)%p.length;a+=p[i][0]*p[j][1]-p[j][0]*p[i][1];}return a/2;}
+function splitPoly(poly, A, n){
+  const E=1e-9, d=poly.map(p=>(p[0]-A[0])*n[0]+(p[1]-A[1])*n[1]);
+  const pos=[], neg=[];
+  for(let i=0;i<poly.length;i++){
+    const j=(i+1)%poly.length, di=d[i], dj=d[j];
+    if(di>=-E) pos.push(poly[i]);
+    if(di<= E) neg.push(poly[i]);
+    if((di>E&&dj<-E)||(di<-E&&dj>E)){
+      const t=di/(di-dj);
+      const ip=[poly[i][0]+t*(poly[j][0]-poly[i][0]), poly[i][1]+t*(poly[j][1]-poly[i][1])];
+      pos.push(ip); neg.push(ip);
+    }
+  }
+  const ok = p => (p.length>=3 && Math.abs(area(p))>1e-6) ? p : null;
+  return [ok(pos), ok(neg)];
+}
+function reflect(p,A,n){const s=(p[0]-A[0])*n[0]+(p[1]-A[1])*n[1];return [p[0]-2*s*n[0], p[1]-2*s*n[1]];}
+function ranks(){
+  const s=[...new Set(faces.map(f=>f.layer))].sort((a,b)=>a-b);
+  const m=new Map(); s.forEach((v,i)=>m.set(v,i)); return m;
+}
+function normalize(){const m=ranks(); faces.forEach(f=>f.layer=m.get(f.layer)); snapCache=null;}
+
+/* ── 접기 ── */
+function foldMatrix(fd, theta){
+  const M=new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(fd.d[0],fd.d[1],0).normalize(), fd.dir*theta);
+  return new THREE.Matrix4().makeTranslation(fd.A[0],fd.A[1],0)
+    .multiply(M).multiply(new THREE.Matrix4().makeTranslation(-fd.A[0],-fd.A[1],0));
+}
+function facePts(f){
+  const pts=f.poly.map(p=>new THREE.Vector3(p[0],p[1],0));
+  for(let i=f.folds.length-1;i>=0;i--){const M=foldMatrix(folds[f.folds[i]],Math.PI); pts.forEach(p=>p.applyMatrix4(M));}
+  for(let i=0;i<f.folds.length;i++){
+    const k=f.folds[i], th=(angles[k]!==undefined)?angles[k]:Math.PI;
+    const M=foldMatrix(folds[k],th); pts.forEach(p=>p.applyMatrix4(M));
+  }
+  const dz=f.layer*TH; pts.forEach(p=>p.z+=dz);
+  return pts;
+}
+
+// P를 Q로 끌었을 때의 접기. filter(rank)=true 인 겹만 움직임
+function doFold(P,Q,dir,filter){
+  const A=[(P[0]+Q[0])/2,(P[1]+Q[1])/2];
+  let nx=P[0]-A[0], ny=P[1]-A[1]; const L=Math.hypot(nx,ny);
+  if(L<0.04) return false;
+  nx/=L; ny/=L;
+  const n=[nx,ny], d=[ny,-nx];
+  const rk=ranks();
+
+  let maxMoved=-Infinity, minMoved=Infinity, any=false;
+  faces.forEach(f=>{
+    if(!filter(rk.get(f.layer))) return;
+    const [mv]=splitPoly(f.poly,A,n);
+    if(mv){any=true; maxMoved=Math.max(maxMoved,f.layer); minMoved=Math.min(minMoved,f.layer);}
+  });
+  if(!any) return false;
+
+  const gmax=Math.max(...faces.map(f=>f.layer)), gmin=Math.min(...faces.map(f=>f.layer));
+  const fi=folds.length; folds.push({A:A,d:d,dir:dir});
+  const out=[];
+  faces.forEach(f=>{
+    if(!filter(rk.get(f.layer))){ out.push(f); return; }
+    const [mv,st]=splitPoly(f.poly,A,n);
+    if(st) out.push({poly:st, layer:f.layer, folds:f.folds.slice()});
+    if(mv){
+      const nl = dir>0 ? gmax+1+(maxMoved-f.layer) : gmin-1-(f.layer-minMoved);
+      out.push({poly:mv.map(p=>reflect(p,A,n)), layer:nl, folds:f.folds.concat([fi])});
+    }
+  });
+  faces=out; normalize();
+  return fi;
+}
+
+function fold(P,Q,dir,mode){
+  const snapshot={f:JSON.parse(JSON.stringify(faces)), d:JSON.parse(JSON.stringify(folds)), g:gi};
+  let idx=[];
+  if(mode==='wing'){
+    const n=new Set(faces.map(f=>f.layer)).size;
+    if(n<2){ toast('겹이 한 장뿐이에요. 먼저 반으로 접어보세요'); return false; }
+    const half=Math.ceil(n/2);
+    const a=doFold(P,Q, 1, r=>r>=half);
+    const b=doFold(P,Q,-1, r=>r< half);
+    if(a===false&&b===false){ faces=snapshot.f; folds=snapshot.d; toast('접을 부분이 없어요'); return false; }
+    if(a!==false) idx.push(a); if(b!==false) idx.push(b);
+  }else{
+    const a=doFold(P,Q,dir,()=>true);
+    if(a===false){ toast('접을 부분이 없어요'); return false; }
+    idx.push(a);
+  }
+  history.push(snapshot);
+  anim={idx:idx, t0:performance.now(), dur:520};
+  stats();
+  return true;
+}
+
+function undo(){
+  if(!history.length) return;
+  const s=history.pop(); faces=s.f; folds=s.d; gi=s.g; angles={}; anim=null; snapCache=null;
+  refresh(); drawSteps(); stats();
+}
+
+/* ══════════ 그리기 ══════════ */
+function refresh(){
+  const pos=[], seg=[];
+  faces.forEach(f=>{
+    const p=facePts(f);
+    for(let i=1;i<p.length-1;i++){
+      pos.push(p[0].x,p[0].y,p[0].z, p[i].x,p[i].y,p[i].z, p[i+1].x,p[i+1].y,p[i+1].z);
+    }
+    for(let i=0;i<p.length;i++){
+      const j=(i+1)%p.length;
+      seg.push(p[i].x,p[i].y,p[i].z, p[j].x,p[j].y,p[j].z);
+    }
+  });
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.computeVertexNormals();
+  const ge=new THREE.BufferGeometry();
+  ge.setAttribute('position', new THREE.Float32BufferAttribute(seg,3));
+
+  if(meshF){ model.remove(meshF,meshB,meshE); meshF.geometry.dispose(); meshE.geometry.dispose(); }
+  meshF=new THREE.Mesh(g,matFront); meshB=new THREE.Mesh(g,matBack); meshE=new THREE.LineSegments(ge,matEdge);
+  meshF.castShadow=true; meshB.castShadow=true;
+  model.add(meshF,meshB,meshE);
+}
+function stats(){
+  $('#sFold').textContent=folds.length;
+  $('#sLayer').textContent=new Set(faces.map(f=>f.layer)).size;
+  $('#bUndo').disabled=!history.length;
+}
+
+/* ══════════ 도면 ══════════ */
+const S2=Math.SQRT2;
+const GUIDE=[
+ {t:'왼쪽 위 모서리 접기', d:'왼쪽 위 모서리를 잡고 가운데 선 위의 점까지 끌어요.', P:[-1,1.4], Q:[0,0.4], dir:1, mode:'all'},
+ {t:'오른쪽 위 모서리 접기', d:'반대쪽도 똑같이. 지붕 모양이 됩니다.', P:[1,1.4], Q:[0,0.4], dir:1, mode:'all'},
+ {t:'왼쪽 빗변 다시 접기', d:'방금 생긴 빗변을 한 번 더 가운데로 모아요.', P:[-1,0.4], Q:[0,1.4-S2], dir:1, mode:'all'},
+ {t:'오른쪽 빗변 다시 접기', d:'반대쪽도 똑같이. 코가 뾰족해집니다.', P:[1,0.4], Q:[0,1.4-S2], dir:1, mode:'all'},
+ {t:'반으로 접기', d:'왼쪽 아래 모서리를 오른쪽 아래 모서리로. 뒤로 접혀요.', P:[-1,-1.4], Q:[1,-1.4], dir:-1, mode:'all'},
+ {t:'날개 접기', d:'바깥 아래 모서리를 끌면 위·아래 겹이 각각 접혀 날개가 됩니다.', P:[1,-1.4], Q:[-0.419,-1.573], dir:1, mode:'wing'},
+];
+function drawSteps(){
+  const box=$('#steps'); box.innerHTML='';
+  GUIDE.forEach((s,i)=>{
+    const el=document.createElement('div');
+    el.className='step'+(i===gi?' cur':'')+(i<gi?' done':'');
+    el.innerHTML='<div class="n">'+String(i+1).padStart(2,'0')+'</div><div><div class="t">'+s.t+'</div><div class="d">'+s.d+'</div></div>';
+    el.onclick=()=>{gi=i; syncTools(); drawSteps();};
+    box.appendChild(el);
+  });
+  $('#bAuto').disabled = gi>=GUIDE.length;
+  if(gi>=GUIDE.length) $('#bAuto').textContent='다 접었어요';
+  else $('#bAuto').textContent='이 단계 접어주기';
+  syncTools();
+}
+function syncTools(){
+  if(!guideOn||gi>=GUIDE.length) return;
+  dirSel=GUIDE[gi].dir; modeSel=GUIDE[gi].mode;
+  document.querySelectorAll('#segDir button').forEach(b=>{
+    const on=+b.dataset.v===dirSel; b.className=on?('on '+(dirSel>0?'v':'m')):'';});
+  document.querySelectorAll('#segMode button').forEach(b=>b.className=(b.dataset.v===modeSel?'on':''));
+}
+
+/* ══════════ 표시물(마커·미리보기) ══════════ */
+const marks=new THREE.Group(); scene.add(marks);
+function ring(color,r){
+  const g=new THREE.RingGeometry(r*0.62,r,40);
+  const m=new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:.85,side:THREE.DoubleSide,depthTest:false});
+  const o=new THREE.Mesh(g,m); o.renderOrder=10; return o;
+}
+const mGrab=ring(0xb98a2e,0.11), mTarget=ring(0x2f4bd8,0.11);
+marks.add(mGrab,mTarget);
+
+/* ── 전용 커서 ── */
+const SNAP={
+  guide :{c:0xb98a2e, s:1.15, name:'도면 지점'},
+  vertex:{c:0xb98a2e, s:1.00, name:'꼭짓점'},
+  cross :{c:0x2f4bd8, s:0.92, name:'교차점'},
+  mid   :{c:0x2f4bd8, s:0.80, name:'중점'},
+  edge  :{c:0x5a6478, s:0.74, name:'변 위'},
+  free  :{c:0x97a1b3, s:0.62, name:''}
+};
+const cursor=new THREE.Group(); marks.add(cursor);
+const curRingM=new THREE.MeshBasicMaterial({color:0x151b2b,transparent:true,opacity:.95,side:THREE.DoubleSide,depthTest:false});
+const curDotM =new THREE.MeshBasicMaterial({color:0x151b2b,depthTest:false});
+const curLineM=new THREE.LineBasicMaterial({color:0x151b2b,transparent:true,opacity:.6,depthTest:false});
+const curRing=new THREE.Mesh(new THREE.RingGeometry(0.052,0.068,36),curRingM);
+const curDot =new THREE.Mesh(new THREE.CircleGeometry(0.021,18),curDotM);
+const tick=[]; [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
+  tick.push(d[0]*0.092,d[1]*0.092,0, d[0]*0.152,d[1]*0.152,0);});
+const curGeo=new THREE.BufferGeometry();
+curGeo.setAttribute('position',new THREE.Float32BufferAttribute(tick,3));
+const curCross=new THREE.LineSegments(curGeo,curLineM);
+[curRing,curDot,curCross].forEach(o=>{o.renderOrder=14;});
+cursor.add(curRing,curDot,curCross);
+cursor.visible=false;
+
+// 끌기 시작점 표시
+const mStart=new THREE.Mesh(new THREE.CircleGeometry(0.034,20),
+  new THREE.MeshBasicMaterial({color:0xb98a2e,depthTest:false}));
+mStart.renderOrder=13; mStart.visible=false; marks.add(mStart);
+
+function setCursor(s,e){
+  if(!s){ cursor.visible=false; tagOff(); return; }
+  const k=SNAP[s.type];
+  cursor.visible=true;
+  cursor.position.set(s.p[0],s.p[1],0.11);
+  cursor.scale.setScalar(k.s);
+  curRingM.color.setHex(k.c); curDotM.color.setHex(k.c); curLineM.color.setHex(k.c);
+  curRing.visible = s.type!=='free';
+  curDot.visible  = (s.type==='vertex'||s.type==='guide'||s.type==='cross');
+  if(k.name && e && e.pointerType==='mouse'){
+    const t=$('#tag'); t.textContent=k.name; t.classList.add('on');
+    t.style.left=(e.clientX+16)+'px'; t.style.top=(e.clientY+16)+'px';
+  } else tagOff();
+}
+function tagOff(){ $('#tag').classList.remove('on'); }
+
+function mkLine(color,dash){
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(new Array(6*40).fill(0),3));
+  const m=dash? new THREE.LineDashedMaterial({color:color,dashSize:.09,gapSize:.06,depthTest:false})
+              : new THREE.LineBasicMaterial({color:color,depthTest:false});
+  const l=new THREE.Line(g,m); l.renderOrder=10; l.visible=false; return l;
+}
+const creaseLine=mkLine(0x2f4bd8,true), dragLine=mkLine(0xb98a2e,false);
+marks.add(creaseLine,dragLine);
+function setLine(line,pts){
+  const a=[]; pts.forEach(p=>a.push(p[0],p[1],0.09));
+  line.geometry.dispose();
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(a,3));
+  line.geometry=g;
+  if(line.computeLineDistances) line.computeLineDistances();
+  line.visible=true;
+}
+
+/* ══════════ 입력 ══════════ */
+const ray=new THREE.Raycaster(), plane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
+const ptrs=new Map();
+let drag=null, orbit=null, pinch=null;
+
+function toWorld(e){
+  const r=canvas.getBoundingClientRect();
+  const v=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(v,camera);
+  const p=new THREE.Vector3();
+  return ray.ray.intersectPlane(plane,p) ? [p.x,p.y] : null;
+}
+function segInt(a,b){
+  const x1=a[0][0],y1=a[0][1],x2=a[1][0],y2=a[1][1];
+  const x3=b[0][0],y3=b[0][1],x4=b[1][0],y4=b[1][1];
+  const den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+  if(Math.abs(den)<1e-9) return null;
+  const t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/den;
+  const u=((x1-x3)*(y1-y2)-(y1-y3)*(x1-x2))/den;
+  const E=1e-4;
+  if(t<E||t>1-E||u<E||u>1-E) return null;      // 끝점끼리 만난 건 꼭짓점이므로 제외
+  return [x1+t*(x2-x1), y1+t*(y2-y1)];
+}
+function dedupe(list, against){
+  const seen=new Set(), out=[];
+  const key=p=>Math.round(p[0]*2e3)+'_'+Math.round(p[1]*2e3);
+  (against||[]).forEach(p=>seen.add(key(p)));
+  list.forEach(p=>{const k=key(p); if(!seen.has(k)){seen.add(k); out.push(p);}});
+  return out;
+}
+function buildSnaps(){
+  const V=[],M=[],X=[],segs=[];
+  faces.forEach(f=>{const p=f.poly;
+    for(let i=0;i<p.length;i++){
+      const j=(i+1)%p.length;
+      V.push(p[i]);
+      M.push([(p[i][0]+p[j][0])/2,(p[i][1]+p[j][1])/2]);
+      segs.push([p[i],p[j]]);
+    }});
+  for(let a=0;a<segs.length;a++)for(let b=a+1;b<segs.length;b++){
+    const ip=segInt(segs[a],segs[b]); if(ip) X.push(ip);
+  }
+  const v=dedupe(V);
+  snapCache={V:v, X:dedupe(X,v), M:dedupe(M,v), segs:segs};
+}
+function nearest(list,pt,th){
+  let b=null,bd=th;
+  for(let i=0;i<list.length;i++){
+    const d=Math.hypot(list[i][0]-pt[0],list[i][1]-pt[1]);
+    if(d<bd){bd=d;b=list[i];}
+  }
+  return b;
+}
+function snapAt(pt){
+  if(!pt) return null;
+  if(!snap) return {p:pt,type:'free'};
+  if(!snapCache) buildSnaps();
+  if(guideOn&&gi<GUIDE.length){
+    const g=nearest([GUIDE[gi].P,GUIDE[gi].Q],pt,0.17);
+    if(g) return {p:[g[0],g[1]],type:'guide'};
+  }
+  let c=nearest(snapCache.V,pt,0.125); if(c) return {p:[c[0],c[1]],type:'vertex'};
+  c=nearest(snapCache.X,pt,0.10);      if(c) return {p:[c[0],c[1]],type:'cross'};
+  c=nearest(snapCache.M,pt,0.10);      if(c) return {p:[c[0],c[1]],type:'mid'};
+  let ep=null,ed=0.075;
+  snapCache.segs.forEach(s=>{
+    const a=s[0],b=s[1],vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;
+    if(L2<1e-9) return;
+    let t=((pt[0]-a[0])*vx+(pt[1]-a[1])*vy)/L2; t=Math.max(0,Math.min(1,t));
+    const q=[a[0]+t*vx,a[1]+t*vy], d=Math.hypot(q[0]-pt[0],q[1]-pt[1]);
+    if(d<ed){ed=d;ep=q;}
+  });
+  if(ep) return {p:ep,type:'edge'};
+  return {p:pt,type:'free'};
+}
+
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){
+    drag=null; hidePreview();
+    const a=[...ptrs.values()];
+    pinch=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+    orbit={x:(a[0].x+a[1].x)/2, y:(a[0].y+a[1].y)/2};
+    cursor.visible=false; tagOff();
+    return;
+  }
+  if(e.button===2||e.shiftKey||finished||anim){
+    orbit={x:e.clientX,y:e.clientY}; cursor.visible=false; tagOff();
+    canvas.style.cursor='move'; return;
+  }
+  const s=snapAt(toWorld(e));
+  if(s){ drag={P:s.p,Q:s.p}; mStart.position.set(s.p[0],s.p[1],0.1); mStart.visible=true; setCursor(s,e); }
+});
+canvas.addEventListener('pointermove',e=>{
+  if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2&&orbit){
+    const a=[...ptrs.values()];
+    const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+    cam.r=Math.max(3,Math.min(16,cam.r*(pinch/d))); pinch=d;
+    const mx=(a[0].x+a[1].x)/2, my=(a[0].y+a[1].y)/2;
+    cam.th-=(mx-orbit.x)*0.007; cam.ph=Math.max(0.05,Math.min(1.45,cam.ph+(my-orbit.y)*0.007));
+    orbit={x:mx,y:my}; placeCam(); return;
+  }
+  if(orbit){
+    cam.th-=(e.clientX-orbit.x)*0.008;
+    cam.ph=Math.max(0.05,Math.min(1.45,cam.ph+(e.clientY-orbit.y)*0.008));
+    orbit={x:e.clientX,y:e.clientY}; placeCam(); return;
+  }
+  if(finished){ cursor.visible=false; tagOff(); return; }
+  const s=snapAt(toWorld(e));
+  setCursor(s,e);
+  if(drag&&s){ drag.Q=s.p; showPreview(drag.P,drag.Q); }
+});
+canvas.addEventListener('pointerleave',()=>{cursor.visible=false;tagOff();});
+function endPtr(e){
+  ptrs.delete(e.pointerId);
+  if(ptrs.size<2) pinch=null;
+  if(orbit&&ptrs.size===0){ orbit=null; canvas.style.cursor=finished?'default':'none'; }
+  if(!drag) return;
+  const d=drag; drag=null; hidePreview();
+  if(Math.hypot(d.Q[0]-d.P[0],d.Q[1]-d.P[1])<0.05) return;
+  if(fold(d.P,d.Q,dirSel,modeSel) && guideOn && gi<GUIDE.length){
+    const g=GUIDE[gi];
+    if(Math.hypot(g.P[0]-d.P[0],g.P[1]-d.P[1])<0.22 && Math.hypot(g.Q[0]-d.Q[0],g.Q[1]-d.Q[1])<0.22){
+      gi++; drawSteps();
+      if(gi>=GUIDE.length) toast('종이비행기 완성! “완성하기”로 날개를 펴보세요');
+    }else drawSteps();
+  }
+}
+canvas.addEventListener('pointerup',endPtr);
+canvas.addEventListener('pointercancel',endPtr);
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('wheel',e=>{e.preventDefault(); cam.r=Math.max(3,Math.min(16,cam.r*(1+Math.sign(e.deltaY)*0.09))); placeCam();},{passive:false});
+
+function showPreview(P,Q){
+  const A=[(P[0]+Q[0])/2,(P[1]+Q[1])/2];
+  let nx=P[0]-A[0], ny=P[1]-A[1]; const L=Math.hypot(nx,ny);
+  if(L<0.05){hidePreview();return;}
+  nx/=L; ny/=L;
+  const d=[ny,-nx];
+  setLine(creaseLine,[[A[0]-d[0]*3,A[1]-d[1]*3],[A[0]+d[0]*3,A[1]+d[1]*3]]);
+  creaseLine.material.color.setHex(dirSel>0?0x2f4bd8:0xd1503c);
+  setLine(dragLine,[P,Q]);
+}
+function hidePreview(){creaseLine.visible=false;dragLine.visible=false;mStart.visible=false;}
+hidePreview();
+
+/* ══════════ 완성 · 날리기 ══════════ */
+let sliderFolds=[];
+function centerX(){
+  let mn=1e9,mx=-1e9;
+  faces.forEach(f=>f.poly.forEach(p=>{mn=Math.min(mn,p[0]);mx=Math.max(mx,p[0]);}));
+  return (mn+mx)/2;
+}
+function enterFinish(){
+  if(!folds.length){ toast('먼저 종이를 접어주세요'); return; }
+  finished=true; hidePreview();
+  $('#right').style.display='none'; $('#finish').style.display='';
+  cursor.visible=false; tagOff(); canvas.style.cursor='default';
+  // 접힌 면이 수직이 되도록 세워서 비행기 자세로
+  model.rotation.set(0,-Math.PI/2,0);
+  model.position.set(0,0,0.75-centerX());
+  // 마지막 접기들을 묶어서(같은 선이면 한 묶음) 각도 조절 제공
+  const groups=[]; let i=folds.length-1;
+  while(i>=0 && groups.length<3){
+    const g=[i];
+    if(i-1>=0 && Math.abs(folds[i].A[0]-folds[i-1].A[0])<1e-6 && Math.abs(folds[i].A[1]-folds[i-1].A[1])<1e-6){ g.push(i-1); i--; }
+    groups.push(g); i--;
+  }
+  sliderFolds=groups;
+  const box=$('#sliders'); box.innerHTML='';
+  groups.forEach((g,k)=>{
+    const name = k===0?'날개':(k===1?'몸통':'안쪽 접기');
+    const init = k===0?124:(k===1?168:180);
+    const el=document.createElement('div'); el.className='sl';
+    el.innerHTML='<label><span>'+name+'</span><b id="v'+k+'">'+init+'°</b></label>'+
+      '<input type="range" min="30" max="180" value="'+init+'" data-k="'+k+'">';
+    box.appendChild(el);
+    el.querySelector('input').addEventListener('input',ev=>{
+      const val=+ev.target.value; $('#v'+k).textContent=val+'°';
+      sliderFolds[k].forEach(fi=>angles[fi]=val*Math.PI/180);
+      refresh();
+    });
+    g.forEach(fi=>angles[fi]=init*Math.PI/180);
+  });
+  cam.ph=0.95; cam.th=-Math.PI/2+0.5; placeCam();
+  refresh();
+}
+function exitFinish(){
+  finished=false; angles={}; flying=null;
+  model.position.set(0,0,0); model.rotation.set(0,0,0);
+  $('#right').style.display=''; $('#finish').style.display='none';
+  canvas.style.cursor='none';
+  cam=Object.assign({},CAM0); placeCam(); refresh();
+}
+function fly(){ flying={t0:performance.now(), z:model.position.z}; }
+
+/* ══════════ 반복 ══════════ */
+function ease(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
+function loop(now){
+  requestAnimationFrame(loop);
+  if(anim){
+    const p=Math.min(1,(now-anim.t0)/anim.dur), e=ease(p);
+    anim.idx.forEach(fi=>angles[fi]=Math.PI*e);
+    if(p>=1){anim.idx.forEach(fi=>delete angles[fi]); anim=null;}
+    refresh();
+  }
+  if(flying){
+    const t=(now-flying.t0)/1000, z0=flying.z;
+    if(t>3.4){ flying=null; model.position.set(0,0,z0); model.rotation.set(0,-Math.PI/2,0); }
+    else{
+      model.position.set(Math.sin(t*1.7)*0.28, t*2.5, z0+1.15*t-0.55*t*t);
+      model.rotation.set(0,-Math.PI/2,Math.sin(t*1.7)*0.13);
+    }
+  }
+  // 가이드 마커
+  const show = guideOn && !finished && !anim && gi<GUIDE.length;
+  mGrab.visible=mTarget.visible=show;
+  if(show){
+    const g=GUIDE[gi], s=1+Math.sin(now/260)*0.16;
+    mGrab.position.set(g.P[0],g.P[1],0.1); mGrab.scale.setScalar(s);
+    mTarget.position.set(g.Q[0],g.Q[1],0.1); mTarget.scale.setScalar(2.4-s);
+  }
+  renderer.render(scene,camera);
+}
+function resize(){
+  const w=innerWidth,h=innerHeight;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize',resize);
+
+let tId;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tId);tId=setTimeout(()=>t.classList.remove('on'),2600);}
+
+/* ══════════ 버튼 ══════════ */
+document.querySelectorAll('#segDir button').forEach(b=>b.onclick=()=>{
+  dirSel=+b.dataset.v;
+  document.querySelectorAll('#segDir button').forEach(x=>x.className=(x===b?('on '+(dirSel>0?'v':'m')):''));
+});
+document.querySelectorAll('#segMode button').forEach(b=>b.onclick=()=>{
+  modeSel=b.dataset.v;
+  document.querySelectorAll('#segMode button').forEach(x=>x.className=(x===b?'on':''));
+});
+$('#cSnap').onchange=e=>snap=e.target.checked;
+$('#bUndo').onclick=undo;
+$('#bReset').onclick=()=>{newPaper();};
+$('#bView').onclick=()=>{cam=Object.assign({},CAM0);placeCam();};
+$('#bFinish').onclick=enterFinish;
+$('#bEdit').onclick=exitFinish;
+$('#bFly').onclick=fly;
+$('#bFree').onclick=()=>{
+  guideOn=!guideOn;
+  $('#bFree').textContent=guideOn?'도면 끄기':'도면 켜기';
+  $('#steps').style.display=guideOn?'':'none';
+  $('#bAuto').style.display=guideOn?'':'none';
+  toast(guideOn?'도면을 따라 접습니다':'자유롭게 접어보세요');
+};
+$('#bAuto').onclick=()=>{
+  if(gi>=GUIDE.length) return;
+  const g=GUIDE[gi];
+  if(fold(g.P,g.Q,g.dir,g.mode)){
+    gi++; drawSteps();
+    if(gi>=GUIDE.length) toast('종이비행기 완성! “완성하기”로 날개를 펴보세요');
+  }
+};
+addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();}
+});
+
+resize(); newPaper(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

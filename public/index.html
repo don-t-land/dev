@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>종이비행기 온라인</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0f1620; }
+  canvas { display: block; }
+  #ui, #ui * { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; color: #eef3fa; }
+
+  /* ---------- 로비 ---------- */
+  #lobby {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, #1c2a3d 0%, #0f1620 70%);
+    pointer-events: auto;
+  }
+  #lobby .panel { width: 460px; max-width: 92vw; }
+  #lobby h1 { font-size: 22px; font-weight: 600; letter-spacing: .06em; margin-bottom: 4px; }
+  #lobby .tag { font-size: 11px; color: #7e90a8; letter-spacing: .16em; margin-bottom: 28px; }
+  #lobby label { display: block; font-size: 10px; letter-spacing: .18em; color: #8ea1b8; margin-bottom: 7px; }
+  #lobby input {
+    width: 100%; padding: 11px 13px; margin-bottom: 22px;
+    background: rgba(255,255,255,.06); border: 1px solid #2b3a4f; border-radius: 6px;
+    color: #eef3fa; font: inherit; font-size: 14px; outline: none;
+  }
+  #lobby input:focus { border-color: #5aa9d6; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mode {
+    padding: 17px 15px; border: 1px solid #2b3a4f; border-radius: 8px;
+    background: rgba(255,255,255,.035); cursor: pointer; transition: all .15s;
+  }
+  .mode:hover { border-color: #5aa9d6; background: rgba(90,169,214,.08); transform: translateY(-2px); }
+  .mode b { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .mode span { font-size: 10.5px; line-height: 1.65; color: #93a5bc; }
+  .mode .icon { font-size: 20px; margin-bottom: 8px; display: block; }
+  #lob-status { margin-top: 20px; font-size: 11px; color: #ff8b7e; min-height: 16px; }
+
+  /* ---------- 게임 HUD ---------- */
+  .hide { display: none !important; }
+
+  #stats { position: absolute; top: 20px; left: 22px; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  #stats .cap { font-size: 9.5px; letter-spacing: .22em; color: #8ea1b8; margin-bottom: 3px; }
+  #stats .big { font-size: 32px; font-weight: 600; line-height: 1.1; }
+  #stats .big small { font-size: 13px; font-weight: 400; opacity: .55; margin-left: 3px; }
+  #stats .sub { margin-top: 9px; font-size: 12px; line-height: 1.75; color: #b9c7da; }
+  #stats .sub b { color: #fff; font-weight: 500; }
+
+  #timer {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    font-size: 20px; font-weight: 600; letter-spacing: .05em;
+    text-shadow: 0 1px 8px rgba(0,0,0,.6);
+  }
+  #timer.low { color: #ff8b7e; }
+
+  #board {
+    position: absolute; top: 20px; right: 22px; min-width: 168px;
+    padding: 10px 13px; background: rgba(10,15,22,.62); border: 1px solid rgba(255,255,255,.09);
+    border-radius: 6px; backdrop-filter: blur(6px); font-size: 11px;
+  }
+  #board .h { font-size: 9px; letter-spacing: .2em; color: #8ea1b8; margin-bottom: 7px; }
+  #board .row { display: flex; justify-content: space-between; gap: 14px; line-height: 1.9; }
+  #board .row.dead { opacity: .38; text-decoration: line-through; }
+  #board .row.me .nm { color: #8fe3c4; }
+  #board .sc { color: #dce5f0; }
+
+  #gauge { position: absolute; bottom: 26px; left: 22px; width: 190px; }
+  #gauge .track { height: 5px; background: rgba(255,255,255,.13); border-radius: 3px; overflow: hidden; position: relative; }
+  #gauge .stallzone { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: rgba(255,90,80,.35); }
+  #gauge .fill { height: 100%; background: #8fe3c4; border-radius: 3px; }
+  #gauge .fill.stall { background: #ff6b5e; }
+  #gauge .lbl { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 10px; letter-spacing: .1em; color: #90a2ba; }
+
+  #ammo { position: absolute; bottom: 62px; left: 22px; display: flex; gap: 6px; }
+  #ammo i { width: 22px; height: 7px; border-radius: 2px; background: rgba(255,255,255,.14); }
+  #ammo i.on { background: #ffc861; box-shadow: 0 0 8px rgba(255,200,97,.5); }
+
+  #thermal {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, 90px);
+    font-size: 13px; letter-spacing: .2em; color: #6ee7b7;
+    opacity: 0; transition: opacity .18s; text-shadow: 0 0 20px rgba(110,231,183,.6);
+  }
+  #thermal.on { opacity: 1; }
+
+  #keys { position: absolute; bottom: 26px; right: 22px; text-align: right; font-size: 11px; line-height: 1.9; color: #8496ad; }
+  #keys kbd { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); border-radius: 3px; padding: 1px 6px; color: #dce5f0; font: inherit; }
+
+  #center {
+    position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%);
+    text-align: center; text-shadow: 0 2px 14px rgba(0,0,0,.7);
+  }
+  #center .cd { font-size: 72px; font-weight: 700; }
+  #center .msg { font-size: 15px; letter-spacing: .24em; color: #b9c7da; }
+  #center .sub2 { margin-top: 8px; font-size: 11px; letter-spacing: .1em; color: #8496ad; }
+
+  #kill {
+    position: absolute; top: 27%; left: 50%; transform: translateX(-50%);
+    font-size: 13px; letter-spacing: .1em; color: #ffc861;
+    opacity: 0; transition: opacity .3s; text-shadow: 0 0 14px rgba(255,200,97,.5);
+  }
+
+  #results {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(10,14,20,.72); backdrop-filter: blur(3px);
+  }
+  #results .box { min-width: 340px; text-align: center; }
+  #results h2 { font-size: 13px; letter-spacing: .3em; color: #8fe3c4; margin-bottom: 22px; }
+  #results table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #results td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: left; }
+  #results td:last-child { text-align: right; color: #dce5f0; }
+  #results tr.me td { color: #8fe3c4; }
+  #results tr:first-child td { color: #ffc861; font-weight: 600; }
+  #results .next { margin-top: 22px; font-size: 11px; letter-spacing: .16em; color: #7e90a8; }
+  #leave-btn {
+    margin-top: 14px; padding: 8px 22px; pointer-events: auto; cursor: pointer;
+    background: none; border: 1px solid #2b3a4f; border-radius: 6px;
+    color: #93a5bc; font: inherit; font-size: 11px; letter-spacing: .1em;
+  }
+  #leave-btn:hover { border-color: #5aa9d6; color: #dce5f0; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+
+  <div id="lobby">
+    <div class="panel">
+      <h1>종이비행기 온라인</h1>
+      <div class="tag">PAPER PLANE MULTIPLAYER</div>
+      <label>조종사 이름</label>
+      <input id="lob-name" maxlength="12" placeholder="이름을 입력하세요" autocomplete="off">
+      <div class="modes">
+        <div class="mode" data-mode="DIST">
+          <span class="icon">🏁</span>
+          <b>멀리 날기</b>
+          <span>직선 협곡을 따라 장애물을 뚫고<br>가장 먼 거리를 기록하세요</span>
+        </div>
+        <div class="mode" data-mode="ARENA">
+          <span class="icon">⚔️</span>
+          <b>오래 날기</b>
+          <span>아레나에서 다트를 쏘아 서로를<br>격추 — 최후의 1인이 승리</span>
+        </div>
+      </div>
+      <div id="lob-status"></div>
+    </div>
+  </div>
+
+  <div id="hud" class="hide">
+    <div id="stats">
+      <div class="cap" id="s-cap">직선 거리</div>
+      <div class="big"><span id="s-main">0</span><small id="s-unit">m</small></div>
+      <div class="sub">
+        고도 <b><span id="s-alt">0</span>m</b><br>
+        승수 <b><span id="s-wins">0</span></b>
+      </div>
+    </div>
+
+    <div id="timer">--:--</div>
+
+    <div id="board"><div class="h" id="b-title">플레이어</div><div id="b-rows"></div></div>
+
+    <div id="ammo" class="hide"><i></i><i></i><i></i></div>
+
+    <div id="gauge">
+      <div class="lbl"><span>속도</span><span id="s-spd">0</span></div>
+      <div class="track"><div class="stallzone"></div><div class="fill" id="s-fill"></div></div>
+    </div>
+
+    <div id="thermal">상승기류</div>
+    <div id="kill"></div>
+
+    <div id="keys">
+      <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 선회</span><br>
+      <span id="keys-fire" class="hide"><kbd>Space</kbd> 다트 발사</span>
+    </div>
+
+    <div id="center" class="hide">
+      <div class="cd hide" id="c-cd"></div>
+      <div class="msg hide" id="c-msg"></div>
+      <div class="sub2 hide" id="c-sub"></div>
+    </div>
+
+    <div id="results" class="hide">
+      <div class="box">
+        <h2 id="r-title">라운드 결과</h2>
+        <table><tbody id="r-body"></tbody></table>
+        <div class="next">잠시 후 다음 라운드가 시작됩니다</div>
+        <button id="leave-btn">로비로 나가기</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   유틸
+   ============================================================ */
+const $ = id => document.getElementById(id);
+
+/* 시드 난수 — 모든 클라이언트가 같은 시드로 같은 맵을 만듭니다 */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* 플레이어 id → 기체 색 (모두가 같은 색을 계산) */
+function idColor(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return new THREE.Color().setHSL((h % 360) / 360, 0.62, 0.62);
+}
+
+/* ============================================================
+   네트워크
+   ============================================================ */
+const net = {
+  ws: null, id: null,
+  players: new Map(),   // id -> { name, wins, alive, score, remote(3D) }
+  connected: false
+};
+
+function connect(name, mode) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}`);
+  net.ws = ws;
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ t: 'hello', token: localStorage.getItem('pp_token'), name }));
+  };
+
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    handle(m, mode);
+  };
+
+  ws.onclose = () => {
+    net.connected = false;
+    enterLobby('서버와의 연결이 끊어졌습니다');
+  };
+  ws.onerror = () => { $('lob-status').textContent = '서버에 연결할 수 없습니다'; };
+}
+
+function send(obj) {
+  if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(obj));
+}
+
+function handle(m, wantMode) {
+  switch (m.t) {
+    case 'hello':
+      net.id = m.id;
+      localStorage.setItem('pp_token', m.token);
+      $('s-wins').textContent = m.wins;
+      net.connected = true;
+      send({ t: 'join', mode: wantMode });
+      break;
+
+    case 'room':
+      game.mode = m.mode;
+      net.players.clear();
+      for (const pl of m.players) if (pl.id !== net.id) addRemote(pl);
+      enterGame();
+      applyPhase(m); // waiting / 진행 중이던 라운드 상태 반영
+      break;
+
+    case 'pj': addRemote(m.pl); refreshBoard(); break;
+
+    case 'pl': {
+      const p = net.players.get(m.id);
+      if (p) { scene.remove(p.remote.group); net.players.delete(m.id); }
+      refreshBoard();
+      break;
+    }
+
+    case 'phase': applyPhase(m); break;
+
+    case 'ss':
+      for (const [id, p, r, alive, score] of m.a) {
+        if (id === net.id) continue;
+        const pl = net.players.get(id);
+        if (!pl) continue;
+        pl.alive = !!alive;
+        pl.score = score;
+        pl.remote.tp.set(p[0], p[1], p[2]);
+        pl.remote.tr.set(r[0], r[1], r[2]);
+        pl.remote.seen = true;
+      }
+      refreshBoard();
+      break;
+
+    case 'shot': {
+      const pl = net.players.get(m.id);
+      spawnDart(
+        new THREE.Vector3(...m.o), new THREE.Vector3(...m.v),
+        m.id, pl ? pl.remote.color : 0xffffff
+      );
+      break;
+    }
+
+    case 'crashed': {
+      if (m.id === net.id) {
+        if (me.alive) dieLocal(false);
+        if (m.by) showKill(`${m.by} 님에게 격추되었습니다`);
+      } else {
+        const pl = net.players.get(m.id);
+        if (pl) { pl.alive = false; pl.remote.group.visible = false; }
+        if (m.by === myName) showKill(`${pl ? pl.name : '?'} 격추!`);
+      }
+      refreshBoard();
+      break;
+    }
+  }
+}
+
+/* ============================================================
+   화면 전환
+   ============================================================ */
+let myName = '';
+
+function enterLobby(msg) {
+  $('lobby').classList.remove('hide');
+  $('hud').classList.add('hide');
+  $('lob-status').textContent = msg || '';
+  clearWorld();
+  for (const p of net.players.values()) scene.remove(p.remote.group);
+  net.players.clear();
+  if (net.ws) { net.ws.onclose = null; net.ws.close(); net.ws = null; }
+  game.phase = 'lobby';
+}
+
+function enterGame() {
+  $('lobby').classList.add('hide');
+  $('hud').classList.remove('hide');
+  const arena = game.mode === 'ARENA';
+  $('s-cap').textContent = arena ? '생존 시간' : '직선 거리';
+  $('s-unit').textContent = arena ? 's' : 'm';
+  $('ammo').classList.toggle('hide', !arena);
+  $('keys-fire').classList.toggle('hide', !arena);
+  $('b-title').textContent = arena ? '생존자' : '순위';
+}
+
+$('lob-name').value = localStorage.getItem('pp_name') || '';
+document.querySelectorAll('.mode').forEach(el => {
+  el.addEventListener('click', () => {
+    const name = $('lob-name').value.trim();
+    if (!name) { $('lob-status').textContent = '이름을 입력하세요'; return; }
+    localStorage.setItem('pp_name', name);
+    myName = name;
+    $('lob-status').textContent = '연결 중…';
+    connect(name, el.dataset.mode);
+  });
+});
+$('leave-btn').addEventListener('click', () => enterLobby());
+
+/* ============================================================
+   Three.js 기본
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xb8c9dd, 0.0026);
+
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 3000);
+camera.position.set(0, 200, 100);
+
+/* 하늘 돔 */
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(1600, 32, 20),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      uTop: { value: new THREE.Color(0x2b5f9e) },
+      uMid: { value: new THREE.Color(0xa8c6e3) },
+      uBottom: { value: new THREE.Color(0xf2d9bd) }
+    },
+    vertexShader: `varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `
+      uniform vec3 uTop,uMid,uBottom; varying vec3 vP;
+      void main(){
+        float h=normalize(vP).y;
+        vec3 c=mix(uBottom,uMid,smoothstep(-.15,.22,h));
+        c=mix(c,uTop,smoothstep(.18,.75,h));
+        gl_FragColor=vec4(c,1.);
+      }`
+  })
+);
+scene.add(sky);
+
+scene.add(new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.left = -140; sun.shadow.camera.right = 140;
+sun.shadow.camera.top = 140; sun.shadow.camera.bottom = -140;
+sun.shadow.camera.far = 400;
+scene.add(sun, sun.target);
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(4000, 4000),
+  new THREE.MeshStandardMaterial({ color: 0x5f7a4e, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(1600, 40, 0x7a9468, 0x6d8a5c);
+grid.material.transparent = true;
+grid.material.opacity = 0.35;
+scene.add(grid);
+
+/* ============================================================
+   종이비행기 팩토리 (본체 + 이름표)
+   ============================================================ */
+function makePlaneMesh(color) {
+  const N = [0, 0, -1.85], B = [0, 0, 0.8];
+  const L = [-1.2, 0.16, 0.92], R = [1.2, 0.16, 0.92], K = [0, -0.42, 0.86];
+  const verts = new Float32Array([...N, ...L, ...B, ...N, ...B, ...R, ...N, ...K, ...B]);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color, roughness: 0.85, side: THREE.DoubleSide, flatShading: true
+  }));
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function makeLabel(text, colorCss) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 64;
+  const cx = cv.getContext('2d');
+  cx.font = '600 30px ui-monospace, Menlo, monospace';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.shadowColor = 'rgba(0,0,0,.7)'; cx.shadowBlur = 8;
+  cx.fillStyle = colorCss;
+  cx.fillText(text, 128, 34);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  spr.scale.set(7.5, 1.9, 1);
+  spr.position.y = 2.4;
+  return spr;
+}
+
+function addRemote(pl) {
+  if (net.players.has(pl.id) || pl.id === net.id) return;
+  const color = idColor(pl.id);
+  const group = new THREE.Group();
+  group.rotation.order = 'YXZ';
+  group.add(makePlaneMesh(color));
+  group.add(makeLabel(pl.name, '#' + color.getHexString()));
+  group.visible = false;
+  scene.add(group);
+  net.players.set(pl.id, {
+    name: pl.name, wins: pl.wins, alive: !!pl.alive, score: 0,
+    remote: {
+      group, color,
+      tp: new THREE.Vector3(), tr: new THREE.Vector3(), seen: false
+    }
+  });
+}
+
+/* ============================================================
+   내 기체 · 비행 상태
+   ============================================================ */
+const craft = new THREE.Group();
+craft.rotation.order = 'YXZ';
+craft.add(makePlaneMesh(0xfdfcf7));
+scene.add(craft);
+
+const GRAVITY = 21, DRAG = 0.0062, STALL = 11, MAX_ALT = 420;
+const me = { yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false, dist: 0, surv: 0, ammo: 3, ammoT: 0 };
+
+/* ============================================================
+   게임 상태 · 월드
+   ============================================================ */
+const game = {
+  mode: 'DIST', phase: 'lobby',
+  ends: 0, seed: 0, order: [],
+  frozen: true
+};
+
+/* 코스 상수 */
+const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT = 0.62;
+const ARENA_R = 240;
+const THERMAL_R = 26, THERMAL_LIFT = 15, RING_R = 8;
+
+/* 월드 컨테이너 — 라운드마다 비우고 다시 만듭니다 */
+const world = new THREE.Group();
+scene.add(world);
+
+let spires = [], rocks = [], thermals = [], ringsArr = [], clouds = [];
+let spireMesh = null, rockMesh = null, wallMesh = null;
+
+const thermalMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  blending: THREE.AdditiveBlending, fog: false,
+  uniforms: { uTime: { value: 0 } },
+  vertexShader: `
+    varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+    void main(){
+      vUv=uv;
+      vec4 mv=modelViewMatrix*vec4(position,1.);
+      vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz);
+      gl_Position=projectionMatrix*mv;
+    }`,
+  fragmentShader: `
+    uniform float uTime; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+    void main(){
+      float band=pow(sin(vUv.y*26.-uTime*2.6)*.5+.5,2.2);
+      float edge=pow(1.-abs(dot(normalize(vN),normalize(vV))),1.6);
+      float fade=smoothstep(1.,.35,vUv.y)*smoothstep(0.,.08,vUv.y);
+      vec3 col=mix(vec3(.25,.85,.62),vec3(1.,.94,.6),band);
+      gl_FragColor=vec4(col,(.09+band*.2)*edge*fade);
+    }`
+});
+const thermalRingMat = new THREE.MeshBasicMaterial({ color: 0x4fd6a4, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
+const ringMat = new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 1.6, roughness: 0.4 });
+const rockLikeMat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true });
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
+
+const unitBox = new THREE.BoxGeometry(1, 1, 1); unitBox.translate(0, 0.5, 0);
+const unitCone = new THREE.CylinderGeometry(0.35, 1, 1, 7, 1); unitCone.translate(0, 0.5, 0);
+const unitRock = new THREE.IcosahedronGeometry(1, 0);
+const dummy = new THREE.Object3D();
+
+function clearWorld() {
+  world.traverse(o => {
+    if (o.isMesh && o.geometry !== unitBox && o.geometry !== unitCone && o.geometry !== unitRock)
+      o.geometry.dispose?.();
+  });
+  world.clear();
+  spires = []; rocks = []; thermals = []; ringsArr = []; clouds = [];
+  spireMesh = rockMesh = wallMesh = null;
+}
+
+function addThermal(x, z) {
+  const g = new THREE.Group();
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(THERMAL_R, THERMAL_R * 0.55, 340, 22, 1, true), thermalMat);
+  col.position.y = 170;
+  g.add(col);
+  const mark = new THREE.Mesh(new THREE.RingGeometry(THERMAL_R - 2.5, THERMAL_R, 36), thermalRingMat);
+  mark.rotation.x = -Math.PI / 2; mark.position.y = 0.6;
+  g.add(mark);
+  g.position.set(x, 0, z);
+  world.add(g);
+  thermals.push(g);
+}
+
+function addRing(x, y, z, rng) {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.65, 10, 36), ringMat);
+  m.position.set(x, y, z);
+  m.rotation.y = (rng() - 0.5) * 0.6;
+  m.userData.taken = false;
+  world.add(m);
+  ringsArr.push(m);
+}
+
+function addClouds(rng, count, area) {
+  for (let i = 0; i < count; i++) {
+    const g = new THREE.Group();
+    const puffs = 3 + Math.floor(rng() * 3);
+    for (let p = 0; p < puffs; p++) {
+      const r = 9 + rng() * 11;
+      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), cloudMat);
+      puff.position.set((rng() - 0.5) * 34, (rng() - 0.5) * 7, (rng() - 0.5) * 26);
+      puff.scale.y = 0.55;
+      g.add(puff);
+    }
+    area(g, rng);
+    g.position.y = 95 + rng() * 220;
+    world.add(g);
+    clouds.push(g);
+  }
+}
+
+/* ---- 멀리 날기: 시드로 7.5km 직선 협곡을 결정론적으로 생성 ---- */
+function buildDistance(seed) {
+  clearWorld();
+  const rng = mulberry32(seed);
+
+  // 협곡 벽
+  const step = 42, segs = Math.ceil(DIST_LEN / step);
+  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), segs * 2);
+  let wi = 0;
+  for (let side = -1; side <= 1; side += 2) {
+    for (let i = 0; i < segs; i++) {
+      dummy.position.set(side * (DIST_HALF + 10 + rng() * 16), 0, -i * step);
+      dummy.scale.set(26 + rng() * 22, 55 + rng() * 95, step * (0.9 + rng() * 0.35));
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      wallMesh.setMatrixAt(wi++, dummy.matrix);
+    }
+  }
+  world.add(wallMesh);
+
+  // 첨탑 — 렌더는 인스턴스 1콜, 충돌은 데이터 배열
+  const nSp = Math.floor(DIST_LEN / 1000 * 22);
+  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), nSp);
+  spireMesh.castShadow = true;
+  for (let i = 0; i < nSp; i++) {
+    const h = 45 + rng() * 125, r = 6 + rng() * 8;
+    const x = (rng() * 2 - 1) * (DIST_HALF - 20);
+    const z = -120 - rng() * (DIST_LEN - 200);
+    dummy.position.set(x, 0, z);
+    dummy.scale.set(r, h, r);
+    dummy.updateMatrix();
+    spireMesh.setMatrixAt(i, dummy.matrix);
+    spires.push({ x, z, h, r });
+  }
+  world.add(spireMesh);
+
+  // 공중 바위
+  const nRk = Math.floor(DIST_LEN / 1000 * 15);
+  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), nRk);
+  rockMesh.castShadow = true;
+  for (let i = 0; i < nRk; i++) {
+    const r = 5 + rng() * 7;
+    const x = (rng() * 2 - 1) * (DIST_HALF - 20);
+    const y = 30 + rng() * 145;
+    const z = -160 - rng() * (DIST_LEN - 250);
+    dummy.position.set(x, y, z);
+    dummy.scale.setScalar(r);
+    dummy.rotation.set(rng() * 3, rng() * 3, 0);
+    dummy.updateMatrix();
+    rockMesh.setMatrixAt(i, dummy.matrix);
+    rocks.push({ p: new THREE.Vector3(x, y, z), r });
+  }
+  world.add(rockMesh);
+
+  // 상승기류 · 부스트 링
+  for (let i = 0; i < Math.floor(DIST_LEN / 1000 * 5); i++)
+    addThermal((rng() * 2 - 1) * (DIST_HALF - 40), -200 - rng() * (DIST_LEN - 300));
+  for (let i = 0; i < Math.floor(DIST_LEN / 1000 * 7); i++)
+    addRing((rng() * 2 - 1) * (DIST_HALF - 35), 40 + rng() * 170, -180 - rng() * (DIST_LEN - 280), rng);
+
+  addClouds(rng, 24, (g, r2) => {
+    g.position.x = (r2() * 2 - 1) * (DIST_HALF + 90);
+    g.position.z = -r2() * DIST_LEN;
+  });
+
+  // 중앙선
+  const line = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.5, DIST_LEN),
+    new THREE.MeshBasicMaterial({ color: 0xf2e6c8, transparent: true, opacity: 0.28 })
+  );
+  line.rotation.x = -Math.PI / 2;
+  line.position.set(0, 0.12, -DIST_LEN / 2);
+  world.add(line);
+}
+
+/* ---- 오래 날기: 원형 아레나 ---- */
+function buildArena(seed) {
+  clearWorld();
+  const rng = mulberry32(seed);
+
+  // 외벽 바위 링
+  const nWall = 56;
+  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), nWall);
+  for (let i = 0; i < nWall; i++) {
+    const a = (i / nWall) * Math.PI * 2;
+    const rr = ARENA_R + 22 + rng() * 14;
+    dummy.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
+    dummy.scale.set(30 + rng() * 18, 70 + rng() * 110, 30 + rng() * 18);
+    dummy.rotation.set(0, a, 0);
+    dummy.updateMatrix();
+    wallMesh.setMatrixAt(i, dummy.matrix);
+  }
+  world.add(wallMesh);
+
+  // 내부 첨탑 — 엄폐물
+  const nSp = 13;
+  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), nSp);
+  spireMesh.castShadow = true;
+  for (let i = 0; i < nSp; i++) {
+    const h = 60 + rng() * 130, r = 7 + rng() * 9;
+    const a = rng() * Math.PI * 2, d = 40 + rng() * (ARENA_R - 80);
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    dummy.position.set(x, 0, z);
+    dummy.scale.set(r, h, r);
+    dummy.updateMatrix();
+    spireMesh.setMatrixAt(i, dummy.matrix);
+    spires.push({ x, z, h, r });
+  }
+  world.add(spireMesh);
+
+  // 공중 바위
+  const nRk = 18;
+  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), nRk);
+  rockMesh.castShadow = true;
+  for (let i = 0; i < nRk; i++) {
+    const r = 5 + rng() * 7;
+    const a = rng() * Math.PI * 2, d = rng() * (ARENA_R - 40);
+    const p = new THREE.Vector3(Math.cos(a) * d, 35 + rng() * 150, Math.sin(a) * d);
+    dummy.position.copy(p);
+    dummy.scale.setScalar(r);
+    dummy.rotation.set(rng() * 3, rng() * 3, 0);
+    dummy.updateMatrix();
+    rockMesh.setMatrixAt(i, dummy.matrix);
+    rocks.push({ p, r });
+  }
+  world.add(rockMesh);
+
+  // 상승기류 · 탄약 링
+  for (let i = 0; i < 8; i++) {
+    const a = rng() * Math.PI * 2, d = 50 + rng() * (ARENA_R - 90);
+    addThermal(Math.cos(a) * d, Math.sin(a) * d);
+  }
+  for (let i = 0; i < 6; i++) {
+    const a = rng() * Math.PI * 2, d = 40 + rng() * (ARENA_R - 70);
+    addRing(Math.cos(a) * d, 45 + rng() * 150, Math.sin(a) * d, rng);
+  }
+
+  addClouds(rng, 12, (g, r2) => {
+    const a = r2() * Math.PI * 2, d = r2() * (ARENA_R + 150);
+    g.position.x = Math.cos(a) * d;
+    g.position.z = Math.sin(a) * d;
+  });
+
+  // 경계 표시 링
+  const bound = new THREE.Mesh(
+    new THREE.RingGeometry(ARENA_R - 2, ARENA_R, 80),
+    new THREE.MeshBasicMaterial({ color: 0xff8b7e, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+  );
+  bound.rotation.x = -Math.PI / 2;
+  bound.position.y = 0.15;
+  world.add(bound);
+}
+
+/* ============================================================
+   다트 (아레나 전용 발사체)
+   ============================================================ */
+const darts = [];
+const dartGeo = new THREE.ConeGeometry(0.3, 1.6, 6);
+dartGeo.rotateX(Math.PI / 2);
+
+function spawnDart(origin, vel, ownerId, color) {
+  const m = new THREE.Mesh(dartGeo, new THREE.MeshStandardMaterial({
+    color: 0xfffbe8, emissive: color, emissiveIntensity: 0.9, flatShading: true
+  }));
+  m.position.copy(origin);
+  scene.add(m);
+  darts.push({ mesh: m, v: vel.clone(), owner: ownerId, life: 2.6 });
+}
+
+function shoot() {
+  if (game.mode !== 'ARENA' || !me.alive || game.phase !== 'playing' || me.ammo <= 0) return;
+  me.ammo--;
+  const dir = new THREE.Vector3(
+    -Math.sin(me.yaw) * Math.cos(me.pitch),
+     Math.sin(me.pitch),
+    -Math.cos(me.yaw) * Math.cos(me.pitch)
+  );
+  const origin = craft.position.clone().addScaledVector(dir, 2.4);
+  const vel = dir.multiplyScalar(me.speed + 46);
+  spawnDart(origin, vel, net.id, 0x8fe3c4);
+  send({ t: 'shoot', o: origin.toArray().map(v => +v.toFixed(1)), v: vel.toArray().map(v => +v.toFixed(1)) });
+}
+
+function stepDarts(dt) {
+  for (let i = darts.length - 1; i >= 0; i--) {
+    const d = darts[i];
+    d.v.y -= 8 * dt;
+    d.mesh.position.addScaledVector(d.v, dt);
+    d.mesh.lookAt(d.mesh.position.clone().add(d.v));
+    d.life -= dt;
+
+    let dead = d.life <= 0 || d.mesh.position.y < 0.3;
+
+    // 내가 쏜 다트만 명중 판정 → 서버에 신고
+    if (!dead && d.owner === net.id) {
+      for (const [pid, pl] of net.players) {
+        if (!pl.alive || !pl.remote.seen) continue;
+        if (d.mesh.position.distanceTo(pl.remote.group.position) < 3.6) {
+          send({ t: 'hit', id: pid, p: d.mesh.position.toArray().map(v => +v.toFixed(1)) });
+          dead = true;
+          break;
+        }
+      }
+    }
+    // 남이 쏜 다트가 나에게 (시각 피드백용 — 판정은 상대 클라이언트가)
+    if (dead) {
+      scene.remove(d.mesh);
+      d.mesh.material.dispose();
+      darts.splice(i, 1);
+    }
+  }
+}
+
+/* ============================================================
+   페이즈 처리
+   ============================================================ */
+function applyPhase(m) {
+  if (m.phase === 'waiting' || m.phase === undefined && m.t === 'room' && m.phase === 'waiting') {
+    game.phase = 'waiting';
+    showCenter(null, '다른 조종사를 기다리는 중', null);
+    return;
+  }
+
+  if (m.phase === 'countdown') {
+    game.phase = 'countdown';
+    game.seed = m.seed;
+    game.ends = m.ends;
+    game.order = m.order || [];
+    $('results').classList.add('hide');
+
+    (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
+    spawnSelf();
+    for (const pl of net.players.values()) {
+      pl.alive = true; pl.score = 0;
+      pl.remote.seen = false;
+      pl.remote.group.visible = false;
+    }
+    refreshBoard();
+    return;
+  }
+
+  if (m.phase === 'playing') {
+    game.phase = 'playing';
+    game.ends = m.ends;
+    game.frozen = false;
+    // 라운드 도중 입장 → 관전
+    if (m.t === 'room') {
+      if (!world.children.length) (game.mode === 'ARENA' ? buildArena : buildDistance)(m.seed);
+      me.alive = false;
+      showCenter(null, '라운드 진행 중', '다음 라운드부터 참가합니다');
+    } else {
+      hideCenter();
+      me.alive = true;
+    }
+    return;
+  }
+
+  if (m.phase === 'results') {
+    game.phase = 'results';
+    game.ends = m.ends;
+    game.frozen = true;
+    hideCenter();
+    showResults(m.results || []);
+  }
+}
+
+function spawnSelf() {
+  const idx = Math.max(0, game.order.indexOf(net.id));
+  const n = Math.max(1, game.order.length);
+
+  if (game.mode === 'DIST') {
+    craft.position.set((idx - (n - 1) / 2) * 10, 150, 0);
+    me.yaw = 0;
+  } else {
+    const a = (idx / n) * Math.PI * 2;
+    craft.position.set(Math.cos(a) * 130, 130, Math.sin(a) * 130);
+    const c = craft.position.clone().multiplyScalar(-1).normalize();
+    me.yaw = Math.atan2(-c.x, -c.z);
+  }
+  me.pitch = -0.05; me.roll = 0; me.speed = 22;
+  me.alive = false;          // playing 페이즈에서 true
+  me.dist = 0; me.surv = 0;
+  me.ammo = 3; me.ammoT = 0;
+  game.frozen = true;
+  craft.visible = true;
+}
+
+function dieLocal(report = true) {
+  if (!me.alive) return;
+  me.alive = false;
+  if (report) send({ t: 'crash' });
+  showCenter(null, '추락', '관전 중 — 라운드 종료를 기다립니다');
+}
+
+/* ---- 중앙 메시지 ---- */
+function showCenter(cd, msg, sub) {
+  $('center').classList.remove('hide');
+  $('c-cd').classList.toggle('hide', cd == null);
+  $('c-msg').classList.toggle('hide', !msg);
+  $('c-sub').classList.toggle('hide', !sub);
+  if (cd != null) $('c-cd').textContent = cd;
+  if (msg) $('c-msg').textContent = msg;
+  if (sub) $('c-sub').textContent = sub;
+}
+function hideCenter() { $('center').classList.add('hide'); }
+
+let killT = null;
+function showKill(text) {
+  $('kill').textContent = text;
+  $('kill').style.opacity = 1;
+  clearTimeout(killT);
+  killT = setTimeout(() => { $('kill').style.opacity = 0; }, 2200);
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+}
+
+function showResults(results) {
+  const unit = game.mode === 'ARENA' ? 's' : 'm';
+  $('r-body').innerHTML = results.map((r, i) =>
+    `<tr class="${r.id === net.id ? 'me' : ''}">
+       <td>${i + 1}. ${escapeHtml(r.name)}</td><td>${r.score}${unit}</td>
+     </tr>`).join('');
+  $('results').classList.remove('hide');
+}
+
+function refreshBoard() {
+  const rows = [];
+  const mine = {
+    name: myName, score: game.mode === 'ARENA' ? Math.floor(me.surv) : Math.floor(me.dist),
+    alive: me.alive || game.phase !== 'playing', me: true
+  };
+  const all = [mine, ...[...net.players.values()].map(p => ({
+    name: p.name, score: p.score, alive: p.alive, me: false
+  }))];
+  all.sort((a, b) => b.score - a.score);
+  const unit = game.mode === 'ARENA' ? 's' : 'm';
+  $('b-rows').innerHTML = all.map(p =>
+    `<div class="row ${p.alive ? '' : 'dead'} ${p.me ? 'me' : ''}">
+       <span class="nm">${escapeHtml(p.name)}</span><span class="sc">${p.score}${unit}</span>
+     </div>`).join('');
+}
+
+/* ============================================================
+   입력
+   ============================================================ */
+const keys = {};
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['KeyW','KeyS','KeyA','KeyD','Space'].includes(e.code)) e.preventDefault();
+  if (e.code === 'Space') shoot();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+/* ============================================================
+   메인 루프
+   ============================================================ */
+const clock = new THREE.Clock();
+const dir = new THREE.Vector3();
+const fwdH = new THREE.Vector3();
+const camPos = new THREE.Vector3();
+const camUp = new THREE.Vector3();
+const lookAt = new THREE.Vector3();
+const tmpV = new THREE.Vector3();
+
+let sendAcc = 0, roundClock = 0;
+
+function physics(dt) {
+  if (keys.KeyW) me.pitch -= 1.1 * dt;
+  if (keys.KeyS) me.pitch += 1.1 * dt;
+  if (keys.KeyA) me.roll += 2.0 * dt;
+  if (keys.KeyD) me.roll -= 2.0 * dt;
+
+  if (!keys.KeyA && !keys.KeyD) {
+    me.roll *= Math.pow(0.12, dt);
+    if (game.mode === 'DIST') me.yaw += (0 - me.yaw) * (1 - Math.pow(0.28, dt));
+  }
+  if (!keys.KeyW && !keys.KeyS) me.pitch += (-0.09 - me.pitch) * (1 - Math.pow(0.35, dt));
+
+  me.pitch = THREE.MathUtils.clamp(me.pitch, -0.95, 0.75);
+  me.roll = THREE.MathUtils.clamp(me.roll, -0.95, 0.95);
+
+  me.yaw += me.roll * 1.15 * dt;
+  if (game.mode === 'DIST') me.yaw = THREE.MathUtils.clamp(me.yaw, -YAW_LIMIT, YAW_LIMIT);
+
+  me.speed += (-Math.sin(me.pitch) * GRAVITY - DRAG * me.speed * me.speed) * dt;
+  me.speed = Math.max(me.speed, 3);
+  if (me.speed < STALL) me.pitch -= (STALL - me.speed) * 0.34 * dt;
+
+  dir.set(
+    -Math.sin(me.yaw) * Math.cos(me.pitch),
+     Math.sin(me.pitch),
+    -Math.cos(me.yaw) * Math.cos(me.pitch)
+  );
+  craft.position.addScaledVector(dir, me.speed * dt);
+
+  /* 경계 */
+  if (game.mode === 'DIST') {
+    const over = Math.abs(craft.position.x) - (DIST_HALF - 6);
+    if (over > 0) {
+      craft.position.x = Math.sign(craft.position.x) * (DIST_HALF - 6);
+      me.speed *= Math.pow(0.55, dt);
+      me.yaw += -Math.sign(craft.position.x) * 1.2 * dt;
+    }
+    me.dist = Math.max(me.dist, -craft.position.z);
+    if (-craft.position.z > DIST_LEN - 60) craft.position.z = -(DIST_LEN - 60); // 코스 끝
+  } else {
+    const r = Math.hypot(craft.position.x, craft.position.z);
+    if (r > ARENA_R - 6) {
+      const s = (ARENA_R - 6) / r;
+      craft.position.x *= s; craft.position.z *= s;
+      me.speed *= Math.pow(0.55, dt);
+      fwdH.set(-Math.sin(me.yaw), 0, -Math.cos(me.yaw));
+      tmpV.set(-craft.position.x, 0, -craft.position.z).normalize();
+      const cross = fwdH.z * tmpV.x - fwdH.x * tmpV.z;
+      me.yaw += Math.sign(cross) * 1.4 * dt;
+    }
+    me.surv = roundClock;
+    // 탄약 재생
+    me.ammoT += dt;
+    if (me.ammoT > 2.5 && me.ammo < 3) { me.ammo++; me.ammoT = 0; }
+  }
+
+  /* 상승기류 */
+  let inTh = 0;
+  for (const t of thermals) {
+    const d = Math.hypot(craft.position.x - t.position.x, craft.position.z - t.position.z);
+    if (d < THERMAL_R && craft.position.y < 340)
+      inTh = Math.max(inTh, 1 - (d / THERMAL_R) * 0.75);
+  }
+  if (inTh > 0) craft.position.y += THERMAL_LIFT * inTh * dt;
+  $('thermal').classList.toggle('on', inTh > 0);
+  craft.position.y = Math.min(craft.position.y, MAX_ALT);
+
+  /* 충돌 */
+  if (craft.position.y <= 1.2) return dieLocal();
+  for (const s of spires) {
+    if (craft.position.y < s.h) {
+      const d = Math.hypot(craft.position.x - s.x, craft.position.z - s.z);
+      if (d < s.r * (1 - 0.65 * craft.position.y / s.h) + 1.4) return dieLocal();
+    }
+  }
+  for (const r of rocks)
+    if (craft.position.distanceTo(r.p) < r.r + 1.4) return dieLocal();
+
+  /* 링 */
+  for (const ring of ringsArr) {
+    if (ring.userData.taken) continue;
+    if (craft.position.distanceTo(ring.position) < RING_R) {
+      ring.userData.taken = true;
+      ring.visible = false;
+      if (game.mode === 'ARENA') me.ammo = Math.min(3, me.ammo + 1);
+      else me.speed += 6;   // 부스트
+    }
+  }
+}
+
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const now = Date.now();
+  thermalMat.uniforms.uTime.value = clock.getElapsedTime();
+
+  if (game.phase === 'lobby') { renderer.render(scene, camera); return; }
+
+  /* ---- 카운트다운 표시 ---- */
+  if (game.phase === 'countdown') {
+    const left = Math.max(0, (game.ends - now) / 1000);
+    showCenter(Math.ceil(left), game.mode === 'ARENA' ? '오래 날기' : '멀리 날기', null);
+  }
+
+  if (game.phase === 'playing') {
+    roundClock = Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
+    if (me.alive) physics(dt);
+  }
+
+  stepDarts(dt);
+
+  /* ---- 원격 기체 보간 ---- */
+  for (const pl of net.players.values()) {
+    const r = pl.remote;
+    if (!r.seen || !pl.alive || game.phase !== 'playing') { r.group.visible = false; continue; }
+    r.group.visible = true;
+    r.group.position.lerp(r.tp, Math.min(1, 12 * dt));
+    r.group.rotation.x += (r.tr.x - r.group.rotation.x) * Math.min(1, 10 * dt);
+    r.group.rotation.z += (r.tr.z - r.group.rotation.z) * Math.min(1, 10 * dt);
+    // yaw는 -π~π 경계 보정
+    let dy = r.tr.y - r.group.rotation.y;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    r.group.rotation.y += dy * Math.min(1, 10 * dt);
+  }
+
+  craft.rotation.set(me.pitch, me.yaw, me.roll);
+  ringsArr.forEach(r => { if (!r.userData.taken) r.rotation.z += dt * 0.8; });
+
+  /* ---- 카메라: 생존 시 추적, 사망 시 관전 ---- */
+  let followPos = craft.position, followYaw = me.yaw, followRoll = me.roll, followPitch = me.pitch;
+  if (!me.alive && game.phase === 'playing') {
+    const target = [...net.players.values()].find(p => p.alive && p.remote.seen);
+    if (target) {
+      followPos = target.remote.group.position;
+      followYaw = target.remote.group.rotation.y;
+      followRoll = 0; followPitch = 0;
+      craft.visible = false;
+    }
+  }
+
+  fwdH.set(-Math.sin(followYaw), 0, -Math.cos(followYaw));
+  camPos.set(followPos.x - fwdH.x * 15, followPos.y + 5.2, followPos.z - fwdH.z * 15);
+  camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
+  camUp.set(0, 1, 0).applyAxisAngle(fwdH, followRoll * 0.45);
+  camera.up.lerp(camUp, 1 - Math.pow(0.02, dt));
+  lookAt.copy(followPos).addScaledVector(fwdH, 14);
+  lookAt.y += Math.sin(followPitch) * 12;
+  camera.lookAt(lookAt);
+
+  /* ---- 배경 추적 ---- */
+  sky.position.copy(camera.position);
+  if (game.mode === 'DIST') {
+    ground.position.set(0, 0, followPos.z);
+    grid.position.set(0, 0.05, Math.round(followPos.z / 40) * 40);
+  } else {
+    ground.position.set(0, 0, 0);
+    grid.position.set(0, 0.05, 0);
+  }
+  sun.position.set(followPos.x + 70, 110, followPos.z + 50);
+  sun.target.position.copy(followPos);
+
+  /* ---- 상태 송신 (15Hz) ---- */
+  sendAcc += dt;
+  if (sendAcc > 0.066 && game.phase === 'playing' && me.alive) {
+    sendAcc = 0;
+    send({
+      t: 's',
+      p: [+craft.position.x.toFixed(1), +craft.position.y.toFixed(1), +craft.position.z.toFixed(1)],
+      r: [+me.pitch.toFixed(2), +me.yaw.toFixed(2), +me.roll.toFixed(2)],
+      d: Math.floor(me.dist)
+    });
+  }
+
+  /* ---- HUD ---- */
+  $('s-main').textContent = game.mode === 'ARENA' ? Math.floor(me.surv) : Math.floor(me.dist);
+  $('s-alt').textContent = Math.floor(craft.position.y);
+  $('s-spd').textContent = Math.floor(me.speed * 3.6);
+  const fill = $('s-fill');
+  fill.style.width = Math.min(100, (me.speed / 48) * 100) + '%';
+  fill.classList.toggle('stall', me.speed < STALL);
+
+  if (game.mode === 'ARENA') {
+    const pips = $('ammo').children;
+    for (let i = 0; i < 3; i++) pips[i].classList.toggle('on', i < me.ammo);
+  }
+
+  if (game.phase === 'playing' || game.phase === 'countdown') {
+    const left = Math.max(0, (game.ends - now) / 1000);
+    const mm = String(Math.floor(left / 60)).padStart(2, '0');
+    const ss = String(Math.floor(left % 60)).padStart(2, '0');
+    $('timer').textContent = game.phase === 'playing' ? `${mm}:${ss}` : '--:--';
+    $('timer').classList.toggle('low', game.phase === 'playing' && left < 20);
+  }
+
+  renderer.render(scene, camera);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

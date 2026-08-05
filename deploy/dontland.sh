@@ -7,6 +7,36 @@ SHARED_DIR="$DEPLOY_ROOT/shared"
 NODE_VERSION=v24.19.0
 PORT=${PORT:-3000}
 
+case "$DEPLOY_ROOT" in
+  /*) ;;
+  *) echo 'DEPLOY_ROOT must be absolute' >&2; exit 1 ;;
+esac
+case "$DEPLOY_ROOT" in
+  *[!A-Za-z0-9_./-]*) echo 'DEPLOY_ROOT contains unsafe characters' >&2; exit 1 ;;
+esac
+case "$PORT" in
+  ''|*[!0-9]*) echo 'PORT must be numeric' >&2; exit 1 ;;
+esac
+[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || { echo 'PORT is out of range' >&2; exit 1; }
+
+valid_previous_release() {
+  [ -n "${PREVIOUS_RELEASE:-}" ] || return 1
+  [ "${PREVIOUS_RELEASE%/*}" = "$DEPLOY_ROOT/releases" ] || return 1
+  previous_name=${PREVIOUS_RELEASE##*/}
+  case "$previous_name" in ''|*[!0-9]*) return 1 ;; esac
+  [ -d "$PREVIOUS_RELEASE" ]
+}
+
+if [ -n "${PREVIOUS_RELEASE:-}" ] && ! valid_previous_release; then
+  echo 'PREVIOUS_RELEASE is outside the managed releases directory' >&2
+  exit 1
+fi
+
+RELEASE_ID=${APP_DIR##*/}
+case "$RELEASE_ID" in
+  ''|*[!A-Za-z0-9._-]*) echo 'Release directory name is unsafe' >&2; exit 1 ;;
+esac
+
 case "$(uname -m)" in
   x86_64)
     NODE_ARCH=x64
@@ -51,13 +81,15 @@ case "${DEPLOY_PHASE:-all}" in
 esac
 
 health_check() {
-  python3 - "$PORT" <<'PY'
+  python3 - "$PORT" "$RELEASE_ID" <<'PY'
 import json, sys, time, urllib.request
 url=f'http://127.0.0.1:{sys.argv[1]}/healthz'
+expected_release=sys.argv[2]
 for _ in range(30):
     try:
         with urllib.request.urlopen(url, timeout=2) as response:
-            if response.status == 200 and json.load(response).get('status') == 'ok':
+            payload=json.load(response)
+            if response.status == 200 and payload.get('status') == 'ok' and payload.get('release') == expected_release:
                 raise SystemExit(0)
     except Exception:
         time.sleep(1)
@@ -65,9 +97,33 @@ raise SystemExit(1)
 PY
 }
 
+stop_pidfile_process() {
+  pid_file="$SHARED_DIR/app.pid"
+  [ -f "$pid_file" ] || return 0
+  old_pid=$(cat "$pid_file" 2>/dev/null || true)
+  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+    cmdline=$(tr '\000' ' ' < "/proc/$old_pid/cmdline" 2>/dev/null || true)
+    case "$cmdline" in
+      *"$DEPLOY_ROOT/current/server.js"*) ;;
+      *) echo "Refusing to stop unrelated PID $old_pid" >&2; return 1 ;;
+    esac
+    kill "$old_pid" 2>/dev/null || true
+    i=0
+    while kill -0 "$old_pid" 2>/dev/null && [ "$i" -lt 20 ]; do sleep 1; i=$((i+1)); done
+    if kill -0 "$old_pid" 2>/dev/null; then
+      echo "Previous app PID $old_pid did not stop" >&2
+      return 1
+    fi
+  fi
+  rm -f "$pid_file"
+}
+
+APP_START_MODE=none
+SYSTEMD_UNIT_WRITTEN=0
 start_with_systemd() {
   command -v systemctl >/dev/null 2>&1 || return 1
   command -v loginctl >/dev/null 2>&1 || return 1
+  [ "$DEPLOY_ROOT" = /home/ovily/appdata/dev ] || return 1
   [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)" = yes ] || return 1
   systemctl --user show-environment >/dev/null 2>&1 || return 1
   unit_dir="$HOME/.config/systemd/user"
@@ -83,6 +139,7 @@ Type=simple
 WorkingDirectory=$DEPLOY_ROOT/current
 Environment=NODE_ENV=production
 Environment=PORT=$PORT
+Environment=RELEASE_ID=$RELEASE_ID
 ExecStart=$NODE_HOME/bin/node $DEPLOY_ROOT/current/server.js
 Restart=always
 RestartSec=3
@@ -90,38 +147,35 @@ RestartSec=3
 [Install]
 WantedBy=default.target
 EOF
-  systemctl --user daemon-reload
-  systemctl --user enable dontland-dev.service >/dev/null
-  systemctl --user restart dontland-dev.service
+  SYSTEMD_UNIT_WRITTEN=1
+  stop_pidfile_process || return 1
+  systemctl --user daemon-reload || return 1
+  systemctl --user enable dontland-dev.service >/dev/null || return 1
+  systemctl --user restart dontland-dev.service || return 1
 }
 
 start_with_pidfile() {
   pid_file="$SHARED_DIR/app.pid"
-  if [ -f "$pid_file" ]; then
-    old_pid=$(cat "$pid_file" 2>/dev/null || true)
-    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-      cmdline=$(tr '\000' ' ' < "/proc/$old_pid/cmdline" 2>/dev/null || true)
-      case "$cmdline" in
-        *"$DEPLOY_ROOT/current/server.js"*) ;;
-        *) echo "Refusing to stop unrelated PID $old_pid" >&2; return 1 ;;
-      esac
-      kill "$old_pid" 2>/dev/null || true
-      i=0
-      while kill -0 "$old_pid" 2>/dev/null && [ "$i" -lt 20 ]; do sleep 1; i=$((i+1)); done
-      if kill -0 "$old_pid" 2>/dev/null; then
-        echo "Previous app PID $old_pid did not stop" >&2
-        return 1
-      fi
-    fi
-  fi
-  nohup env NODE_ENV=production PORT="$PORT" "$NODE_HOME/bin/node" "$DEPLOY_ROOT/current/server.js" >> "$SHARED_DIR/app.log" 2>&1 </dev/null &
-  echo $! > "$pid_file"
+  stop_pidfile_process || return 1
+  nohup env NODE_ENV=production PORT="$PORT" RELEASE_ID="$RELEASE_ID" "$NODE_HOME/bin/node" "$DEPLOY_ROOT/current/server.js" >> "$SHARED_DIR/app.log" 2>&1 </dev/null &
+  new_pid=$!
+  [ -n "$new_pid" ] || return 1
+  echo "$new_pid" > "$pid_file" || return 1
 }
 
 restart_app() {
-  if [ "${DONTLAND_USE_SYSTEMD:-1}" = 1 ] && start_with_systemd; then
-    APP_START_MODE=systemd
-    return 0
+  if [ "${DONTLAND_USE_SYSTEMD:-1}" = 1 ]; then
+    if start_with_systemd; then
+      APP_START_MODE=systemd
+      return 0
+    fi
+    if [ "$SYSTEMD_UNIT_WRITTEN" = 1 ]; then
+      systemctl --user stop dontland-dev.service >/dev/null 2>&1 || return 1
+      return 1
+    fi
+  fi
+  if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet dontland-dev.service 2>/dev/null; then
+    systemctl --user stop dontland-dev.service >/dev/null 2>&1 || return 1
   fi
   start_with_pidfile
   APP_START_MODE=pidfile
@@ -141,17 +195,23 @@ verify_started_process() {
   esac
 }
 
-restart_app
-if health_check && verify_started_process; then
+if restart_app && health_check && verify_started_process; then
   echo "dontland-dev-ready port=$PORT node=$($NODE_HOME/bin/node --version)"
   exit 0
 fi
 
 echo 'New release failed health verification; attempting rollback.' >&2
-if [ -n "${PREVIOUS_RELEASE:-}" ] && [ -d "$PREVIOUS_RELEASE" ]; then
+if valid_previous_release; then
   ln -sfn "$PREVIOUS_RELEASE" "$DEPLOY_ROOT/current.rollback"
   mv -Tf "$DEPLOY_ROOT/current.rollback" "$DEPLOY_ROOT/current"
-  restart_app
-  health_check || true
+  RELEASE_ID=${PREVIOUS_RELEASE##*/}
+  if restart_app && health_check && verify_started_process; then
+    echo "dontland-dev-rollback-ready release=$RELEASE_ID"
+  fi
+else
+  case "$APP_START_MODE" in
+    systemd) systemctl --user stop dontland-dev.service >/dev/null 2>&1 || true ;;
+    pidfile) stop_pidfile_process || true ;;
+  esac
 fi
 exit 1

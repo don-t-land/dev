@@ -195,7 +195,8 @@
           sh '''
             set -eu
             ASKPASS=$(mktemp)
-            cleanup() { rm -f "$ASKPASS"; }
+            ARCHIVE=$(mktemp)
+            cleanup() { rm -f "$ASKPASS" "$ARCHIVE"; }
             trap cleanup EXIT HUP INT TERM
             printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "$DONTLAND_PASSWORD"' > "$ASKPASS"
             chmod 700 "$ASKPASS"
@@ -204,10 +205,18 @@
             RELEASE="$DEPLOY_ROOT/releases/$BUILD_NUMBER"
 
             setsid -w ssh $SSH_BASE "$DONTLAND_USER@$DEPLOY_HOST" "set -eu; rm -rf '$RELEASE'; mkdir -p '$RELEASE'"
-            tar --exclude='.git' --exclude='./.git' --exclude='node_modules' --exclude='./node_modules' -czf - . | setsid -w ssh $SSH_BASE "$DONTLAND_USER@$DEPLOY_HOST" "tar -xzf - -C '$RELEASE'"
+            tar --exclude='.git' --exclude='./.git' --exclude='node_modules' --exclude='./node_modules' -czf "$ARCHIVE" .
+            setsid -w ssh $SSH_BASE "$DONTLAND_USER@$DEPLOY_HOST" "tar -xzf - -C '$RELEASE'" < "$ARCHIVE"
+            rm -f "$ARCHIVE"
             setsid -w ssh $SSH_BASE "$DONTLAND_USER@$DEPLOY_HOST" "DEPLOY_ROOT='$DEPLOY_ROOT' RELEASE='$RELEASE' BUILD_NUMBER='$BUILD_NUMBER' sh -s" <<'REMOTE'
 set -eu
 previous=$(readlink "$DEPLOY_ROOT/current" 2>/dev/null || true)
+if [ -n "$previous" ]; then
+  [ "${previous%/*}" = "$DEPLOY_ROOT/releases" ] || { echo 'Unsafe current release link' >&2; exit 1; }
+  previous_name=${previous##*/}
+  case "$previous_name" in ''|*[!0-9]*) echo 'Unsafe current release name' >&2; exit 1 ;; esac
+  [ -d "$previous" ] || { echo 'Current release target is missing' >&2; exit 1; }
+fi
 if [ -x "$RELEASE/deploy/dontland.sh" ]; then
   DEPLOY_ROOT="$DEPLOY_ROOT" DEPLOY_PHASE=prepare "$RELEASE/deploy/dontland.sh"
 fi
@@ -217,6 +226,8 @@ rollback() {
   if [ -n "$previous" ] && [ -d "$previous" ]; then
     ln -sfn "$previous" "$DEPLOY_ROOT/current.rollback"
     mv -Tf "$DEPLOY_ROOT/current.rollback" "$DEPLOY_ROOT/current"
+  else
+    rm -f "$DEPLOY_ROOT/current"
   fi
 }
 if [ -x "$RELEASE/deploy/dontland.sh" ]; then
@@ -227,6 +238,10 @@ else
   echo 'No deploy hook found; source release activated only.'
 fi
 printf 'deployed_release=%s\n' "$RELEASE"
+old_releases=$(find "$DEPLOY_ROOT/releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | grep -E '^[0-9]+$' | sort -nr | sed -n '6,$p' || true)
+for old_name in $old_releases; do
+  rm -rf -- "$DEPLOY_ROOT/releases/$old_name"
+done
 REMOTE
           '''
         }

@@ -37,7 +37,7 @@ test('health endpoint reports readiness', async () => {
   const response = await request('/healthz');
   assert.equal(response.status, 200);
   assert.match(response.contentType, /^application\/json/);
-  assert.deepEqual(JSON.parse(response.body), { status: 'ok' });
+  assert.deepEqual(JSON.parse(response.body), { status: 'ok', release: 'development' });
 });
 
 test('root serves the multiplayer client', async () => {
@@ -67,4 +67,18 @@ test('WebSocket payloads larger than 16 KiB are rejected', async () => {
     ws.once('close', resolve);
   });
   assert.equal(closeCode, 1009);
+});
+
+test('WebSocket clients exceeding 60 messages per second are rate-limited', async () => {
+  const WebSocket = require('ws');
+  const wsUrl = baseUrl.replace(/^http/, 'ws');
+  const closeCode = await new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    ws.once('error', reject);
+    ws.once('open', () => {
+      for (let i = 0; i < 61; i++) ws.send('{}');
+    });
+    ws.once('close', resolve);
+  });
+  assert.equal(closeCode, 1008);
 });

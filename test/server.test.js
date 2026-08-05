@@ -269,6 +269,103 @@ test('playing rooms publish a server-authoritative live leaderboard', async () =
   }
 });
 
+test('round participants return to the waiting room only after individual acknowledgement', async () => {
+  const host = await connectClient();
+  const guest = await connectClient();
+  try {
+    const hostHello = await establishSession(host, '확인방장');
+    const guestHello = await establishSession(guest, '확인손님');
+    host.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    guest.send({ t: 'join', code: created.code });
+    await guest.next(message => message.t === 'room' && message.players.length === 2);
+    host.takeAll(message => message.t === 'room');
+
+    host.send({ t: 'start' });
+    await guest.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);
+    guest.send({ t: 'crash' });
+    await host.next(message => message.t === 'phase' && message.phase === 'results');
+
+    host.send({ t: 'results-ready' });
+    const hostReady = await host.next(message => message.t === 'room' && message.phase === 'results' &&
+      Array.isArray(message.readyIds) && message.readyIds.includes(hostHello.id));
+    assert.deepEqual(hostReady.readyIds, [hostHello.id]);
+
+    host.send({ t: 'results-ready' });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(host.takeAll(message => message.t === 'room' && message.phase === 'results').length, 0,
+      'duplicate acknowledgement must not broadcast another room snapshot');
+
+    guest.send({ t: 'results-ready' });
+    const [hostWaiting, guestWaiting] = await Promise.all([
+      host.next(message => message.t === 'room' && message.phase === 'waiting'),
+      guest.next(message => message.t === 'room' && message.phase === 'waiting')
+    ]);
+    assert.equal(hostWaiting.results.length, 0);
+    assert.equal(guestWaiting.results.length, 0);
+    assert.deepEqual(hostWaiting.readyIds, []);
+    assert.deepEqual(guestWaiting.readyIds, []);
+    assert.deepEqual(new Set(hostWaiting.players.map(player => player.id)), new Set([hostHello.id, guestHello.id]));
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
+  }
+});
+
+test('disconnecting an unacknowledged participant releases the remaining ready player', async () => {
+  const host = await connectClient();
+  const guest = await connectClient();
+  try {
+    const hostHello = await establishSession(host, '남은방장');
+    await establishSession(guest, '연결종료손님');
+    host.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    guest.send({ t: 'join', code: created.code });
+    await guest.next(message => message.t === 'room' && message.players.length === 2);
+    host.takeAll(message => message.t === 'room');
+
+    host.send({ t: 'start' });
+    await guest.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);
+    guest.send({ t: 'crash' });
+    await host.next(message => message.t === 'phase' && message.phase === 'results');
+    host.send({ t: 'results-ready' });
+    await host.next(message => message.t === 'room' && message.phase === 'results' &&
+      message.readyIds.includes(hostHello.id));
+
+    await guest.close();
+    const waiting = await host.next(message => message.t === 'room' && message.phase === 'waiting' &&
+      message.players.length === 1);
+    assert.deepEqual(waiting.players.map(player => player.id), [hostHello.id]);
+    assert.deepEqual(waiting.readyIds, []);
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
+  }
+});
+
+test('a spectator room returns to waiting when every round participant leaves', async () => {
+  const host = await connectClient();
+  const spectator = await connectClient();
+  try {
+    await establishSession(host, '떠나는참가자');
+    const spectatorHello = await establishSession(spectator, '남은관전자');
+    host.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    host.send({ t: 'start' });
+    await host.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);
+
+    spectator.send({ t: 'join', code: created.code });
+    await spectator.next(message => message.t === 'room' && message.phase === 'playing');
+    host.send({ t: 'leave' });
+
+    const waiting = await spectator.next(message => message.t === 'room' && message.phase === 'waiting', 1_500);
+    assert.deepEqual(waiting.order, []);
+    assert.deepEqual(waiting.results, []);
+    assert.deepEqual(waiting.readyIds, []);
+    assert.equal(waiting.hostId, spectatorHello.id);
+  } finally {
+    await Promise.all([host.close(), spectator.close()]);
+  }
+});
+
 test('results survive membership changes and late joins', async () => {
   const host = await connectClient();
   const guest = await connectClient();
@@ -280,6 +377,7 @@ test('results survive membership changes and late joins', async () => {
     const created = await host.next(message => message.t === 'room');
     guest.send({ t: 'join', code: created.code });
     await guest.next(message => message.t === 'room' && message.players.length === 2);
+    host.takeAll(message => message.t === 'room');
 
     host.send({ t: 'start' });
     await guest.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);

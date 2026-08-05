@@ -17,5 +17,5 @@
     return gameKeyCodes.has(event?.code) && !isEditableTarget(event?.target);
   }
 
-  return { shouldCaptureGameKey };
+  return { shouldCaptureGameKey, isEditableTarget };
 });

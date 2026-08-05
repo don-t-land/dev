@@ -4,8 +4,8 @@
    - HTTP: public/ 정적 파일 서빙
    - WebSocket: 방·세션·라운드 관리, 상태 중계
    - 세션: 토큰으로 재접속 시 이름·승수 유지 (서버 생존 동안)
-   - 방: 모드별 자동 생성, 최대 8명
-   - 라운드: waiting → countdown(4s) → playing → results(7s) 반복
+   - 방: 공개/비공개 생성, 초대 코드, 최대 8명
+   - 라운드: waiting → countdown(4s) → playing → results → 참가자별 확인 → waiting
    ============================================================ */
 'use strict';
 
@@ -91,6 +91,7 @@ function makeRoom(mode, visibility = 'public') {
     startedAt: 0,
     startedWith: 0,
     results: [],
+    readyIds: new Set(),
     timer: null
   };
   rooms.set(room.id, room);
@@ -205,6 +206,7 @@ function snapshot(room) {
     ends: room.phaseEnds,
     order: room.order,
     results: room.results,
+    readyIds: [...room.readyIds],
     players: [...room.players.values()].map(p => ({
       id: p.id, name: p.name, wins: p.wins, alive: p.alive
     }))
@@ -214,13 +216,15 @@ function snapshot(room) {
 function removePlayerFromRoom(room, player) {
   room.players.delete(player.id);
   room.order = room.order.filter(id => id !== player.id);
+  room.readyIds.delete(player.id);
   bcast(room, { t: 'pl', id: player.id });
   if (room.hostId === player.id) room.hostId = room.players.keys().next().value || null;
   if (room.players.size === 0) {
     clearTimeout(room.timer);
     rooms.delete(room.id);
   } else {
-    bcast(room, snapshot(room));
+    const resultsFinished = room.phase === 'results' && finishResultsIfReady(room);
+    if (!resultsFinished) bcast(room, snapshot(room));
     checkEarlyEnd(room);
   }
   broadcastRoomList();
@@ -245,6 +249,7 @@ function startCountdown(room) {
   room.phaseEnds = Date.now() + 4000;
   room.order = [...room.players.keys()];
   room.results = [];
+  room.readyIds.clear();
   for (const p of room.players.values()) {
     p.alive = true;
     p.score = 0;
@@ -263,6 +268,10 @@ function startPlaying(room) {
   room.phase = 'playing';
   room.startedAt = Date.now();
   room.startedWith = room.order.filter(id => room.players.has(id)).length;
+  if (room.startedWith === 0) {
+    endRound(room);
+    return;
+  }
   room.phaseEnds = Date.now() + ROUND_SEC[room.mode] * 1000;
   bcast(room, { t: 'phase', phase: 'playing', ends: room.phaseEnds });
   broadcastRoomList();
@@ -297,18 +306,31 @@ function endRound(room) {
   }
 
   room.results = results;
-  room.phaseEnds = Date.now() + 7000;
-  bcast(room, { t: 'phase', phase: 'results', results, ends: room.phaseEnds });
+  room.readyIds.clear();
+  room.phaseEnds = 0;
+  room.timer = null;
+  if (finishResultsIfReady(room)) return;
+  bcast(room, {
+    t: 'phase', phase: 'results', results, ends: room.phaseEnds,
+    order: room.order, readyIds: []
+  });
   broadcastRoomList();
-  room.timer = setTimeout(() => {
-    room.phase = 'waiting';
-    room.phaseEnds = 0;
-    room.order = [];
-    room.results = [];
-    for (const player of room.players.values()) player.alive = false;
-    bcast(room, snapshot(room));
-    broadcastRoomList();
-  }, 7000);
+}
+
+function finishResultsIfReady(room) {
+  if (room.phase !== 'results') return false;
+  const requiredIds = room.order.filter(id => room.players.has(id));
+  if (requiredIds.some(id => !room.readyIds.has(id))) return false;
+
+  room.phase = 'waiting';
+  room.phaseEnds = 0;
+  room.order = [];
+  room.results = [];
+  room.readyIds.clear();
+  for (const player of room.players.values()) player.alive = false;
+  bcast(room, snapshot(room));
+  broadcastRoomList();
+  return true;
 }
 
 function onCrash(room, player, byName) {
@@ -519,6 +541,14 @@ wss.on('connection', (ws) => {
       }
       startCountdown(room);
       broadcastRoomList();
+      return;
+    }
+
+    /* -- 결과 확인은 라운드 참가자별로 명시적으로 완료합니다 -- */
+    if (m.t === 'results-ready') {
+      if (room.phase !== 'results' || !room.order.includes(me.id) || room.readyIds.has(me.id)) return;
+      room.readyIds.add(me.id);
+      if (!finishResultsIfReady(room)) bcast(room, snapshot(room));
       return;
     }
 

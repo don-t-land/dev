@@ -12,5 +12,12 @@
     return player?.alive ? 'active' : 'crashed';
   }
 
-  return { getLocalRoundRole };
+  function shouldShowResults(room, playerId) {
+    if (room?.phase !== 'results') return false;
+    const order = Array.isArray(room.order) ? room.order : [];
+    const readyIds = Array.isArray(room.readyIds) ? room.readyIds : [];
+    return order.includes(playerId) && !readyIds.includes(playerId);
+  }
+
+  return { getLocalRoundRole, shouldShowResults };
 });

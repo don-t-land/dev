@@ -195,7 +195,11 @@ verify_started_process() {
   esac
 }
 
-if restart_app && health_check && verify_started_process; then
+verify_websocket() {
+  PORT="$PORT" "$NODE_HOME/bin/node" "$APP_DIR/deploy/verify-websocket.js"
+}
+
+if restart_app && health_check && verify_started_process && verify_websocket; then
   echo "dontland-dev-ready port=$PORT node=$($NODE_HOME/bin/node --version)"
   exit 0
 fi
@@ -205,7 +209,7 @@ if valid_previous_release; then
   ln -sfn "$PREVIOUS_RELEASE" "$DEPLOY_ROOT/current.rollback"
   mv -Tf "$DEPLOY_ROOT/current.rollback" "$DEPLOY_ROOT/current"
   RELEASE_ID=${PREVIOUS_RELEASE##*/}
-  if restart_app && health_check && verify_started_process; then
+  if restart_app && health_check && verify_started_process && verify_websocket; then
     echo "dontland-dev-rollback-ready release=$RELEASE_ID"
   fi
 else

@@ -203,9 +203,11 @@
   }
 }
 </script>
+<script src="./input-policy.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
+const { shouldCaptureGameKey } = window.inputPolicy;
 
 /* ============================================================
    유틸
@@ -950,8 +952,9 @@ function refreshBoard() {
    ============================================================ */
 const keys = {};
 addEventListener('keydown', e => {
+  if (!shouldCaptureGameKey(e)) return;
   keys[e.code] = true;
-  if (['KeyW','KeyS','KeyA','KeyD','Space'].includes(e.code)) e.preventDefault();
+  e.preventDefault();
   if (e.code === 'Space') shoot();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });

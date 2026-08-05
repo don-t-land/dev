@@ -7,21 +7,25 @@ const {
   keyGuideVisibleFromStorage
 } = require('../public/flight-controls.js');
 
-test('DIST flight keeps its attitude without automatic forward alignment', () => {
+test('DIST keeps free pitch while its roll self-levels like ARENA', () => {
   const state = { yaw: 1.7, pitch: 1.2, roll: 0.8 };
   const next = updateAttitude(state, {}, 0.5, 'DIST');
+  const arena = updateAttitude(state, {}, 0.5, 'ARENA');
 
   assert.ok(Math.abs(next.pitch - state.pitch) < 1e-9);
-  assert.ok(Math.abs(next.roll - state.roll) < 1e-9);
+  assert.equal(next.roll, arena.roll);
+  assert.ok(Math.abs(next.roll) < Math.abs(state.roll));
   assert.ok(next.yaw > state.yaw, 'bank angle should continue turning the aircraft');
 });
 
-test('DIST flight supports complete loops and rolls instead of angle clamps', () => {
-  const state = { yaw: 0, pitch: -3.05, roll: 3.05 };
+test('DIST supports complete loops but uses the same roll limit as ARENA', () => {
+  const state = { yaw: 0, pitch: -3.05, roll: 0.9 };
   const next = updateAttitude(state, { KeyW: true, KeyA: true }, 0.2, 'DIST');
+  const arena = updateAttitude(state, { KeyW: true, KeyA: true }, 0.2, 'ARENA');
 
   assert.ok(next.pitch > 2.9, `pitch should wrap through -π, got ${next.pitch}`);
-  assert.ok(next.roll < -2.8, `roll should wrap through π, got ${next.roll}`);
+  assert.equal(next.roll, arena.roll);
+  assert.equal(next.roll, 0.95);
 });
 
 test('ARENA keeps its existing assisted attitude limits without pulling yaw toward zero', () => {
@@ -35,25 +39,13 @@ test('ARENA keeps its existing assisted attitude limits without pulling yaw towa
   assert.ok(next.roll >= -0.95 && next.roll <= 0.95);
 });
 
-test('DIST bank-to-turn remains continuous across the full-roll wrap boundary', () => {
-  const positive = updateAttitude({ yaw: 0, pitch: 0, roll: Math.PI - 0.01 }, {}, 0.05, 'DIST');
-  const negative = updateAttitude({ yaw: 0, pitch: 0, roll: -Math.PI + 0.01 }, {}, 0.05, 'DIST');
-
-  assert.ok(Math.abs(positive.yaw) < 0.002, `positive wrap turn was ${positive.yaw}`);
-  assert.ok(Math.abs(negative.yaw) < 0.002, `negative wrap turn was ${negative.yaw}`);
-});
-
-test('DIST full-roll steering is effectively frame-rate independent', () => {
-  function simulate(hz) {
-    let state = { yaw: 0, pitch: 0, roll: 0 };
-    const dt = 1 / hz;
-    for (let i = 0; i < hz * 10; i++) state = updateAttitude(state, { KeyA: true }, dt, 'DIST');
-    return state;
+test('DIST and ARENA apply identical roll dynamics for both input and release', () => {
+  for (const keys of [{ KeyD: true }, {}]) {
+    const state = { yaw: -0.4, pitch: 0.2, roll: -0.7 };
+    const dist = updateAttitude(state, keys, 0.05, 'DIST');
+    const arena = updateAttitude(state, keys, 0.05, 'ARENA');
+    assert.equal(dist.roll, arena.roll);
   }
-  const low = simulate(20);
-  const high = simulate(120);
-  const yawDifference = Math.abs(Math.atan2(Math.sin(low.yaw - high.yaw), Math.cos(low.yaw - high.yaw)));
-  assert.ok(yawDifference < 0.02, `20Hz/120Hz yaw differed by ${yawDifference}rad`);
 });
 
 test('mouse free-look rotates continuously and clamps only the vertical view', () => {

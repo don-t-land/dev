@@ -146,8 +146,8 @@ test('the first screen is a modular paper-plane home screen with two flight mode
   ]);
   assert.match(html, /<link rel="stylesheet" href="\.\/home-screen\.css">/);
   assert.match(html, /id="home-screen"/);
-  assert.match(html, /data-home-mode="distance"/);
-  assert.match(html, /data-home-mode="survival"/);
+  assert.match(html, /data-home-mode="DIST"/);
+  assert.match(html, /data-home-mode="ARENA"/);
   assert.match(html, /data-home-action="costume"/);
   assert.match(html, /class="home-vertical-plane"/);
   assert.match(html, /<script src="\.\/home-screen\.js"><\/script>/);

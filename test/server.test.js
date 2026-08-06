@@ -267,11 +267,34 @@ test('an arena room requires every player to be ready before its host starts fol
     const launch = await host.next(message => message.t === 'phase' && message.phase === 'launch');
     assert.equal(launch.order.length, 2);
     assert.equal(launch.crafts.length, 2);
+    assert.equal(launch.duration, 80);
     assert.equal(launch.crafts.find(craft => craft.id === hostHello.id).aeroProfile.planformArea, 2);
     assert.ok(launch.ends > Date.now());
     await host.next(message => message.t === 'phase' && message.phase === 'playing');
   } finally {
     await Promise.all([host.close(), guest.close()]);
+  }
+});
+
+test('a distance room uses the same ready and folding flow before its own map', async () => {
+  const host = await connectClient();
+  try {
+    await establishSession(host, '거리방장');
+    host.send({ t: 'create', mode: 'DIST', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    assert.equal(created.maxPlayers, 4);
+
+    host.send({ t: 'start' });
+    const notReady = await host.next(message => message.t === 'error');
+    assert.equal(notReady.code, 'NOT_ALL_READY');
+
+    host.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players[0].ready === true);
+    host.send({ t: 'start' });
+    const folding = await host.next(message => message.t === 'phase' && message.phase === 'folding');
+    assert.deepEqual(folding.order, [created.hostId]);
+  } finally {
+    await host.close();
   }
 });
 
@@ -291,8 +314,10 @@ test('host ownership transfers when the host disconnects', async () => {
     const updated = await guest.next(message => message.t === 'room' && message.hostId === guestHello.id);
     assert.equal(updated.players.length, 1);
 
+    guest.send({ t: 'ready', ready: true });
+    await guest.next(message => message.t === 'room' && message.players[0].ready === true);
     guest.send({ t: 'start' });
-    const phase = await guest.next(message => message.t === 'phase' && message.phase === 'countdown');
+    const phase = await guest.next(message => message.t === 'phase' && message.phase === 'folding');
     assert.deepEqual(phase.order, [guestHello.id]);
   } finally {
     await Promise.all([host.close(), guest.close()]);
@@ -481,21 +506,21 @@ test('a lobby player can rename before joining a room', async () => {
   }
 });
 
-test('a room rejects the ninth player', async () => {
-  const clients = await Promise.all(Array.from({ length: 9 }, () => connectClient()));
+test('a distance room rejects the fifth player', async () => {
+  const clients = await Promise.all(Array.from({ length: 5 }, () => connectClient()));
   try {
     await Promise.all(clients.map((client, index) => establishSession(client, `조종사${index + 1}`)));
     clients[0].send({ t: 'create', mode: 'DIST', visibility: 'public' });
     const room = await clients[0].next(message => message.t === 'room');
-    assert.equal(room.maxPlayers, 8);
+    assert.equal(room.maxPlayers, 4);
 
-    for (let index = 1; index < 8; index++) {
+    for (let index = 1; index < 4; index++) {
       clients[index].send({ t: 'join', code: room.code });
       await clients[index].next(message => message.t === 'room' && message.players.length >= index + 1);
     }
 
-    clients[8].send({ t: 'join', code: room.code });
-    const denied = await clients[8].next(message => message.t === 'error');
+    clients[4].send({ t: 'join', code: room.code });
+    const denied = await clients[4].next(message => message.t === 'error');
     assert.equal(denied.code, 'ROOM_FULL');
   } finally {
     await Promise.all(clients.map(client => client.close()));

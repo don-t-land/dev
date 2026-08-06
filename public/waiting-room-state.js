@@ -35,7 +35,7 @@
 
   function canStart(room, playerId) {
     if (room?.phase !== 'waiting' || getWaitingRole(room, playerId) !== 'host') return false;
-    return room.mode === 'ARENA' ? areAllPlayersReady(room) : getPlayers(room).length > 0;
+    return areAllPlayersReady(room);
   }
 
   function getLocalReady(room, playerId) {

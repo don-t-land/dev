@@ -69,7 +69,7 @@ const sessions = new Map(); // token -> { name, wins }
 
 /* ---------- 방 ---------- */
 const ROUND_SEC = { DIST: 150, ARENA: 180 };
-const MAX_PLAYERS = { DIST: 8, ARENA: 4 };
+const MAX_PLAYERS = { DIST: 4, ARENA: 4 };
 const configuredFoldingMs = Number(process.env.FOLDING_MS || 60_000);
 const FOLDING_MS = Number.isFinite(configuredFoldingMs) && configuredFoldingMs >= 0
   ? configuredFoldingMs
@@ -241,6 +241,7 @@ function snapshot(room) {
     phase: room.phase,
     seed: room.seed,
     ends: room.phaseEnds,
+    duration: room.phase === 'launch' ? LAUNCH_MS : undefined,
     order: room.order,
     crafts: craftSnapshots(room),
     results: room.results,
@@ -694,12 +695,11 @@ wss.on('connection', (ws) => {
         sendJson(ws, { t: 'error', code: 'ROOM_NOT_WAITING', message: '대기 중인 방만 시작할 수 있습니다' });
         return;
       }
-      if (room.mode === 'ARENA' && ![...room.players.values()].every(player => player.ready)) {
+      if (![...room.players.values()].every(player => player.ready)) {
         sendJson(ws, { t: 'error', code: 'NOT_ALL_READY', message: '모든 플레이어가 준비해야 시작할 수 있습니다' });
         return;
       }
-      if (room.mode === 'ARENA') startFolding(room);
-      else startCountdown(room);
+      startFolding(room);
       broadcastRoomList();
       return;
     }

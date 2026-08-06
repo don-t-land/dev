@@ -93,13 +93,17 @@ test('대기 단계의 준비 완료된 방에서 방장만 시작할 수 있다
   assert.equal(canStart(makeRoom({ players: [] }), 'host'), false);
 });
 
-test('DIST 방은 READY와 무관하게 방장이 바로 시작할 수 있다', () => {
+test('DIST 방도 ARENA와 동일하게 모두 READY 후 방장만 시작할 수 있다', () => {
   const { canStart } = require(modulePath);
   const distanceRoom = makeRoom({ mode: 'DIST' });
 
-  assert.equal(canStart(distanceRoom, 'host'), true);
+  assert.equal(canStart(distanceRoom, 'host'), false);
   assert.equal(canStart(distanceRoom, 'guest'), false);
   assert.equal(canStart({ ...distanceRoom, phase: 'playing' }, 'host'), false);
+  assert.equal(canStart({
+    ...distanceRoom,
+    players: distanceRoom.players.map(player => ({ ...player, ready: true }))
+  }, 'host'), true);
 });
 
 test('로컬 플레이어의 준비 여부를 불리언으로 반환한다', () => {

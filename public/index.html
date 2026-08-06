@@ -343,14 +343,14 @@
 
     <div class="home-actions" role="group" aria-label="메뉴 선택">
       <div class="home-mode-grid">
-        <button class="home-mode-card home-mode-distance" type="button" data-home-mode="distance">
+        <button class="home-mode-card home-mode-distance" type="button" data-home-mode="DIST">
           <span class="home-mode-icon" aria-hidden="true">
             <svg viewBox="0 0 32 32"><path d="M5 23c5-1 7-5 9-10 2-4 6-6 13-5"></path><path d="m21 4 6 4-5 5"></path><circle cx="7" cy="23" r="2.5"></circle></svg>
           </span>
           <span class="home-mode-label">멀리 날기</span>
           <span class="home-mode-arrow" aria-hidden="true">›</span>
         </button>
-        <button class="home-mode-card home-mode-survival" type="button" data-home-mode="survival">
+        <button class="home-mode-card home-mode-survival" type="button" data-home-mode="ARENA">
           <span class="home-mode-icon" aria-hidden="true">
             <svg viewBox="0 0 32 32"><circle cx="16" cy="17" r="10"></circle><path d="M16 11v7l5 3M12 4h8"></path></svg>
           </span>
@@ -369,13 +369,13 @@
   </main>
 </section>
 
-<section id="survival-entry" class="hide" aria-modal="true" role="dialog" aria-labelledby="entry-title">
+<section id="room-entry" class="hide" aria-modal="true" role="dialog" aria-labelledby="entry-title">
   <div class="room-entry-backdrop" data-entry-close></div>
   <div class="room-entry-card">
     <button class="room-entry-close" type="button" aria-label="닫기" data-entry-close>×</button>
-    <div class="room-entry-kicker">UP TO 4 PLAYERS</div>
+    <div id="entry-kicker" class="room-entry-kicker">UP TO 4 PLAYERS</div>
     <h2 id="entry-title">오래 날기</h2>
-    <p>방을 만들거나 초대 코드로 친구의 방에 들어가세요.</p>
+    <p id="entry-description">방을 만들거나 초대 코드로 친구의 방에 들어가세요.</p>
     <div class="room-entry-field">
       <label for="entry-name">닉네임</label>
       <input id="entry-name" maxlength="12" placeholder="닉네임을 입력하세요" autocomplete="off">
@@ -674,7 +674,7 @@ function connect() {
     net.room = null;
     net.ws = null;
     if (wasInRoom) enterHome('서버와의 연결이 끊어졌습니다');
-    else if (!$('survival-entry').classList.contains('hide')) $('entry-status').textContent = '서버 연결이 끊어졌습니다';
+    else if (!$('room-entry').classList.contains('hide')) $('entry-status').textContent = '서버 연결이 끊어졌습니다';
     else $('lob-status').textContent = '서버 연결이 끊어졌습니다 — 새로고침을 눌러 주세요';
   };
   ws.onerror = () => showNetworkError('서버에 연결할 수 없습니다');
@@ -895,7 +895,7 @@ let myName = '';
 
 function enterHome(msg) {
   $('home-screen').classList.remove('hide');
-  $('survival-entry').classList.add('hide');
+  $('room-entry').classList.add('hide');
   $('lobby').classList.add('hide');
   $('room-lobby').classList.add('hide');
   $('hud').classList.add('hide');
@@ -908,16 +908,33 @@ function enterHome(msg) {
   if (msg) console.warn(msg);
 }
 
-function openSurvivalEntry() {
+const ROOM_ENTRY_COPY = Object.freeze({
+  DIST: {
+    title: '멀리 날기',
+    description: '방을 만들거나 초대 코드로 친구들과 멀리 날기에 도전하세요.'
+  },
+  ARENA: {
+    title: '오래 날기',
+    description: '방을 만들거나 초대 코드로 친구들과 오래 날기에 도전하세요.'
+  }
+});
+let entryMode = 'ARENA';
+
+function openRoomEntry(mode) {
+  entryMode = ROOM_ENTRY_COPY[mode] ? mode : 'ARENA';
+  const copy = ROOM_ENTRY_COPY[entryMode];
+  $('entry-title').textContent = copy.title;
+  $('entry-description').textContent = copy.description;
+  $('entry-kicker').textContent = 'UP TO 4 PLAYERS';
   $('entry-name').value = localStorage.getItem('pp_name') || $('lob-name').value || '';
   $('entry-code').value = '';
   $('entry-status').textContent = '';
-  $('survival-entry').classList.remove('hide');
+  $('room-entry').classList.remove('hide');
   setTimeout(() => $('entry-name').focus(), 0);
 }
 
-function closeSurvivalEntry() {
-  $('survival-entry').classList.add('hide');
+function closeRoomEntry() {
+  $('room-entry').classList.add('hide');
 }
 
 function enterLobby(msg) {
@@ -926,7 +943,7 @@ function enterLobby(msg) {
   closePauseMenu();
   releaseFlightPointerLock();
   $('home-screen').classList.add('hide');
-  $('survival-entry').classList.add('hide');
+  $('room-entry').classList.add('hide');
   $('lobby').classList.remove('hide');
   $('room-lobby').classList.add('hide');
   $('hud').classList.add('hide');
@@ -939,7 +956,7 @@ function enterLobby(msg) {
 
 function enterRoomLobby(room, resultsPending = false) {
   $('home-screen').classList.add('hide');
-  $('survival-entry').classList.add('hide');
+  $('room-entry').classList.add('hide');
   game.phase = room.phase;
   game.frozen = true;
   closePauseMenu();
@@ -955,7 +972,7 @@ function enterRoomLobby(room, resultsPending = false) {
   $('room-code-display').textContent = room.code;
   $('room-count').textContent = `${room.players.length} / ${room.maxPlayers}`;
 
-  const slots = getWaitingSlots(room, room.mode === 'ARENA' ? 4 : Math.min(8, room.maxPlayers));
+  const slots = getWaitingSlots(room, 4);
   $('room-player-list').innerHTML = slots.map((slot, slotIndex) => {
     if (!slot.player) return `<div class="room-player-slot empty" data-slot-index="${slotIndex}"><div class="room-player-info"><div class="room-player-name">빈 자리</div><div class="room-player-meta"><span class="role-badge client">WAITING</span></div></div></div>`;
     const role = slot.role === 'host' ? 'HOST' : 'CLIENT';
@@ -972,7 +989,7 @@ function enterRoomLobby(room, resultsPending = false) {
   const startAllowed = !resultsPending && canStart(room, net.id);
   $('room-ready-btn').textContent = localReady ? 'READY ✓' : 'READY';
   $('room-ready-btn').classList.toggle('ready', localReady);
-  $('room-ready-btn').classList.toggle('hide', resultsPending || room.mode !== 'ARENA');
+  $('room-ready-btn').classList.toggle('hide', resultsPending);
   $('room-start-btn').classList.toggle('hide', !isHost || resultsPending);
   $('room-start-btn').disabled = !startAllowed;
   if (resultsPending) {
@@ -980,12 +997,12 @@ function enterRoomLobby(room, resultsPending = false) {
     $('room-status').textContent = acknowledged
       ? '결과 확인 완료 · 다른 참가자가 대기실로 돌아오기를 기다리는 중입니다'
       : '진행 중이던 라운드의 결과 확인이 끝나기를 기다리는 중입니다';
-  } else if (room.mode === 'ARENA') {
-    if (startAllowed) $('room-status').textContent = '모두 READY · START를 누르면 60초 종이접기가 시작됩니다';
-    else if (isHost) $('room-status').textContent = '모든 플레이어가 READY가 되면 시작할 수 있습니다';
-    else $('room-status').textContent = localReady ? '방장의 START를 기다리는 중입니다' : 'READY를 눌러 준비를 완료하세요';
+  } else if (startAllowed) {
+    $('room-status').textContent = '모두 READY · START를 누르면 60초 종이접기가 시작됩니다';
+  } else if (isHost) {
+    $('room-status').textContent = '모든 플레이어가 READY가 되면 시작할 수 있습니다';
   } else {
-    $('room-status').textContent = isHost ? '참가자를 확인한 뒤 라운드를 시작하세요' : '방장이 라운드를 시작하기를 기다리는 중입니다';
+    $('room-status').textContent = localReady ? '방장의 START를 기다리는 중입니다' : 'READY를 눌러 준비를 완료하세요';
   }
 }
 
@@ -993,7 +1010,7 @@ function enterFolding() {
   closePauseMenu();
   releaseFlightPointerLock();
   $('home-screen').classList.add('hide');
-  $('survival-entry').classList.add('hide');
+  $('room-entry').classList.add('hide');
   $('lobby').classList.add('hide');
   $('room-lobby').classList.add('hide');
   $('hud').classList.add('hide');
@@ -1005,7 +1022,7 @@ function enterFolding() {
 function enterGame() {
   closePauseMenu();
   $('home-screen').classList.add('hide');
-  $('survival-entry').classList.add('hide');
+  $('room-entry').classList.add('hide');
   $('lobby').classList.add('hide');
   $('room-lobby').classList.add('hide');
   $('hud').classList.remove('hide');
@@ -1018,7 +1035,7 @@ function enterGame() {
 }
 
 function showNetworkError(message) {
-  if (!$('survival-entry').classList.contains('hide')) $('entry-status').textContent = message;
+  if (!$('room-entry').classList.contains('hide')) $('entry-status').textContent = message;
   else if (!$('room-lobby').classList.contains('hide')) $('room-status').textContent = message;
   else $('lob-status').textContent = message;
 }
@@ -1049,9 +1066,10 @@ function joinByCode(code) {
 $('lob-name').value = localStorage.getItem('pp_name') || '';
 $('entry-name').value = $('lob-name').value;
 
-document.querySelector('[data-home-mode="survival"]').addEventListener('click', openSurvivalEntry);
-document.querySelector('[data-home-mode="distance"]').addEventListener('click', () => enterLobby());
-document.querySelectorAll('[data-entry-close]').forEach(element => element.addEventListener('click', closeSurvivalEntry));
+document.querySelectorAll('[data-home-mode]').forEach(button => {
+  button.addEventListener('click', () => openRoomEntry(button.dataset.homeMode));
+});
+document.querySelectorAll('[data-entry-close]').forEach(element => element.addEventListener('click', closeRoomEntry));
 
 function withEntrySession(action) {
   const name = $('entry-name').value.trim();
@@ -1075,7 +1093,7 @@ function joinFromEntry() {
 }
 
 $('entry-create-btn').addEventListener('click', () => withEntrySession(() => send({
-  t: 'create', mode: 'ARENA', visibility: 'private'
+  t: 'create', mode: entryMode, visibility: 'private'
 })));
 $('entry-join-btn').addEventListener('click', joinFromEntry);
 $('entry-code').addEventListener('keydown', event => { if (event.key === 'Enter') joinFromEntry(); });
@@ -1646,7 +1664,7 @@ function buildArena(seed) {
   world.add(bound);
 }
 
-/* ---- 오래 날기 출발 연출: 각 스폰 지점의 옥상에서 달려 점프 ---- */
+/* ---- 공통 출발 연출: 모드별 스폰 지점의 옥상에서 달려 점프 ---- */
 const launchState = { active: false, startedAt: 0, duration: 4400, actors: [] };
 
 function arenaSpawnPoint(index, count, radius = 130) {
@@ -1654,25 +1672,34 @@ function arenaSpawnPoint(index, count, radius = 130) {
   return new THREE.Vector3(Math.cos(angle) * radius, 130, Math.sin(angle) * radius);
 }
 
+function launchSpawnPoint(index, count, stage = 'end') {
+  if (game.mode === 'ARENA') {
+    const radius = stage === 'start' ? 146 : stage === 'edge' ? 133 : 130;
+    return arenaSpawnPoint(index, count, radius);
+  }
+  const z = stage === 'start' ? 16 : stage === 'edge' ? 3 : 0;
+  return new THREE.Vector3((index - (Math.max(1, count) - 1) / 2) * 10, 150, z);
+}
+
 function buildLaunchTowers() {
-  if (game.mode !== 'ARENA') return;
+  const arena = game.mode === 'ARENA';
   const count = Math.max(1, game.order.length);
   const rng = mulberry32((game.seed ^ 0x51f15e) >>> 0);
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2;
-    const radius = 146;
-    const width = 24 + rng() * 5;
-    const depth = 22 + rng() * 6;
+    const height = arena ? 128 : 148;
+    const width = arena ? 24 + rng() * 5 : 8 + rng();
+    const depth = arena ? 22 + rng() * 6 : 28 + rng() * 3;
     const tower = new THREE.Group();
     const body = new THREE.Mesh(
-      new THREE.BoxGeometry(width, 128, depth),
+      new THREE.BoxGeometry(width, height, depth),
       new THREE.MeshStandardMaterial({
         color: new THREE.Color().setHSL(.60 + rng() * .06, .28, .21 + rng() * .08),
         roughness: .72,
         metalness: .12
       })
     );
-    body.position.y = 64;
+    body.position.y = height / 2;
     body.castShadow = true;
     body.receiveShadow = true;
     tower.add(body);
@@ -1681,17 +1708,21 @@ function buildLaunchTowers() {
       new THREE.BoxGeometry(width + 1.5, .8, depth + 1.5),
       new THREE.MeshStandardMaterial({ color: 0x6de1ed, emissive: 0x266d91, emissiveIntensity: .7, roughness: .5 })
     );
-    roof.position.y = 128.4;
+    roof.position.y = height + .4;
     tower.add(roof);
 
     const stripeMaterial = new THREE.MeshBasicMaterial({ color: index % 2 ? 0xf4cd6c : 0x76e6ef });
     for (let floor = 0; floor < 7; floor += 1) {
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(width + .15, .32, depth + .18), stripeMaterial);
-      stripe.position.y = 17 + floor * 15;
+      stripe.position.y = height * (floor + 1) / 8;
       tower.add(stripe);
     }
-    tower.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
-    tower.rotation.y = -angle;
+    if (arena) {
+      tower.position.set(Math.cos(angle) * 146, 0, Math.sin(angle) * 146);
+      tower.rotation.y = -angle;
+    } else {
+      tower.position.set((index - (count - 1) / 2) * 10, 0, 16);
+    }
     world.add(tower);
   }
 }
@@ -1709,10 +1740,10 @@ function startLaunchSequence(phase) {
   game.order.forEach((id, index) => {
     const mascot = makeStandingPlaneMascot();
     mascot.scale.setScalar(.92);
-    const start = arenaSpawnPoint(index, count, 146);
-    const end = arenaSpawnPoint(index, count, 130);
+    const start = launchSpawnPoint(index, count, 'start');
+    const end = launchSpawnPoint(index, count, 'end');
     const direction = end.clone().sub(start).setY(0).normalize();
-    mascot.position.copy(start).add(new THREE.Vector3(0, 131.2 - start.y, 0));
+    mascot.position.copy(start).add(new THREE.Vector3(0, 3.05, 0));
     mascot.lookAt(mascot.position.clone().add(direction));
     world.add(mascot);
     launchState.actors.push({ id, group: mascot, mascot, start, end, direction });
@@ -1740,8 +1771,8 @@ function updateLaunch(now) {
   const localIndex = Math.max(0, game.order.indexOf(net.id));
 
   launchState.actors.forEach((actor, index) => {
-    const pathStart = arenaSpawnPoint(index, count, 146);
-    const roofEdge = arenaSpawnPoint(index, count, 133);
+    const pathStart = launchSpawnPoint(index, count, 'start');
+    const roofEdge = launchSpawnPoint(index, count, 'edge');
     const position = pathStart.clone().lerp(roofEdge, runProgress);
     if (progress > .65) {
       position.lerp(actor.end, jumpProgress);
@@ -1774,7 +1805,7 @@ function updateLaunch(now) {
   if (progress >= 1) {
     launchState.active = false;
     launchState.actors.forEach(actor => { actor.mascot.visible = false; });
-    craft.position.copy(arenaSpawnPoint(localIndex, count, 130));
+    craft.position.copy(launchSpawnPoint(localIndex, count, 'end'));
     craft.visible = true;
     game.phase = 'launch_done';
     game.frozen = true;
@@ -1880,7 +1911,7 @@ function applyPhase(m) {
     game.ends = Number(m.ends) || Date.now() + 60000;
     game.order = Array.isArray(m.order) ? m.order : [];
     $('results').classList.add('hide');
-    buildArena(game.seed);
+    (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
     buildLaunchTowers();
     spawnSelf();
     setCraftFromFoldModel(null);
@@ -1915,6 +1946,11 @@ function applyPhase(m) {
     game.seed = Number(m.seed) || game.seed;
     game.ends = Number(m.ends) || Date.now() + 4400;
     game.order = Array.isArray(m.order) ? m.order : game.order;
+    if (m.t === 'room' && !world.children.length) {
+      (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
+      buildLaunchTowers();
+      spawnSelf();
+    }
     applyCraftSnapshots(m.crafts);
     startLaunchSequence(m);
     return;
@@ -1943,7 +1979,7 @@ function applyPhase(m) {
       game.phase = 'playing';
       me.alive = false;
       showCenter('비행 종료', '관전 중', '다음 라운드를 기다리세요');
-    } else if (game.mode === 'ARENA' && wasLaunch) {
+    } else if (wasLaunch) {
       clearLaunchActors();
       game.phase = 'playing';
       me.alive = true;

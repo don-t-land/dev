@@ -21,29 +21,39 @@ test('home wordmark stays large on one line and obsolete copy is absent', () => 
   assert.doesNotMatch(html, /구름과\s*절벽\s*사이/);
 });
 
-test('survival entry and four-slot waiting room controls are mounted', () => {
+test('both flight modes use one mode-aware room popup and four-slot waiting room', () => {
   for (const id of [
-    'survival-entry', 'entry-name', 'entry-create-btn', 'entry-code', 'entry-join-btn',
+    'room-entry', 'entry-name', 'entry-create-btn', 'entry-code', 'entry-join-btn',
     'room-lobby', 'waiting-room-canvas', 'room-player-list', 'room-ready-btn', 'room-start-btn'
   ]) assert.equal(hasId(id), true, `missing #${id}`);
-  assert.match(html, /getWaitingSlots\(room, room\.mode === 'ARENA' \? 4/);
+  assert.match(html, /data-home-mode="DIST"/);
+  assert.match(html, /data-home-mode="ARENA"/);
+  assert.match(html, /function openRoomEntry\(mode\)/);
+  assert.match(html, /querySelectorAll\('\[data-home-mode\]'\)[\s\S]*openRoomEntry\(button\.dataset\.homeMode\)/);
+  assert.match(html, /t: 'create', mode: entryMode/);
+  assert.match(html, /getWaitingSlots\(room, 4\)/);
   assert.match(html, /window\.waitingRoomStage\?\.update/);
   assert.match(flowCss, /grid-template-columns:\s*repeat\(4,1fr\)/);
 });
 
-test('survival entry stays translucent over the home scene', () => {
-  assert.match(flowCss, /#survival-entry\s*\{[\s\S]*rgba\([^)]*,\s*\.72\)[\s\S]*\}/);
+test('room entry stays translucent over the home scene', () => {
+  assert.match(flowCss, /#room-entry\s*\{[\s\S]*rgba\([^)]*,\s*\.72\)[\s\S]*\}/);
   assert.match(flowCss, /\.room-entry-card\s*\{[\s\S]*rgba\([^)]*,\s*\.82\)/);
   assert.match(flowCss, /backdrop-filter:\s*blur\(5px\)/);
 });
 
-test('waiting room actors align from eight DOM slot rectangles with a visible gap', () => {
+test('waiting room actors are larger and layered in front of slot boxes', () => {
   const waiting3d = fs.readFileSync(path.join(publicDir, 'waiting-room-3d.js'), 'utf8');
   assert.match(html, /data-slot-index=/);
-  assert.match(waiting3d, /index < 8/);
+  assert.match(waiting3d, /index < 4/);
   assert.match(waiting3d, /getBoundingClientRect\(\)/);
   assert.match(waiting3d, /screenToWorldOnPlane/);
-  assert.match(waiting3d, /ACTOR_BLOCK_GAP_PX\s*=\s*48/);
+  assert.match(waiting3d, /const ACTOR_BLOCK_GAP_PX = 80/);
+  assert.match(waiting3d, /block\.width\s*\/\s*210,\s*\.6,\s*\.94/);
+  assert.match(flowCss, /#waiting-room-canvas\s*\{[^}]*z-index:\s*2/s);
+  assert.match(flowCss, /#room-player-list\s*\{[^}]*z-index:\s*auto/s);
+  assert.match(flowCss, /\.room-player-slot::before\s*\{[^}]*z-index:\s*1/s);
+  assert.match(flowCss, /\.room-player-info\s*\{[^}]*z-index:\s*3/s);
 });
 
 test('folding UI exposes direction, unfold, completion and synchronized progress', () => {
@@ -64,6 +74,7 @@ test('active room snapshots are idempotent and launch is server-authoritative', 
   assert.match(html, /case 'room':[\s\S]*isSameRoundPhase\(m\)/);
   assert.match(html, /m\.phase === 'launch'/);
   assert.match(html, /case 'phase':[\s\S]*m\.phase === 'launch'/);
+  assert.match(html, /m\.t === 'room' && !world\.children\.length[\s\S]*buildLaunchTowers\(\);[\s\S]*spawnSelf\(\)/);
   assert.doesNotMatch(html, /setCraftFromFoldModel\(foldedModel\);\s*startLaunchSequence\(\)/s);
 });
 
@@ -73,11 +84,16 @@ test('remote and launch Three.js resources are explicitly disposed', () => {
   assert.match(html, /disposeObject3D\(player\.remote\.group\)/);
 });
 
-test('DIST keeps its immediate host start and eight-player presentation', () => {
-  assert.match(html, /getWaitingSlots\(room, room\.mode === 'ARENA' \? 4 : Math\.min\(8, room\.maxPlayers\)\)/);
-  assert.match(html, /room\.mode === 'ARENA'/);
+test('DIST and ARENA share READY and folding flow while retaining mode-specific play maps', () => {
+  assert.match(html, /getWaitingSlots\(room, 4\)/);
+  assert.match(html, /room-ready-btn'[\s\S]*resultsPending/);
+  assert.doesNotMatch(html, /room-ready-btn'[\s\S]{0,180}room\.mode !== 'ARENA'/);
   const waiting3d = fs.readFileSync(path.join(publicDir, 'waiting-room-3d.js'), 'utf8');
-  assert.match(waiting3d, /index < 8/);
+  assert.match(waiting3d, /index < 4/);
+  assert.match(html, /const arena = game\.mode === 'ARENA'/);
+  assert.match(html, /function launchSpawnPoint\(index, count, stage/);
+  assert.match(html, /\(game\.mode === 'ARENA' \? buildArena : buildDistance\)\(game\.seed\);\s*buildLaunchTowers\(\)/);
+  assert.match(html, /else if \(wasLaunch\)/);
 });
 
 test('fold-derived aerodynamic profile drives the actual flight loop and HUD', () => {

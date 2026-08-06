@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
 
-const ACTOR_BLOCK_GAP_PX = 48;
+const ACTOR_BLOCK_GAP_PX = 80;
 const actors = [];
 const raycaster = new THREE.Raycaster();
 const slotPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -35,7 +35,7 @@ function tintMascot(mascot, id) {
 
 function makeActor(index) {
   const mascot = makeStandingPlaneMascot();
-  mascot.scale.setScalar(.72);
+  mascot.scale.setScalar(.84);
   mascot.position.set(0, 0, 0);
   const actor = { mascot, id: null, ready: false, host: false };
   scene.add(mascot);
@@ -68,7 +68,7 @@ function alignActorsToSlots() {
     actor.mascot.position.x = target.x;
     actor.mascot.position.y = target.y;
     actor.mascot.position.z = 0;
-    actor.mascot.scale.setScalar(THREE.MathUtils.clamp(block.width / 260, .42, .72));
+    actor.mascot.scale.setScalar(THREE.MathUtils.clamp(block.width / 210, .6, .94));
   });
 }
 
@@ -114,7 +114,7 @@ function mount() {
   rim.position.set(6, 2, 7);
   scene.add(rim);
 
-  for (let index = 0; index < 8; index += 1) actors.push(makeActor(index));
+  for (let index = 0; index < 4; index += 1) actors.push(makeActor(index));
   resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(stage);
   resize();

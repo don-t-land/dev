@@ -4,9 +4,8 @@
    - HTTP: public/ 정적 파일 서빙
    - WebSocket: 방·세션·라운드 관리, 상태 중계
    - 세션: 토큰으로 재접속 시 이름·승수 유지 (서버 생존 동안)
-   - 방: 공개/비공개 생성, 초대 코드, DIST 최대 8명 / ARENA 최대 4명
-   - 라운드: DIST는 countdown(4s), ARENA는 folding(60s) → launch → playing,
-             이후 results → 참가자별 확인 → waiting
+   - 방: 공개/비공개 생성, 초대 코드, DIST 최대 4명 / ARENA 최대 8명
+   - 라운드: DIST는 waiting → folding(60s) → launch → playing → results / ARENA는 상시 live (드롭인·개인 스폰)
    ============================================================ */
 'use strict';
 
@@ -69,7 +68,7 @@ const sessions = new Map(); // token -> { name, wins }
 
 /* ---------- 방 ---------- */
 const ROUND_SEC = { DIST: 150, ARENA: 180 };
-const MAX_PLAYERS = { DIST: 4, ARENA: 4 };
+const MAX_PLAYERS = { DIST: 4, ARENA: 8 };
 const configuredFoldingMs = Number(process.env.FOLDING_MS || 60_000);
 const FOLDING_MS = Number.isFinite(configuredFoldingMs) && configuredFoldingMs >= 0
   ? configuredFoldingMs
@@ -116,6 +115,11 @@ function makeRoom(mode, visibility = 'public') {
     readyIds: new Set(),
     timer: null
   };
+  if (mode === 'ARENA') {
+    room.phase = 'live';
+    room.seed = crypto.randomInt(2 ** 31);
+    room.startedAt = Date.now();
+  }
   rooms.set(room.id, room);
   return room;
 }
@@ -124,12 +128,16 @@ function maxPlayers(room) {
   return MAX_PLAYERS[room.mode];
 }
 
+function joinablePhase(room) {
+  return room.mode === 'ARENA' ? room.phase === 'live' : room.phase === 'waiting';
+}
+
 function findRoom(mode) {
   for (const room of rooms.values()) {
-    if (room.visibility === 'public' && room.mode === mode && room.phase === 'waiting' &&
+    if (room.visibility === 'public' && room.mode === mode && joinablePhase(room) &&
         room.players.size < maxPlayers(room)) return room;
   }
-  return makeRoom(mode, 'public');
+  return mode === 'ARENA' ? makeRoom('ARENA', 'public') : null;
 }
 
 function bcast(room, msg, exceptId) {
@@ -173,7 +181,7 @@ function roomSummary(room) {
     players: room.players.size,
     maxPlayers: maxPlayers(room),
     hostName: host ? host.name : '무명',
-    joinable: room.phase === 'waiting' && room.players.size < maxPlayers(room)
+    joinable: joinablePhase(room) && room.players.size < maxPlayers(room)
   };
 }
 
@@ -266,7 +274,7 @@ function removePlayerFromRoom(room, player) {
   clearTimeout(player.disconnectTimer);
   player.disconnectTimer = null;
   room.players.delete(player.id);
-  if (room.phase === 'waiting') room.order = room.order.filter(id => id !== player.id);
+  if (room.phase === 'waiting' || room.phase === 'live') room.order = room.order.filter(id => id !== player.id);
   room.readyIds.delete(player.id);
   bindSessionToRoom(player, null);
   bcast(room, { t: 'pl', id: player.id });
@@ -325,10 +333,6 @@ function startPreparation(room, phase, duration, nextPhase) {
   }
   bcast(room, { t: 'phase', phase, seed: room.seed, ends: room.phaseEnds, order: room.order });
   room.timer = setTimeout(() => nextPhase(room), duration);
-}
-
-function startCountdown(room) {
-  startPreparation(room, 'countdown', 4000, startPlaying);
 }
 
 function startFolding(room) {
@@ -609,12 +613,16 @@ wss.on('connection', (ws) => {
       } else {
         targetRoom = findRoom(m.mode === 'ARENA' ? 'ARENA' : 'DIST');
       }
+      if (!targetRoom) {
+        sendJson(ws, { t: 'error', code: 'ROOM_NOT_FOUND', message: '참여 가능한 방이 없습니다. 방을 만들어 보세요' });
+        return;
+      }
       ws.roomListSubscribed = false;
       if (room === targetRoom) {
         sendJson(ws, snapshot(room));
         return;
       }
-      if (targetRoom.phase !== 'waiting') {
+      if (!joinablePhase(targetRoom)) {
         sendJson(ws, { t: 'error', code: 'ROOM_NOT_JOINABLE', message: '이미 시작한 방에는 참가할 수 없습니다' });
         return;
       }
@@ -651,6 +659,10 @@ wss.on('connection', (ws) => {
 
     /* -- 대기 상태는 방장 여부와 무관하게 각 플레이어가 직접 설정합니다 -- */
     if (m.t === 'ready') {
+      if (room.mode === 'ARENA') {
+        sendJson(ws, { t: 'error', code: 'ARENA_LIVE', message: '오래 날기는 항상 진행 중입니다. 접기를 마치면 바로 참여합니다' });
+        return;
+      }
       if (room.phase !== 'waiting') {
         sendJson(ws, { t: 'error', code: 'ROOM_NOT_WAITING', message: '대기 중에만 준비 상태를 바꿀 수 있습니다' });
         return;
@@ -687,6 +699,10 @@ wss.on('connection', (ws) => {
 
     /* -- 라운드 시작은 현재 방장만 요청할 수 있습니다 -- */
     if (m.t === 'start') {
+      if (room.mode === 'ARENA') {
+        sendJson(ws, { t: 'error', code: 'ARENA_LIVE', message: '오래 날기는 항상 진행 중입니다. 접기를 마치면 바로 참여합니다' });
+        return;
+      }
       if (room.hostId !== me.id) {
         sendJson(ws, { t: 'error', code: 'NOT_HOST', message: '방장만 시작할 수 있습니다' });
         return;
@@ -706,6 +722,10 @@ wss.on('connection', (ws) => {
 
     /* -- 결과 확인은 라운드 참가자별로 명시적으로 완료합니다 -- */
     if (m.t === 'results-ready') {
+      if (room.mode === 'ARENA') {
+        sendJson(ws, { t: 'error', code: 'ARENA_LIVE', message: '오래 날기는 항상 진행 중입니다. 접기를 마치면 바로 참여합니다' });
+        return;
+      }
       if (room.phase !== 'results' || !room.order.includes(me.id) || room.readyIds.has(me.id)) return;
       room.readyIds.add(me.id);
       if (!finishResultsIfReady(room)) bcast(room, snapshot(room));

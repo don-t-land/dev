@@ -5,7 +5,7 @@
    - WebSocket: 방·세션·라운드 관리, 상태 중계
    - 세션: 토큰으로 재접속 시 이름·승수 유지 (서버 생존 동안)
    - 방: 공개/비공개 생성, 초대 코드, DIST 최대 4명 / ARENA 최대 8명
-   - 라운드: DIST는 waiting → folding(60s) → launch → playing → results / ARENA는 상시 live (드롭인·개인 스폰)
+   - 라운드: DIST는 waiting → folding(120s, 전원 완료 시 조기 launch) → launch → playing → results / ARENA는 상시 live (드롭인·개인 스폰)
    ============================================================ */
 'use strict';
 
@@ -69,10 +69,14 @@ const sessions = new Map(); // token -> { name, wins }
 /* ---------- 방 ---------- */
 const ROUND_SEC = { DIST: 150, ARENA: 180 };
 const MAX_PLAYERS = { DIST: 4, ARENA: 8 };
-const configuredFoldingMs = Number(process.env.FOLDING_MS || 60_000);
+const configuredFoldingMs = Number(process.env.FOLDING_MS || 120_000);
 const FOLDING_MS = Number.isFinite(configuredFoldingMs) && configuredFoldingMs >= 0
   ? configuredFoldingMs
-  : 60_000;
+  : 120_000;
+const configuredFoldSubmissionGraceMs = Number(process.env.FOLD_SUBMISSION_GRACE_MS || 300);
+const FOLD_SUBMISSION_GRACE_MS = Number.isFinite(configuredFoldSubmissionGraceMs) && configuredFoldSubmissionGraceMs >= 0
+  ? configuredFoldSubmissionGraceMs
+  : 300;
 const configuredLaunchMs = Number(process.env.LAUNCH_MS || 4_400);
 const LAUNCH_MS = Number.isFinite(configuredLaunchMs) && configuredLaunchMs >= 0
   ? configuredLaunchMs
@@ -252,6 +256,7 @@ function craftSnapshots(room) {
 }
 
 function snapshot(room) {
+  const serverNow = Date.now();
   return {
     t: 'room',
     id: room.id,
@@ -262,6 +267,7 @@ function snapshot(room) {
     mode: room.mode,
     phase: room.phase,
     seed: room.seed,
+    serverNow,
     ends: room.phaseEnds,
     duration: room.phase === 'launch' ? LAUNCH_MS : undefined,
     order: room.order,
@@ -288,7 +294,7 @@ function removePlayerFromRoom(room, player) {
   clearTimeout(player.disconnectTimer);
   player.disconnectTimer = null;
   room.players.delete(player.id);
-  if (room.phase === 'waiting' || room.phase === 'live') room.order = room.order.filter(id => id !== player.id);
+  if (room.phase !== 'results') room.order = room.order.filter(id => id !== player.id);
   room.readyIds.delete(player.id);
   bindSessionToRoom(player, null);
   bcast(room, { t: 'pl', id: player.id });
@@ -298,8 +304,9 @@ function removePlayerFromRoom(room, player) {
     rooms.delete(room.id);
   } else {
     const resultsFinished = room.phase === 'results' && finishResultsIfReady(room);
-    if (!resultsFinished) bcast(room, snapshot(room));
-    checkEarlyEnd(room);
+    const foldsFinished = room.phase === 'folding' && startLaunchIfFoldsComplete(room);
+    if (!resultsFinished && !foldsFinished) bcast(room, snapshot(room));
+    if (!foldsFinished) checkEarlyEnd(room);
   }
   broadcastRoomList();
 }
@@ -326,11 +333,12 @@ function resetPlayerForRoom(player) {
 }
 
 /* ---------- 라운드 흐름 ---------- */
-function startPreparation(room, phase, duration, nextPhase) {
+function startPreparation(room, phase, duration, nextPhase, transitionDelay = 0) {
   clearTimeout(room.timer);
   room.phase = phase;
   room.seed = (Math.random() * 0x7fffffff) | 0;
-  room.phaseEnds = Date.now() + duration;
+  const serverNow = Date.now();
+  room.phaseEnds = serverNow + duration;
   room.order = [...room.players.keys()];
   room.results = [];
   room.readyIds.clear();
@@ -349,21 +357,35 @@ function startPreparation(room, phase, duration, nextPhase) {
     p.ammo = 3;
     p.ammoAt = Date.now();
   }
-  bcast(room, { t: 'phase', phase, seed: room.seed, ends: room.phaseEnds, order: room.order });
-  room.timer = setTimeout(() => nextPhase(room), duration);
+  bcast(room, {
+    t: 'phase', phase, seed: room.seed,
+    serverNow, ends: room.phaseEnds, duration, order: room.order
+  });
+  room.timer = setTimeout(() => nextPhase(room), duration + transitionDelay);
 }
 
 function startFolding(room) {
-  startPreparation(room, 'folding', FOLDING_MS, startLaunch);
+  startPreparation(room, 'folding', FOLDING_MS, startLaunch, FOLD_SUBMISSION_GRACE_MS);
+}
+
+function startLaunchIfFoldsComplete(room) {
+  if (room.phase !== 'folding') return false;
+  const participants = room.order.map(id => room.players.get(id)).filter(Boolean);
+  if (participants.length === 0 || participants.some(player => !player.foldDone)) return false;
+  startLaunch(room);
+  return true;
 }
 
 function startLaunch(room) {
   if (!rooms.has(room.id) || room.phase !== 'folding') return;
+  clearTimeout(room.timer);
+  room.timer = null;
   room.phase = 'launch';
-  room.phaseEnds = Date.now() + LAUNCH_MS;
+  const serverNow = Date.now();
+  room.phaseEnds = serverNow + LAUNCH_MS;
   bcast(room, {
     t: 'phase', phase: 'launch', seed: room.seed,
-    ends: room.phaseEnds, order: room.order, duration: LAUNCH_MS,
+    serverNow, ends: room.phaseEnds, order: room.order, duration: LAUNCH_MS,
     crafts: craftSnapshots(room)
   });
   broadcastRoomList();
@@ -378,10 +400,11 @@ function startPlaying(room) {
     endRound(room);
     return;
   }
-  room.phaseEnds = Date.now() + ROUND_SEC[room.mode] * 1000;
+  const serverNow = Date.now();
+  room.phaseEnds = serverNow + ROUND_SEC[room.mode] * 1000;
   bcast(room, {
     t: 'phase', phase: 'playing', seed: room.seed,
-    ends: room.phaseEnds, order: room.order, crafts: craftSnapshots(room)
+    serverNow, ends: room.phaseEnds, order: room.order, crafts: craftSnapshots(room)
   });
   broadcastRoomList();
   room.timer = setTimeout(() => endRound(room), ROUND_SEC[room.mode] * 1000);
@@ -746,6 +769,7 @@ wss.on('connection', (ws) => {
         room.players.get(id).aeroProfile
       ]));
       bcast(room, { t: 'fold_status', doneIds, total: room.order.length, profiles });
+      startLaunchIfFoldsComplete(room);
       return;
     }
 

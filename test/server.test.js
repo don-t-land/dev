@@ -1,8 +1,11 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const http = require('node:http');
+const path = require('node:path');
 const { after, before, test } = require('node:test');
 const WebSocket = require('ws');
-process.env.FOLDING_MS = '120';
+process.env.FOLDING_MS = '500';
+process.env.FOLD_SUBMISSION_GRACE_MS = '100';
 process.env.LAUNCH_MS = '80';
 process.env.RECONNECT_GRACE_MS = '250';
 const { httpServer, wss } = require('../server');
@@ -106,6 +109,12 @@ test('root serves the multiplayer client', async () => {
   assert.equal(response.status, 200);
   assert.match(response.contentType, /^text\/html/);
   assert.match(response.body, /종이비행기 온라인/);
+});
+
+test('production folding time defaults to two minutes', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(source, /process\.env\.FOLDING_MS \|\| 120_000/);
+  assert.match(source, /:\s*120_000;/);
 });
 
 test('a public room can be created and discovered before joining', async () => {
@@ -240,7 +249,10 @@ test('a distance room requires every player to be ready before its host starts f
     ]);
     assert.deepEqual(hostPhase.order, guestPhase.order);
     assert.equal(hostPhase.order.length, 2);
-    assert.ok(hostPhase.ends - requestedAt >= 90);
+    assert.ok(hostPhase.ends - requestedAt >= 450);
+    assert.ok(Number.isFinite(hostPhase.serverNow));
+    assert.ok(hostPhase.ends - hostPhase.serverNow <= 500);
+    assert.equal(hostPhase.duration, 500);
 
     // 자유각도 커맨드 형식: {start, end, angle}. 상단 절반을 180° 접는다.
     // Task 2: 프로필이 computeFoldedGeometry(3D) 기반이라 접힌 형상이
@@ -263,6 +275,7 @@ test('a distance room requires every player to be ready before its host starts f
     const invalidFold = await guest.next(message => message.t === 'error');
     assert.equal(invalidFold.code, 'INVALID_FOLD');
 
+    const allDoneAt = Date.now();
     guest.send({ t: 'fold_done', commands: '[]' });
     const allDoneStatus = await host.next(message => message.t === 'fold_status' && message.doneIds.length === 2);
     assert.deepEqual(new Set(allDoneStatus.doneIds), new Set([hostHello.id, guestHello.id]));
@@ -270,10 +283,12 @@ test('a distance room requires every player to be ready before its host starts f
     assert.equal(allDoneStatus.profiles[guestHello.id].foldCount, 0);
 
     const launch = await host.next(message => message.t === 'phase' && message.phase === 'launch');
+    assert.ok(Date.now() - allDoneAt < 400, 'launch should start immediately after every fold is complete');
     assert.equal(launch.order.length, 2);
     assert.equal(launch.crafts.length, 2);
     assert.equal(launch.duration, 80);
     assert.equal(launch.crafts.find(craft => craft.id === hostHello.id).aeroProfile.foldCount, 1);
+    assert.ok(Number.isFinite(launch.serverNow));
     assert.ok(launch.ends > Date.now());
     await host.next(message => message.t === 'phase' && message.phase === 'playing');
   } finally {
@@ -300,6 +315,96 @@ test('a distance room uses the same ready and folding flow before its own map', 
     assert.deepEqual(folding.order, [created.hostId]);
   } finally {
     await host.close();
+  }
+});
+
+test('a final fold submitted just after the visible deadline is preserved for launch', async () => {
+  const host = await connectClient();
+  try {
+    const hello = await establishSession(host, '마감제출');
+    host.send({ t: 'create', mode: 'DIST', visibility: 'private' });
+    await host.next(message => message.t === 'room');
+    host.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players[0].ready);
+    host.send({ t: 'start' });
+    const folding = await host.next(message => message.t === 'phase' && message.phase === 'folding');
+    const waitMs = Math.max(0, folding.ends - Date.now() + 25);
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+    host.send({
+      t: 'fold_done',
+      commands: JSON.stringify([{ start: [-1, 0], end: [1, 0], angle: Math.PI }])
+    });
+    const launch = await host.next(message => message.t === 'phase' && message.phase === 'launch');
+    const craft = launch.crafts.find(item => item.id === hello.id);
+    assert.ok(Math.abs(craft.aeroProfile.planformArea - 2) < 1e-6,
+      `planformArea ${craft.aeroProfile.planformArea}`);
+  } finally {
+    await host.close();
+  }
+});
+
+test('leaving during folding removes the player and immediately launches when survivors are done', async () => {
+  const host = await connectClient();
+  const guest = await connectClient();
+  try {
+    const hostHello = await establishSession(host, '잔류방장');
+    await establishSession(guest, '이탈손님');
+    host.send({ t: 'create', mode: 'DIST', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    guest.send({ t: 'join', code: created.code });
+    await host.next(message => message.t === 'room' && message.players.length === 2);
+    host.send({ t: 'ready', ready: true });
+    guest.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players.every(player => player.ready));
+    host.send({ t: 'start' });
+    await host.next(message => message.t === 'phase' && message.phase === 'folding');
+    host.send({ t: 'fold_done', commands: '[]' });
+    await host.next(message => message.t === 'fold_status' && message.doneIds.length === 1);
+    guest.send({ t: 'leave' });
+    const launch = await host.next(
+      message => message.t === 'phase' && message.phase === 'launch',
+      400
+    );
+    assert.deepEqual(launch.order, [hostHello.id]);
+    assert.deepEqual(launch.crafts.map(craft => craft.id), [hostHello.id]);
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
+  }
+});
+
+test('disconnect grace expiry removes a folded player from playing order and crafts', async () => {
+  const host = await connectClient();
+  const guest = await connectClient();
+  try {
+    const hostHello = await establishSession(host, '잔류완료자');
+    const guestHello = await establishSession(guest, '단절완료자');
+    host.send({ t: 'create', mode: 'DIST', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    guest.send({ t: 'join', code: created.code });
+    await host.next(message => message.t === 'room' && message.players.length === 2);
+    host.send({ t: 'ready', ready: true });
+    guest.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players.every(player => player.ready));
+    host.send({ t: 'start' });
+    await host.next(message => message.t === 'phase' && message.phase === 'folding');
+
+    guest.send({ t: 'fold_done', commands: '[]' });
+    await host.next(message => message.t === 'fold_status' && message.doneIds.includes(guestHello.id));
+    await guest.close();
+    await host.next(message => message.t === 'room' && message.phase === 'folding' &&
+      message.players.some(player => player.id === guestHello.id && player.connected === false));
+
+    host.send({ t: 'fold_done', commands: '[]' });
+    const launch = await host.next(message => message.t === 'phase' && message.phase === 'launch');
+    assert.deepEqual(new Set(launch.order), new Set([hostHello.id, guestHello.id]));
+    await host.next(message => message.t === 'phase' && message.phase === 'playing');
+
+    const pruned = await host.next(message => message.t === 'room' && message.phase === 'playing' &&
+      message.players.length === 1, 1_000);
+    assert.deepEqual(pruned.order, [hostHello.id]);
+    assert.deepEqual(pruned.crafts.map(craft => craft.id), [hostHello.id]);
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
   }
 });
 

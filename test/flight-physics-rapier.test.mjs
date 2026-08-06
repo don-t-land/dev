@@ -41,6 +41,22 @@ test('square paper produces a non-degenerate folded-shape collider hull', () => 
   assert.ok(new Set([...vertices].map(value => value.toFixed(3))).size > 3);
 });
 
+test('a 90-degree fold lifts collider vertices to the folded 3d height, not just the paper thickness', () => {
+  const foldedModel = applyFold(createPaperModel(), [-1, 0], [1, 0], Math.PI / 2);
+  const vertices = makeColliderVertices(foldedModel);
+  assert.ok([...vertices].every(Number.isFinite));
+  const ys = [];
+  for (let index = 1; index < vertices.length; index += 3) ys.push(vertices[index]);
+  const uniqueYs = new Set(ys.map(value => value.toFixed(3)));
+  // The old flat-sheet implementation only ever produced y = ±0.035 (paper
+  // thickness). A 90-degree fold must lift some vertices to roughly the
+  // folded height (1 material unit) scaled by 1.35, ± the thickness offset.
+  assert.ok([...uniqueYs].some(value => value !== '0.035' && value !== '-0.035'));
+  assert.ok(ys.some(y => Math.abs(y - 1.35) <= .035 + 1e-6));
+  const seenPairs = new Set(ys.map(value => value.toFixed(6)));
+  assert.ok(seenPairs.size > 2);
+});
+
 test('Rapier fixed-step flight is independent of render cadence', async () => {
   const at30 = await configured(createPaperModel());
   const at144 = await configured(createPaperModel());

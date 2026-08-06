@@ -1,5 +1,17 @@
 import RAPIER from './vendor/rapier3d-compat-0.19.3.mjs';
 
+// paper-fold-model.js is a UMD module loaded as a classic <script> in the
+// browser (exposing globalThis.paperFoldModel) but required as CommonJS in
+// Node tests. This ESM module can't `require()` directly, so it prefers the
+// browser global and falls back to a require() obtained via a top-level
+// await of node:module — resolved once at load time so later synchronous
+// callers (makeColliderVertices) can use it without becoming async.
+let paperFoldModel = globalThis.paperFoldModel || null;
+if (!paperFoldModel && typeof process !== 'undefined' && process.versions?.node) {
+  const { createRequire } = await import('node:module');
+  paperFoldModel = createRequire(import.meta.url)('./paper-fold-model.js');
+}
+
 export const FIXED_HZ = 120;
 export const FIXED_DT = 1 / FIXED_HZ;
 const GRAVITY = 21;
@@ -50,17 +62,19 @@ function sanitizeProfile(profile) {
 }
 
 export function makeColliderVertices(model) {
+  const geometry = paperFoldModel.computeFoldedGeometry(model);
   const points = [];
   const seen = new Set();
-  for (const face of model?.faces || []) {
-    for (const point of face?.poly || []) {
-      if (!Array.isArray(point) || !finite(point[0]) || !finite(point[1])) continue;
-      const x = point[0] * 1.35;
-      const z = -point[1] * 1.35;
-      const key = `${x.toFixed(6)}:${z.toFixed(6)}`;
+  for (const face of geometry?.faces || []) {
+    for (const vertex of face?.vertices3 || []) {
+      if (!Array.isArray(vertex) || !finite(vertex[0]) || !finite(vertex[1]) || !finite(vertex[2])) continue;
+      const x = vertex[0] * 1.35;
+      const y = vertex[1] * 1.35;
+      const z = vertex[2] * 1.35;
+      const key = `${x.toFixed(6)}:${y.toFixed(6)}:${z.toFixed(6)}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      points.push(x, -.035, z, x, .035, z);
+      points.push(x, y - .035, z, x, y + .035, z);
     }
   }
   return new Float32Array(points);

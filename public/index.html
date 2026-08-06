@@ -1469,23 +1469,42 @@ if (USE_RAPIER_PHYSICS) {
 
 function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {
   if (!model?.commands?.length || !Array.isArray(model.faces)) return null;
+  const geometry3d = window.paperFoldModel.computeFoldedGeometry(model);
+  const faces = Array.isArray(geometry3d?.faces) ? geometry3d.faces : [];
+  if (!faces.length) return null;
   const visual = new THREE.Group();
   visual.name = 'foldedCraftVisual';
-  const maxLayer = Math.max(1, ...model.faces.map(face => Number(face.layer) || 0));
-  model.faces.forEach((face, faceIndex) => {
-    if (!Array.isArray(face.poly) || face.poly.length < 3) return;
+  const maxFoldDepth = Math.max(1, ...faces.map(face => Number(face.foldDepth) || 0));
+  faces.forEach((face, faceIndex) => {
+    const poly3 = Array.isArray(face.vertices3) ? face.vertices3 : [];
+    if (poly3.length < 3) return;
+    const foldDepth = Number(face.foldDepth) || 0;
+
+    // Face normal (from the first triangle) drives a tiny per-fold-depth
+    // offset so opposite faces that end up coplanar at ±180deg folds don't
+    // z-fight.
+    const a = new THREE.Vector3(poly3[0][0], poly3[0][1], poly3[0][2]);
+    const b = new THREE.Vector3(poly3[1][0], poly3[1][1], poly3[1][2]);
+    const c = new THREE.Vector3(poly3[2][0], poly3[2][1], poly3[2][2]);
+    const normal = new THREE.Vector3().subVectors(c, b).cross(new THREE.Vector3().subVectors(a, b)).normalize();
+    const offset = normal.clone().multiplyScalar(.012 * foldDepth);
+
     const vertices = [];
-    for (let index = 1; index < face.poly.length - 1; index += 1) {
-      for (const point of [face.poly[0], face.poly[index], face.poly[index + 1]]) {
-        vertices.push(point[0] * 1.35, (Number(face.layer) || 0) * .026, -point[1] * 1.35);
+    for (let index = 1; index < poly3.length - 1; index += 1) {
+      for (const point of [poly3[0], poly3[index], poly3[index + 1]]) {
+        vertices.push(
+          point[0] * 1.35 + offset.x,
+          point[1] * 1.35 + offset.y,
+          point[2] * 1.35 + offset.z
+        );
       }
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.computeVertexNormals();
-    const layerRatio = (Number(face.layer) || 0) / maxLayer;
-    const faceColor = tint.clone().lerp(new THREE.Color(0xffffff), .46 - layerRatio * .2);
-    faceColor.offsetHSL(faceIndex * .008, 0, -layerRatio * .08);
+    const depthRatio = foldDepth / maxFoldDepth;
+    const faceColor = tint.clone().lerp(new THREE.Color(0xffffff), .46 - depthRatio * .2);
+    faceColor.offsetHSL(faceIndex * .008, 0, -depthRatio * .08);
     const material = new THREE.MeshStandardMaterial({
       color: faceColor, roughness: .72, side: THREE.DoubleSide, flatShading: true
     });

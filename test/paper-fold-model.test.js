@@ -36,7 +36,7 @@ test('the UMD build exposes the same five functions in a browser-like context', 
 
   assert.deepEqual(
     Object.keys(context.paperFoldModel).sort(),
-    ['applyFold', 'createPaperModel', 'replayFoldCommands', 'serializeFoldCommands', 'undoFold']
+    ['applyFold', 'createPaperModel', 'createPresetModel', 'getPresetCommands', 'presetNames', 'replayFoldCommands', 'serializeFoldCommands', 'undoFold']
   );
 });
 

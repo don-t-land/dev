@@ -303,11 +303,34 @@
     return model;
   }
 
+  const PRESETS = {
+    dart: [
+      { start: [0, 1], end: [1, 0], direction: 1 },
+      { start: [-1, 0], end: [0, 1], direction: 1 },
+      { start: [0, 1], end: [1, -1], direction: 1 },
+      { start: [-1, -1], end: [0, 1], direction: 1 },
+      { start: [1, -0.7], end: [-1, -0.7], direction: 1 }
+    ]
+  };
+
+  function getPresetCommands(name) {
+    const commands = PRESETS[name];
+    return commands ? commands.map(cloneCommand) : null;
+  }
+
+  function createPresetModel(name) {
+    const commands = PRESETS[name];
+    return commands ? replayFoldCommands(commands) : null;
+  }
+
   return {
     createPaperModel,
     applyFold,
     undoFold,
     serializeFoldCommands,
-    replayFoldCommands
+    replayFoldCommands,
+    getPresetCommands,
+    createPresetModel,
+    presetNames: Object.keys(PRESETS)
   };
 });

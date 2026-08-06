@@ -27,7 +27,7 @@ test('flat square produces a finite neutral baseline profile', () => {
 
 test('folding the square in half halves projected area and raises stall speed', () => {
   const flat = deriveAerodynamicProfile(createPaperModel());
-  const foldedModel = applyFold(createPaperModel(), [-1, 0], [1, 0], 1);
+  const foldedModel = applyFold(createPaperModel(), [-1, 0], [1, 0], Math.PI);
   const folded = deriveAerodynamicProfile(foldedModel);
 
   approx(folded.physicalArea, 4);
@@ -77,4 +77,19 @@ test('profile calculation is deterministic, bounded, and does not mutate the fol
   assert.ok(first.stallSpeed >= 8 && first.stallSpeed <= 42);
   assert.ok(first.rollBias >= -.65 && first.rollBias <= .65);
   assert.ok(first.pitchBias >= -.55 && first.pitchBias <= .55);
+});
+
+test('상반각 접기는 안정성을 높인다', () => {
+  let model = applyFold(createPaperModel(), [0.5, -1], [0.5, 1], 0.8);
+  model = applyFold(model, [-0.5, 1], [-0.5, -1], 0.8);
+  const folded = deriveAerodynamicProfile(model);
+  const flat = deriveAerodynamicProfile(createPaperModel());
+  assert.ok(folded.dihedral > 0.05);
+  assert.ok(folded.stability > flat.stability);
+});
+
+test('비대칭 접기는 rollBias를 만든다', () => {
+  const model = applyFold(createPaperModel(), [0.3, -1], [0.3, 1], Math.PI / 2);
+  const profile = deriveAerodynamicProfile(model);
+  assert.ok(Math.abs(profile.rollBias) > 0.05);
 });

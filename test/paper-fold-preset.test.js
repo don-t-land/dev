@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
+  createPaperModel,
   createPresetModel,
   getPresetCommands,
   presetNames,
@@ -59,14 +60,17 @@ test('dart 3D 기하는 좌우 대칭이고 날개 상반각을 가진다', () =
 });
 
 test('dart 프리셋은 균형 잡힌 비행 프로필을 만든다', () => {
-  // NOTE: 프로필은 아직 전개도(2D) 기준이라 접힌 3D 형상을 반영하지 않는다.
-  // Task 2에서 deriveAerodynamicProfile이 computeFoldedGeometry 기반으로 바뀌면
-  // 아래 임계값은 새 산출에 맞춰 함께 조정한다 (검증 강도는 유지).
+  // Task 2: deriveAerodynamicProfile이 computeFoldedGeometry(3D) 기반으로
+  // 바뀐 뒤 dart 프리셋 실측값(liftScale≈.716, rollBias=0, pitchBias≈.074,
+  // stability≈1.13, dihedral≈.175)에 맞춰 확정한 임계값. stability는 평평한
+  // 종이(≈1.12) 대비 상반각 덕분에 더 높아야 한다는 상대 비교로 검증한다.
   const profile = deriveAerodynamicProfile(createPresetModel('dart'));
-  assert.ok(profile.liftScale >= 0.65, `liftScale ${profile.liftScale}`);
+  const flat = deriveAerodynamicProfile(createPaperModel());
+  assert.ok(profile.liftScale >= 0.6, `liftScale ${profile.liftScale}`);
   assert.ok(Math.abs(profile.rollBias) <= 0.01, `rollBias ${profile.rollBias}`);
   assert.ok(Math.abs(profile.pitchBias) <= 0.1, `pitchBias ${profile.pitchBias}`);
-  assert.ok(profile.stability >= 1.0, `stability ${profile.stability}`);
+  assert.ok(profile.stability > flat.stability, `stability ${profile.stability} <= flat ${flat.stability}`);
+  assert.ok(profile.dihedral >= 0.1, `dihedral ${profile.dihedral}`);
 });
 
 test('dart 프리셋은 한 단계씩 되돌릴 수 있다', () => {

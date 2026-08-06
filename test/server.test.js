@@ -243,8 +243,8 @@ test('a distance room requires every player to be ready before its host starts f
     assert.ok(hostPhase.ends - requestedAt >= 90);
 
     // 자유각도 커맨드 형식: {start, end, angle}. 상단 절반을 180° 접는다.
-    // NOTE: 프로필은 아직 전개도(2D) 기준이라 planformArea가 접기를 반영하지
-    // 않는다 — Task 2에서 3D 기하 기반으로 바뀌면 planform 검증을 복원한다.
+    // Task 2: 프로필이 computeFoldedGeometry(3D) 기반이라 접힌 형상이
+    // planformArea에 반영된다 — 절반을 겹치는 접기라 planformArea가 절반이 된다.
     const halfFold = JSON.stringify([{
       start: [-1, 0], end: [1, 0], angle: Math.PI
     }]);
@@ -253,6 +253,8 @@ test('a distance room requires every player to be ready before its host starts f
     assert.deepEqual(oneDone.doneIds, [hostHello.id]);
     assert.equal(oneDone.total, 2);
     assert.equal(oneDone.profiles[hostHello.id].foldCount, 1);
+    assert.ok(Math.abs(oneDone.profiles[hostHello.id].planformArea - 2) < 1e-6,
+      `planformArea ${oneDone.profiles[hostHello.id].planformArea}`);
 
     guest.send({
       t: 'fold_done',

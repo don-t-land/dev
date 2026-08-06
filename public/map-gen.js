@@ -153,16 +153,15 @@
   /* ============================================================
      buildDistanceLayout — biome-0 현행 배치를 기준으로 밀도·폭 변조
      ============================================================ */
-  function biomeAt(z) {
-    const { a, b, t } = sampleBiome(z);
-    return t < 0.5 ? BIOMES[a] : BIOMES[b];
-  }
-
   function widthScaleAt(z, noise) {
-    const biome = biomeAt(z);
+    // Lerp widthScale across the blend zone instead of hard-switching at t=0.5 —
+    // a hard switch snaps the canyon envelope discontinuously at the midpoint of
+    // every blend zone (e.g. a ~20% half-width jump at the 화산재 boundary).
+    const s = sampleBiome(z);
+    const widthScale = BIOMES[s.a].widthScale + (BIOMES[s.b].widthScale - BIOMES[s.a].widthScale) * s.t;
     // ±25% of DIST_HALF from noise, plus per-biome widthScale (e.g. -20% in biome 3).
     const noiseFactor = 1 + noise(z) * 0.25;
-    return noiseFactor * biome.widthScale;
+    return noiseFactor * widthScale;
   }
 
   function buildDistanceLayout(seed) {
@@ -293,6 +292,7 @@
     sampleBiome,
     makeNoise1d,
     buildDistanceLayout,
-    arenaTheme
+    arenaTheme,
+    widthScaleAt
   };
 });

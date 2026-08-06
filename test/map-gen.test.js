@@ -11,7 +11,8 @@ const {
   sampleBiome,
   makeNoise1d,
   buildDistanceLayout,
-  arenaTheme
+  arenaTheme,
+  widthScaleAt
 } = mapGen;
 
 /* ---------------------------------------------------------------
@@ -193,6 +194,30 @@ test('non-wall obstacles stay within the modulated canyon width', () => {
   for (const r of layout.rocks) assert.ok(Math.abs(r.x) <= maxHalf, `rock x=${r.x}`);
   for (const t of layout.thermals) assert.ok(Math.abs(t.x) <= maxHalf, `thermal x=${t.x}`);
   for (const r of layout.rings) assert.ok(Math.abs(r.x) <= maxHalf, `ring x=${r.x}`);
+});
+
+test('widthScaleAt is continuous across a biome boundary (no hard-switch jump)', () => {
+  // Boundary between biome 2 (설원, widthScale 1.0) and biome 3 (화산재, widthScale 0.8)
+  // sits at z=-4500, inside the +-150m blend zone. A flat (zero) noise function isolates
+  // the biome-lerp contribution from noise jitter, so any discontinuity here is caused
+  // purely by a hard a/b switch rather than the noise term.
+  const flatNoise = () => 0;
+  const before = widthScaleAt(-4495, flatNoise);
+  const after = widthScaleAt(-4505, flatNoise);
+  const deltaHalfWidth = Math.abs(before - after) * DIST_HALF;
+  assert.ok(deltaHalfWidth < DIST_HALF * 0.02,
+    `expected <2% of DIST_HALF jump across boundary, got ${deltaHalfWidth} (before=${before}, after=${after})`);
+});
+
+test('widthScaleAt sweeps smoothly (no jump anywhere) across the 화산재 blend zone', () => {
+  const flatNoise = () => 0;
+  let prev = widthScaleAt(-4650, flatNoise);
+  for (let z = -4649; z <= -4350; z += 1) {
+    const v = widthScaleAt(z, flatNoise);
+    const deltaHalfWidth = Math.abs(v - prev) * DIST_HALF;
+    assert.ok(deltaHalfWidth < DIST_HALF * 0.005, `discontinuity at z=${z}: delta=${deltaHalfWidth}`);
+    prev = v;
+  }
 });
 
 test('rocks and rings keep y within the current game range', () => {

@@ -28,7 +28,7 @@ function totalArea(faces) {
   }, 0);
 }
 
-test('the UMD build exposes the same five functions in a browser-like context', () => {
+test('the UMD build exposes the same functions in a browser-like context', () => {
   const source = fs.readFileSync(path.join(__dirname, '../public/paper-fold-model.js'), 'utf8');
   const context = {};
   vm.createContext(context);

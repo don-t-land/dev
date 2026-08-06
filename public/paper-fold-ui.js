@@ -129,12 +129,17 @@
     if (typeof onModelChange === 'function') onModelChange(value);
   }
 
+  const DISPLAYED_STAT_FIELDS = ['liftScale', 'dragScale', 'stability', 'stallSpeed', 'rollBias'];
+
   function renderStats() {
     const host = $('fold-stats');
     const aero = root.PaperAeroProfile;
     const view = root.foldStatsView;
     if (!host || !aero || !view || !model) return;
     const profile = aero.deriveAerodynamicProfile(model);
+    if (previousProfile && DISPLAYED_STAT_FIELDS.every(field => profile[field] === previousProfile[field])) {
+      return;
+    }
     const rows = view.buildStatsRows(profile, previousProfile);
     previousProfile = profile;
     host.innerHTML = rows.map(row => `

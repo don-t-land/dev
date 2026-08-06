@@ -6,10 +6,16 @@
   'use strict';
 
   const EPSILON = 1e-9;
+  const HINGE_EPSILON = 1e-7;
   const MIN_DRAG = 0.05;
+  const MIN_ANGLE = 0.05;
+  const MAX_ANGLE = Math.PI;
   const MIN_POLYGON_AREA = 1e-6;
   const MAX_FOLDS = 10;
   const MAX_FACES = 64;
+  // 규약: 접는선 진행방향의 왼쪽 영역이 angle > 0 에서 +y(위)로 들린다.
+  // d3 축(전개도 방향을 (x,0,-y)로 올린 것)에 대한 오른손 법칙이 그 규약과 일치한다.
+  const ANGLE_SIGN = 1;
 
   function clonePoint(point) {
     return [point[0], point[1]];
@@ -18,7 +24,6 @@
   function cloneFace(face) {
     return {
       poly: face.poly.map(clonePoint),
-      layer: face.layer,
       folds: face.folds.slice()
     };
   }
@@ -27,7 +32,8 @@
     return {
       A: clonePoint(fold.A),
       d: clonePoint(fold.d),
-      dir: fold.dir
+      angle: fold.angle,
+      parents: fold.parents.slice()
     };
   }
 
@@ -35,7 +41,7 @@
     return {
       start: clonePoint(command.start),
       end: clonePoint(command.end),
-      direction: command.direction
+      angle: command.angle
     };
   }
 
@@ -50,8 +56,9 @@
   function createPaperModel() {
     return {
       faces: [{
+        // 전개도(material) 좌표 — 접기는 이 좌표를 절대 변형하지 않으며,
+        // 면들은 원판 [-1,1]² 시트를 항상 그대로 분할한다.
         poly: [[-1, -1], [1, -1], [1, 1], [-1, 1]],
-        layer: 0,
         folds: []
       }],
       folds: [],
@@ -67,6 +74,12 @@
       && Number.isFinite(point[1]);
   }
 
+  function isValidAngle(angle) {
+    return Number.isFinite(angle)
+      && Math.abs(angle) >= MIN_ANGLE
+      && Math.abs(angle) <= MAX_ANGLE;
+  }
+
   function isUsableModel(model) {
     return Boolean(model)
       && Array.isArray(model.faces)
@@ -79,7 +92,6 @@
         && Array.isArray(face.poly)
         && face.poly.length >= 3
         && face.poly.every(isPoint)
-        && Number.isFinite(face.layer)
         && Array.isArray(face.folds));
   }
 
@@ -108,7 +120,7 @@
     return clean;
   }
 
-  // The positive half-plane is the part carried from start to end.
+  // The positive half-plane is the left side of the directed crease — the part that folds.
   function splitPolygon(poly, creasePoint, normal) {
     const distances = poly.map(point => (point[0] - creasePoint[0]) * normal[0]
       + (point[1] - creasePoint[1]) * normal[1]);
@@ -148,34 +160,101 @@
     return poly && poly.length >= 3 && Math.abs(signedArea(poly)) > MIN_POLYGON_AREA;
   }
 
-  function reflectPoint(point, creasePoint, normal) {
-    const distance = (point[0] - creasePoint[0]) * normal[0]
-      + (point[1] - creasePoint[1]) * normal[1];
-    return [
-      point[0] - 2 * distance * normal[0],
-      point[1] - 2 * distance * normal[1]
-    ];
+  // Faces stay convex forever (they are line-splits of a convex sheet),
+  // so a boundary-inclusive same-side test is exact.
+  function pointInPolygon(point, poly) {
+    const orientation = signedArea(poly) >= 0 ? 1 : -1;
+    for (let i = 0; i < poly.length; i += 1) {
+      const a = poly[i];
+      const b = poly[(i + 1) % poly.length];
+      const cross = (b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0]);
+      if (cross * orientation < -EPSILON) return false;
+    }
+    return true;
   }
 
-  function normalizeLayers(faces) {
-    const layers = [...new Set(faces.map(face => face.layer))].sort((left, right) => left - right);
-    const rank = new Map(layers.map((layer, index) => [layer, index]));
-    return faces.map(face => ({
-      poly: face.poly,
-      layer: rank.get(face.layer),
-      folds: face.folds
-    }));
+  function foldsKey(folds) {
+    return folds.slice().sort((left, right) => left - right).join(',');
+  }
+
+  function lineSide(point, origin, normal) {
+    return (point[0] - origin[0]) * normal[0] + (point[1] - origin[1]) * normal[1];
+  }
+
+  // Signed offset of a point from the infinite line through `A` along unit `d`.
+  function lineOffset(point, A, d) {
+    return (point[0] - A[0]) * -d[1] + (point[1] - A[1]) * d[0];
+  }
+
+  // Edges of `poly` that lie on fold `fold`'s crease line — the hinge along
+  // which the piece that carries that fold is attached.
+  function edgesOnFoldLine(poly, fold) {
+    const edges = [];
+    for (let i = 0; i < poly.length; i += 1) {
+      const a = poly[i];
+      const b = poly[(i + 1) % poly.length];
+      if (Math.abs(lineOffset(a, fold.A, fold.d)) <= HINGE_EPSILON
+          && Math.abs(lineOffset(b, fold.A, fold.d)) <= HINGE_EPSILON) {
+        edges.push([a, b]);
+      }
+    }
+    return edges;
+  }
+
+  function creaseCrossesEdges(edges, creasePoint, normal) {
+    return edges.some(([a, b]) => {
+      const sideA = lineSide(a, creasePoint, normal);
+      const sideB = lineSide(b, creasePoint, normal);
+      return (sideA > EPSILON && sideB < -EPSILON)
+        || (sideA < -EPSILON && sideB > EPSILON);
+    });
+  }
+
+  /**
+   * A new crease may not cut through a hinge that already carries paper:
+   * neither a hinge of a flap folded off this component (child) nor the hinge
+   * this component itself hangs from (parent). Crossing either would tear.
+   */
+  function creaseTearsHinge(model, componentFolds, componentFaces, creasePoint, normal) {
+    const componentSet = new Set(componentFolds);
+
+    // Child hinges: faces whose folds are exactly componentFolds plus one.
+    for (const face of model.faces) {
+      if (face.folds.length !== componentFolds.length + 1) continue;
+      if (!componentFolds.every(index => face.folds.includes(index))) continue;
+      const extra = face.folds.find(index => !componentSet.has(index));
+      const fold = model.folds[extra];
+      if (!fold) continue;
+      if (creaseCrossesEdges(edgesOnFoldLine(face.poly, fold), creasePoint, normal)) return true;
+    }
+
+    // Parent hinges: this component hangs from fold j onto faces whose folds
+    // are exactly componentFolds minus j; the hinge edges sit on our own faces.
+    for (const hingeIndex of componentFolds) {
+      const parentKey = foldsKey(componentFolds.filter(index => index !== hingeIndex));
+      if (!model.faces.some(face => foldsKey(face.folds) === parentKey)) continue;
+      const fold = model.folds[hingeIndex];
+      if (!fold) continue;
+      for (const face of componentFaces) {
+        if (creaseCrossesEdges(edgesOnFoldLine(face.poly, fold), creasePoint, normal)) return true;
+      }
+    }
+
+    return false;
   }
 
   /**
    * Return a newly folded model. A rejected command returns the original model,
    * which lets callers use `model = applyFold(model, ...)` without a side channel.
+   * The fold splits only the rigid component under the crease midpoint; material
+   * (unfolded-sheet) coordinates are never altered — 3D placement is derived
+   * later by computeFoldedGeometry.
    */
-  function applyFold(model, start, end, direction) {
+  function applyFold(model, start, end, angle) {
     if (!isUsableModel(model)
         || !isPoint(start)
         || !isPoint(end)
-        || (direction !== 1 && direction !== -1)
+        || !isValidAngle(angle)
         || model.folds.length >= MAX_FOLDS) {
       return model;
     }
@@ -189,54 +268,46 @@
     const creaseDirection = [deltaX / dragLength, deltaY / dragLength];
     // A directed crease has an unambiguous folding side: its left half-plane.
     const normal = [-creaseDirection[1], creaseDirection[0]];
-    const pieces = [];
+
+    const midpoint = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
+    const anchor = model.faces.find(face => pointInPolygon(midpoint, face.poly));
+    if (!anchor) return model;
+
+    // The rigid component: every face whose fold set matches the anchor's.
+    const componentKey = foldsKey(anchor.folds);
+    const componentFaces = model.faces.filter(face => foldsKey(face.folds) === componentKey);
+
+    if (creaseTearsHinge(model, anchor.folds, componentFaces, creasePoint, normal)) return model;
+
+    const foldIndex = model.folds.length;
+    const faces = [];
     let anyMoved = false;
 
     for (const face of model.faces) {
-      const split = splitPolygon(face.poly, creasePoint, normal);
-      if (split.moved) {
-        if (!isLargeEnough(split.moved)) return model;
-        anyMoved = true;
+      if (foldsKey(face.folds) !== componentKey) {
+        faces.push(cloneFace(face));
+        continue;
       }
+      const split = splitPolygon(face.poly, creasePoint, normal);
+      if (split.moved && !isLargeEnough(split.moved)) return model;
       if (split.stationary && !isLargeEnough(split.stationary)) return model;
-      pieces.push({ face, moved: split.moved, stationary: split.stationary });
-    }
-
-    if (!anyMoved) return model;
-
-    const resultingFaceCount = pieces.reduce((count, piece) => count
-      + (piece.moved ? 1 : 0) + (piece.stationary ? 1 : 0), 0);
-    if (resultingFaceCount > MAX_FACES) return model;
-
-    const movedLayers = pieces.filter(piece => piece.moved).map(piece => piece.face.layer);
-    const maxMoved = Math.max(...movedLayers);
-    const minMoved = Math.min(...movedLayers);
-    const allLayers = model.faces.map(face => face.layer);
-    const globalMax = Math.max(...allLayers);
-    const globalMin = Math.min(...allLayers);
-    const foldIndex = model.folds.length;
-    const faces = [];
-
-    pieces.forEach(piece => {
-      const face = piece.face;
-      if (piece.stationary) {
+      if (split.stationary) {
         faces.push({
-          poly: piece.stationary.map(clonePoint),
-          layer: face.layer,
+          poly: split.stationary.map(clonePoint),
           folds: face.folds.slice()
         });
       }
-      if (piece.moved) {
-        const layer = direction > 0
-          ? globalMax + 1 + (maxMoved - face.layer)
-          : globalMin - 1 - (face.layer - minMoved);
+      if (split.moved) {
+        anyMoved = true;
         faces.push({
-          poly: piece.moved.map(point => reflectPoint(point, creasePoint, normal)),
-          layer,
+          poly: split.moved.map(clonePoint),
           folds: face.folds.concat(foldIndex)
         });
       }
-    });
+    }
+
+    if (!anyMoved) return model;
+    if (faces.length > MAX_FACES) return model;
 
     const snapshot = {
       faces: model.faces.map(cloneFace),
@@ -246,19 +317,105 @@
     const command = {
       start: [start[0], start[1]],
       end: [end[0], end[1]],
-      direction
+      angle
     };
 
     return {
-      faces: normalizeLayers(faces),
+      faces,
       folds: model.folds.map(cloneFold).concat({
         A: creasePoint,
         d: creaseDirection,
-        dir: direction
+        angle,
+        parents: anchor.folds.slice()
       }),
       history: model.history.map(cloneSnapshot).concat(snapshot),
       commands: model.commands.map(cloneCommand).concat(command)
     };
+  }
+
+  // 전개도 점 (x,y) → 기저 3D (x, 0, -y). 기수(nose) = -z = 전개도 +y.
+  function basePoint3(point) {
+    return [point[0], 0, -point[1]];
+  }
+
+  // Rodrigues rotation of `p` around the axis through `origin` along unit `u`.
+  function rotateAroundAxis(p, origin, u, angle) {
+    const px = p[0] - origin[0];
+    const py = p[1] - origin[1];
+    const pz = p[2] - origin[2];
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const dot = px * u[0] + py * u[1] + pz * u[2];
+    const crossX = u[1] * pz - u[2] * py;
+    const crossY = u[2] * px - u[0] * pz;
+    const crossZ = u[0] * py - u[1] * px;
+    return [
+      origin[0] + px * cos + crossX * sin + u[0] * dot * (1 - cos),
+      origin[1] + py * cos + crossY * sin + u[1] * dot * (1 - cos),
+      origin[2] + pz * cos + crossZ * sin + u[2] * dot * (1 - cos)
+    ];
+  }
+
+  /**
+   * Pure derivation of the folded 3D shape: every face starts on the y=0 plane
+   * in material coordinates and accumulates the rotations of its fold set in
+   * ascending order. Each fold's axis is itself carried through the rotations
+   * of the folds that existed on its component when it was created (parents).
+   */
+  function computeFoldedGeometry(model) {
+    if (!isUsableModel(model)) return { faces: [], minY: 0, maxY: 0 };
+
+    const axisCache = new Array(model.folds.length).fill(null);
+
+    function transformThrough(point3, foldIndices) {
+      let current = point3;
+      for (const index of foldIndices) {
+        const fold = model.folds[index];
+        if (!fold) continue;
+        const axis = axisFor(index);
+        current = rotateAroundAxis(current, axis.origin3, axis.dir3, ANGLE_SIGN * fold.angle);
+      }
+      return current;
+    }
+
+    function axisFor(index) {
+      if (axisCache[index]) return axisCache[index];
+      const fold = model.folds[index];
+      const parents = fold.parents.slice().sort((left, right) => left - right);
+      const origin3 = transformThrough(basePoint3(fold.A), parents);
+      const tip3 = transformThrough(
+        basePoint3([fold.A[0] + fold.d[0], fold.A[1] + fold.d[1]]),
+        parents
+      );
+      const dx = tip3[0] - origin3[0];
+      const dy = tip3[1] - origin3[1];
+      const dz = tip3[2] - origin3[2];
+      const length = Math.hypot(dx, dy, dz) || 1;
+      axisCache[index] = { origin3, dir3: [dx / length, dy / length, dz / length] };
+      return axisCache[index];
+    }
+
+    let minY = Infinity;
+    let maxY = -Infinity;
+    const faces = model.faces.map(face => {
+      const ordered = face.folds.slice().sort((left, right) => left - right);
+      const vertices3 = face.poly.map(point => transformThrough(basePoint3(point), ordered));
+      vertices3.forEach(vertex => {
+        if (vertex[1] < minY) minY = vertex[1];
+        if (vertex[1] > maxY) maxY = vertex[1];
+      });
+      return {
+        vertices3,
+        foldDepth: face.folds.length,
+        materialPoly: face.poly.map(clonePoint)
+      };
+    });
+
+    if (minY === Infinity) {
+      minY = 0;
+      maxY = 0;
+    }
+    return { faces, minY, maxY };
   }
 
   function undoFold(model) {
@@ -295,21 +452,23 @@
     let model = createPaperModel();
     for (const command of commands) {
       if (!command || !isPoint(command.start) || !isPoint(command.end)
-          || (command.direction !== 1 && command.direction !== -1)) return null;
-      const next = applyFold(model, command.start, command.end, command.direction);
+          || !isValidAngle(command.angle)) return null;
+      const next = applyFold(model, command.start, command.end, command.angle);
       if (next === model) return null;
       model = next;
     }
     return model;
   }
 
+  // 좌우 대칭 dart: 날개를 먼저 상반각으로 세우고, 기수 쪽 코너를 각 날개
+  // 위로 접어 넣는다. 날개 접기 이후의 코너 접기는 해당 날개 컴포넌트 안에서만
+  // 일어나므로 어떤 힌지도 찢거나 가로지르지 않는다.
   const PRESETS = {
     dart: [
-      { start: [0, 1], end: [1, 0], direction: 1 },
-      { start: [-1, 0], end: [0, 1], direction: 1 },
-      { start: [0, 1], end: [1, -1], direction: 1 },
-      { start: [-1, -1], end: [0, 1], direction: 1 },
-      { start: [1, -0.7], end: [-1, -0.7], direction: 1 }
+      { start: [0.5, 1], end: [0.5, -1], angle: 0.9 },     // 오른 날개 상반각 (바깥쪽이 왼편)
+      { start: [-0.5, -1], end: [-0.5, 1], angle: 0.9 },   // 왼 날개 상반각
+      { start: [0.6, 1], end: [1, 0.5], angle: Math.PI },  // 우상단(기수) 코너를 오른 날개 위로
+      { start: [-1, 0.5], end: [-0.6, 1], angle: Math.PI } // 좌상단(기수) 코너를 왼 날개 위로
     ]
   };
 
@@ -331,6 +490,7 @@
     replayFoldCommands,
     getPresetCommands,
     createPresetModel,
+    computeFoldedGeometry,
     presetNames: Object.keys(PRESETS)
   };
 });

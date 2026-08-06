@@ -242,18 +242,21 @@ test('a distance room requires every player to be ready before its host starts f
     assert.equal(hostPhase.order.length, 2);
     assert.ok(hostPhase.ends - requestedAt >= 90);
 
+    // 자유각도 커맨드 형식: {start, end, angle}. 상단 절반을 180° 접는다.
+    // NOTE: 프로필은 아직 전개도(2D) 기준이라 planformArea가 접기를 반영하지
+    // 않는다 — Task 2에서 3D 기하 기반으로 바뀌면 planform 검증을 복원한다.
     const halfFold = JSON.stringify([{
-      start: [-1, 0], end: [1, 0], direction: 1
+      start: [-1, 0], end: [1, 0], angle: Math.PI
     }]);
     host.send({ t: 'fold_done', commands: halfFold });
     const oneDone = await guest.next(message => message.t === 'fold_status' && message.doneIds.length === 1);
     assert.deepEqual(oneDone.doneIds, [hostHello.id]);
     assert.equal(oneDone.total, 2);
-    assert.equal(oneDone.profiles[hostHello.id].planformArea, 2);
+    assert.equal(oneDone.profiles[hostHello.id].foldCount, 1);
 
     guest.send({
       t: 'fold_done',
-      commands: JSON.stringify([{ start: [0, 0], end: [0, 0], direction: 1 }])
+      commands: JSON.stringify([{ start: [0, 0], end: [0, 0], angle: Math.PI / 2 }])
     });
     const invalidFold = await guest.next(message => message.t === 'error');
     assert.equal(invalidFold.code, 'INVALID_FOLD');
@@ -262,13 +265,13 @@ test('a distance room requires every player to be ready before its host starts f
     const allDoneStatus = await host.next(message => message.t === 'fold_status' && message.doneIds.length === 2);
     assert.deepEqual(new Set(allDoneStatus.doneIds), new Set([hostHello.id, guestHello.id]));
     assert.equal(allDoneStatus.total, 2);
-    assert.equal(allDoneStatus.profiles[guestHello.id].planformArea, 4);
+    assert.equal(allDoneStatus.profiles[guestHello.id].foldCount, 0);
 
     const launch = await host.next(message => message.t === 'phase' && message.phase === 'launch');
     assert.equal(launch.order.length, 2);
     assert.equal(launch.crafts.length, 2);
     assert.equal(launch.duration, 80);
-    assert.equal(launch.crafts.find(craft => craft.id === hostHello.id).aeroProfile.planformArea, 2);
+    assert.equal(launch.crafts.find(craft => craft.id === hostHello.id).aeroProfile.foldCount, 1);
     assert.ok(launch.ends > Date.now());
     await host.next(message => message.t === 'phase' && message.phase === 'playing');
   } finally {

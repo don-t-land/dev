@@ -1410,8 +1410,8 @@ const foldPreview = (() => {
     const width = previewCanvas.clientWidth || 1;
     const height = previewCanvas.clientHeight || 1;
     const ratio = previewRenderer.getPixelRatio();
-    const targetWidth = Math.round(width * ratio);
-    const targetHeight = Math.round(height * ratio);
+    const targetWidth = Math.floor(width * ratio);
+    const targetHeight = Math.floor(height * ratio);
     if (previewCanvas.width !== targetWidth || previewCanvas.height !== targetHeight) {
       previewRenderer.setSize(width, height, false);
       previewCamera.aspect = width / height;

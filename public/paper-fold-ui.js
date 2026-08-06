@@ -8,6 +8,7 @@
   let active = false;
   let locked = false;
   let ends = 0;
+  let timed = true;
   let direction = 1;
   let drag = null;
   let frame = 0;
@@ -155,8 +156,12 @@
     const count = model?.commands?.length || 0;
     const peers = roomProgress ? ` · 완료 ${roomProgress.done}/${roomProgress.total}명` : '';
     $('fold-status').textContent = locked
-      ? `완성 · ${count}번 접음 · 다른 플레이어를 기다리는 중${peers}`
-      : `${count}/10번 접음 · 그은 선의 왼쪽 면이 접힙니다${peers}`;
+      ? (timed
+        ? `완성 · ${count}번 접음 · 다른 플레이어를 기다리는 중${peers}`
+        : `완성 · ${count}번 접음 · 활공을 시작합니다${peers}`)
+      : (timed
+        ? `${count}/10번 접음 · 그은 선의 왼쪽 면이 접힙니다${peers}`
+        : `${count}/10번 접음 · 완성 버튼을 누르면 바로 출격합니다${peers}`);
     $('fold-undo-btn').disabled = locked || !count;
     renderStats();
   }
@@ -170,14 +175,16 @@
     drawFaces(camera);
     drawFoldPreview(camera);
 
-    const left = Math.max(0, ends - Date.now());
-    const seconds = Math.ceil(left / 1000);
-    const timer = $('fold-timer');
-    const minutesPart = Math.floor(seconds / 60);
-    const secondsPart = seconds % 60;
-    timer.textContent = `${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`;
-    timer.classList.toggle('low', seconds <= 10);
-    if (left <= 0 && !locked) lock('시간 종료 · 접은 모양으로 출발합니다');
+    if (timed) {
+      const left = Math.max(0, ends - Date.now());
+      const seconds = Math.ceil(left / 1000);
+      const timer = $('fold-timer');
+      const minutesPart = Math.floor(seconds / 60);
+      const secondsPart = seconds % 60;
+      timer.textContent = `${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`;
+      timer.classList.toggle('low', seconds <= 10);
+      if (left <= 0 && !locked) lock('시간 종료 · 접은 모양으로 출발합니다');
+    }
     frame = requestAnimationFrame(render);
   }
 
@@ -186,7 +193,10 @@
     locked = true;
     drag = null;
     updateStats();
-    if (message) $('fold-status').textContent = message;
+    const finalMessage = message || (timed
+      ? '완성 · 다른 플레이어의 접기가 끝나기를 기다리는 중'
+      : '완성 · 활공 시작!');
+    $('fold-status').textContent = finalMessage;
     $('fold-complete-btn').textContent = '완성됨';
     $('fold-complete-btn').disabled = true;
     $('fold-preset-btn').disabled = true;
@@ -198,8 +208,13 @@
 
   function enter(options) {
     if (!api) throw new Error('paperFoldModel is not loaded');
-    model = api.createPaperModel();
-    ends = Number(options?.ends) || Date.now() + 60000;
+    timed = Number.isFinite(Number(options?.ends));
+    ends = timed ? Number(options.ends) : 0;
+    const initial = typeof options?.initialCommands === 'string' && options.initialCommands !== '[]'
+      ? api.replayFoldCommands(options.initialCommands)
+      : null;
+    model = initial || api.createPaperModel();
+    $('fold-timer').classList.toggle('hide', !timed);
     direction = 1;
     drag = null;
     locked = false;
@@ -283,7 +298,7 @@
       updateStats();
       emitModelChange(model);
     });
-    $('fold-complete-btn').addEventListener('click', () => lock('완성 · 다른 플레이어의 접기가 끝나기를 기다리는 중'));
+    $('fold-complete-btn').addEventListener('click', () => lock());
     root.addEventListener('resize', fitCanvas);
   }
 

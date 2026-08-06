@@ -650,7 +650,8 @@ const net = {
   ws: null, id: null, room: null,
   players: new Map(),   // id -> { name, wins, alive, score, remote(3D) }
   leaderboard: [], rooms: [], pendingAction: null,
-  connected: false, helloSent: false
+  connected: false, helloSent: false,
+  lastFoldCommands: '[]'
 };
 
 function connect() {
@@ -784,13 +785,20 @@ function handle(m) {
       break;
 
     case 'room': {
-      const sameRoundPhase = isSameRoundPhase(m);
       net.room = m;
       game.mode = m.mode;
       const self = (m.players || []).find(player => player.id === net.id);
       if (self) $('s-wins').textContent = self.wins;
-      if (m.phase === 'waiting') net.leaderboard = [];
       syncRoomPlayers(m.players || []);
+      if (m.phase === 'live') {
+        const alreadyInWorld = Number(m.seed) === Number(game.seed) &&
+          (game.phase === 'playing' || game.phase === 'folding');
+        if (!alreadyInWorld) enterLiveArena(m);
+        refreshBoard();
+        break;
+      }
+      const sameRoundPhase = isSameRoundPhase(m);
+      if (m.phase === 'waiting') net.leaderboard = [];
       if (m.phase === 'launch' || m.phase === 'playing' || m.phase === 'results') {
         applyCraftSnapshots(m.crafts);
       }
@@ -837,6 +845,56 @@ function handle(m) {
         Number(m.total) || game.order.length
       );
       break;
+
+    case 'fold_ok':
+      send({ t: 'spawn' });
+      break;
+
+    case 'spawned': {
+      if (m.id === net.id) {
+        window.paperFoldingStage?.leave();
+        enterGame();
+        game.phase = 'playing';
+        const angle = Number(m.angle) || 0;
+        craft.position.set(Math.cos(angle) * 130, 130, Math.sin(angle) * 130);
+        const center = craft.position.clone().multiplyScalar(-1).normalize();
+        me.yaw = Math.atan2(-center.x, -center.z);
+        me.pitch = -0.05; me.roll = 0; me.speed = 22;
+        freeLook = { yaw: 0, pitch: 0 };
+        me.alive = true;
+        me.dist = 0; me.surv = 0;
+        me.ammo = 3; me.ammoT = 0;
+        game.frozen = false;
+        craft.visible = true;
+        craft.rotation.set(me.pitch, me.yaw, -me.roll);
+        const commandKey = m.commands || net.lastFoldCommands || '[]';
+        setCraftFromFoldModel(
+          window.paperFoldModel.replayFoldCommands(commandKey),
+          m.profile,
+          commandKey
+        );
+        syncRapierMap();
+        syncRapierFromCraft();
+        hideCenter();
+      } else {
+        if (!net.players.has(m.id)) addRemote({ id: m.id, name: m.name, wins: 0 });
+        const player = net.players.get(m.id);
+        if (player) {
+          player.alive = true;
+          player.remote.seen = false;
+          setFoldedCraftVisual(
+            player.remote.group,
+            player.remote.baseVisual,
+            window.paperFoldModel.replayFoldCommands(m.commands || '[]'),
+            player.remote.color,
+            m.commands || '[]'
+          );
+        }
+        showKill(`${escapeHtml(m.name || '조종사')} 참전!`);
+      }
+      refreshBoard();
+      break;
+    }
 
     case 'leaderboard':
       net.leaderboard = Array.isArray(m.rows) ? m.rows : [];
@@ -1963,6 +2021,29 @@ function stepDarts(dt) {
       darts.splice(i, 1);
     }
   }
+}
+
+/* ============================================================
+   아레나 드롭인 입장
+   ============================================================ */
+function enterLiveArena(m) {
+  game.mode = 'ARENA';
+  game.seed = Number(m.seed) || 0;
+  game.order = Array.isArray(m.order) ? m.order : [];
+  game.ends = 0;
+  net.leaderboard = [];
+  hideResults();
+  buildArena(game.seed);
+  applyCraftSnapshots(m.crafts);
+  enterFolding();
+  window.paperFoldingStage?.enter({
+    ends: null,
+    initialCommands: net.lastFoldCommands || '[]',
+    onComplete: fold => {
+      net.lastFoldCommands = fold.commands;
+      send({ t: 'fold_done', commands: fold.commands });
+    }
+  });
 }
 
 /* ============================================================

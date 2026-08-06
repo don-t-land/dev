@@ -14,6 +14,7 @@
   let onComplete = null;
   let completionSent = false;
   let roomProgress = null;
+  let previousProfile = null;
 
   const $ = id => document.getElementById(id);
 
@@ -123,6 +124,23 @@
     ctx.restore();
   }
 
+  function renderStats() {
+    const host = $('fold-stats');
+    const aero = root.PaperAeroProfile;
+    const view = root.foldStatsView;
+    if (!host || !aero || !view || !model) return;
+    const profile = aero.deriveAerodynamicProfile(model);
+    const rows = view.buildStatsRows(profile, previousProfile);
+    previousProfile = profile;
+    host.innerHTML = rows.map(row => `
+      <div class="fold-stat-row${row.good ? ' good' : ''}">
+        <span>${row.label}</span>
+        <span class="fold-stat-bar"><i style="width:${row.percent}%"></i></span>
+        <span class="fold-stat-value">${row.text}</span>
+        <span class="fold-stat-delta">${row.delta === 'up' ? '▲' : row.delta === 'down' ? '▼' : ''}</span>
+      </div>`).join('');
+  }
+
   function updateStats() {
     const count = model?.commands?.length || 0;
     const peers = roomProgress ? ` · 완료 ${roomProgress.done}/${roomProgress.total}명` : '';
@@ -130,6 +148,7 @@
       ? `완성 · ${count}번 접음 · 다른 플레이어를 기다리는 중${peers}`
       : `${count}/10번 접음 · 그은 선의 왼쪽 면이 접힙니다${peers}`;
     $('fold-undo-btn').disabled = locked || !count;
+    renderStats();
   }
 
   function render() {
@@ -176,6 +195,7 @@
     locked = false;
     completionSent = false;
     roomProgress = null;
+    previousProfile = null;
     onComplete = typeof options?.onComplete === 'function' ? options.onComplete : null;
     active = true;
     $('folding-screen').classList.remove('hide');

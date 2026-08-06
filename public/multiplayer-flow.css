@@ -143,6 +143,16 @@
 .fold-btn.active { color:#071d39; border-color:transparent; background:#76e5ef; }
 .fold-btn.finish { color:#111536; border-color:transparent; background:#f4cd6c; }
 #fold-status { text-align:center; color:#9dafcc; font-size:12px; }
+.fold-side { position:absolute; top:14px; right:14px; width:min(236px,36vw); display:flex; flex-direction:column; gap:10px; z-index:2; }
+.fold-stats { background:rgba(9,14,38,.74); border:1px solid rgba(134,220,245,.22); border-radius:14px; padding:10px 12px; backdrop-filter:blur(4px); }
+.fold-stats .fold-stat-row { display:grid; grid-template-columns:56px 1fr 58px 14px; align-items:center; gap:7px; margin:5px 0; font-size:11px; color:#cfe6f4; }
+.fold-stats .fold-stat-bar { height:6px; border-radius:3px; background:rgba(255,255,255,.12); overflow:hidden; }
+.fold-stats .fold-stat-bar i { display:block; height:100%; background:#ff9d92; transition:width .25s; }
+.fold-stats .fold-stat-row.good .fold-stat-bar i { background:#69e3b6; }
+.fold-stats .fold-stat-delta { text-align:center; color:#9fb4cc; }
+.fold-stats .fold-stat-value { text-align:right; font-variant-numeric:tabular-nums; }
+.fold-preview { width:100%; aspect-ratio:1/1; border-radius:14px; border:1px solid rgba(134,220,245,.22); background:radial-gradient(circle at 50% 42%,rgba(102,210,238,.14),rgba(9,14,38,.6) 70%); }
+@media (max-width:760px) { .fold-side { width:min(200px,44vw); } }
 
 @media (max-width:760px) {
   .room-entry-card { padding:27px 20px 20px; }

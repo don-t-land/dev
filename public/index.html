@@ -575,6 +575,10 @@
   <main class="fold-stage">
     <canvas id="fold-paper-canvas"></canvas>
     <div class="fold-hint">접을 선을 그으세요 · 선을 그은 방향의 왼쪽 면이 접힙니다</div>
+    <aside class="fold-side">
+      <div id="fold-stats" class="fold-stats" aria-live="polite"></div>
+      <canvas id="fold-preview-canvas" class="fold-preview" aria-label="접은 비행기 미리보기"></canvas>
+    </aside>
   </main>
   <footer class="fold-controls">
     <div class="fold-direction">
@@ -603,6 +607,7 @@
 <script src="./waiting-room-state.js"></script>
 <script src="./paper-fold-model.js"></script>
 <script src="./paper-aero-profile.js"></script>
+<script src="./fold-stats-view.js"></script>
 <script src="./paper-fold-ui.js"></script>
 <script src="./home-screen.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>

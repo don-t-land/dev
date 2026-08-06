@@ -81,6 +81,10 @@ const configuredReconnectGraceMs = Number(process.env.RECONNECT_GRACE_MS || 10_0
 const RECONNECT_GRACE_MS = Number.isFinite(configuredReconnectGraceMs) && configuredReconnectGraceMs >= 0
   ? configuredReconnectGraceMs
   : 10_000;
+const configuredRespawnCooldownMs = Number(process.env.RESPAWN_COOLDOWN_MS || 2_000);
+const RESPAWN_COOLDOWN_MS = Number.isFinite(configuredRespawnCooldownMs) && configuredRespawnCooldownMs >= 0
+  ? configuredRespawnCooldownMs
+  : 2_000;
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let roomSeq = 0;
 const rooms = new Map();
@@ -132,6 +136,10 @@ function joinablePhase(room) {
   return room.mode === 'ARENA' ? room.phase === 'live' : room.phase === 'waiting';
 }
 
+function isFlightPhase(room) {
+  return room.phase === 'playing' || room.phase === 'live';
+}
+
 function findRoom(mode) {
   for (const room of rooms.values()) {
     if (room.visibility === 'public' && room.mode === mode && joinablePhase(room) &&
@@ -165,6 +173,12 @@ function vecDistanceSquared(a, b) {
 }
 
 function expectedSpawn(room, playerId) {
+  if (room.mode === 'ARENA' && room.phase === 'live') {
+    const player = room.players.get(playerId);
+    if (player && player.spawnAngle !== null) {
+      return [Math.cos(player.spawnAngle) * 130, 130, Math.sin(player.spawnAngle) * 130];
+    }
+  }
   const index = Math.max(0, room.order.indexOf(playerId));
   const count = Math.max(1, room.order.length);
   if (room.mode === 'DIST') return [(index - (count - 1) / 2) * 10, 150, 0];
@@ -257,7 +271,7 @@ function snapshot(room) {
     players: [...room.players.values()].map(p => ({
       id: p.id, name: p.name, wins: p.wins, alive: p.alive, ready: p.ready,
       foldDone: Boolean(p.foldDone), foldCommands: p.foldCommands || '[]',
-      aeroProfile: p.aeroProfile || DEFAULT_AERO_PROFILE,
+      aeroProfile: p.aeroProfile || DEFAULT_AERO_PROFILE, kills: p.kills || 0,
       connected: Boolean(p.ws && p.ws.readyState === 1)
     }))
   };
@@ -297,6 +311,10 @@ function resetPlayerForRoom(player) {
   player.aeroProfile = DEFAULT_AERO_PROFILE;
   player.alive = false;
   player.score = 0;
+  player.kills = 0;
+  player.lifeStartedAt = 0;
+  player.diedAt = 0;
+  player.spawnAngle = null;
   player.state = null;
   player.stateAt = 0;
   player.movementBudget = 40;
@@ -427,14 +445,23 @@ function finishResultsIfReady(room) {
   return true;
 }
 
-function onCrash(room, player, byName) {
-  if (room.phase !== 'playing' || !player.alive) return;
+function onCrash(room, player, killer) {
+  if ((room.phase !== 'playing' && room.phase !== 'live') || !player.alive) return;
   player.alive = false;
+
+  if (room.phase === 'live') {
+    player.score = (Date.now() - player.lifeStartedAt) / 1000;
+    player.diedAt = Date.now();
+    if (killer) killer.kills += 1;
+    bcast(room, { t: 'crashed', id: player.id, by: killer?.name || null });
+    return; // live에서는 조기 종료 검사 없음
+  }
+
   if (room.mode === 'ARENA')
     player.score = (Date.now() - room.startedAt) / 1000;
   // DIST 점수는 상태 메시지에서 이미 누적됨
 
-  bcast(room, { t: 'crashed', id: player.id, by: byName || null });
+  bcast(room, { t: 'crashed', id: player.id, by: killer?.name || null });
   checkEarlyEnd(room);
 }
 
@@ -454,6 +481,16 @@ function checkEarlyEnd(room) {
 }
 
 function leaderboardMessage(room, now = Date.now()) {
+  if (room.mode === 'ARENA' && room.phase === 'live') {
+    const rows = [...room.players.values()].map(player => ({
+      id: player.id,
+      name: player.name,
+      kills: player.kills,
+      score: Math.round((player.alive ? (now - player.lifeStartedAt) / 1000 : player.score) * 10) / 10,
+      alive: player.alive
+    })).sort((a, b) => b.kills - a.kills || b.score - a.score);
+    return { t: 'leaderboard', rows };
+  }
   const rows = room.order
     .map(id => room.players.get(id))
     .filter(Boolean)
@@ -553,6 +590,10 @@ wss.on('connection', (ws) => {
         foldDone: false,
         alive: false,
         score: 0,
+        kills: 0,
+        lifeStartedAt: 0,
+        diedAt: 0,
+        spawnAngle: null,
         state: null,
         stateAt: 0,
         movementBudget: 40,
@@ -675,7 +716,9 @@ wss.on('connection', (ws) => {
 
     /* -- 접기 명령은 서버에서 재생·검증한 뒤 공력 프로필로 변환합니다 -- */
     if (m.t === 'fold_done') {
-      if (room.phase !== 'folding' || me.foldDone) return;
+      const liveFold = room.phase === 'live' && !me.alive;
+      const roundFold = room.phase === 'folding' && !me.foldDone;
+      if (!liveFold && !roundFold) return;
       const commands = m.commands === undefined ? '[]' : m.commands;
       const foldModel = replayFoldCommands(commands);
       if (!foldModel) {
@@ -688,12 +731,49 @@ wss.on('connection', (ws) => {
       me.foldCommands = serializeFoldCommands(foldModel);
       me.aeroProfile = deriveAerodynamicProfile(foldModel);
       me.foldDone = true;
+      if (liveFold) {
+        sendJson(ws, { t: 'fold_ok', profile: me.aeroProfile });
+        return;
+      }
       const doneIds = room.order.filter(id => room.players.get(id)?.foldDone);
       const profiles = Object.fromEntries(doneIds.map(id => [
         id,
         room.players.get(id).aeroProfile
       ]));
       bcast(room, { t: 'fold_status', doneIds, total: room.order.length, profiles });
+      return;
+    }
+
+    /* -- 아레나 live 방에서 개인 스폰(입장·리스폰) -- */
+    if (m.t === 'spawn') {
+      if (room.phase !== 'live') return;
+      if (me.alive) {
+        sendJson(ws, { t: 'error', code: 'ALREADY_ALIVE', message: '이미 비행 중입니다' });
+        return;
+      }
+      if (!me.foldDone) {
+        sendJson(ws, { t: 'error', code: 'FOLD_REQUIRED', message: '비행기를 먼저 접어 주세요' });
+        return;
+      }
+      const spawnNow = Date.now();
+      if (me.diedAt && spawnNow - me.diedAt < RESPAWN_COOLDOWN_MS) {
+        sendJson(ws, { t: 'error', code: 'RESPAWN_COOLDOWN', message: '잠시 후 다시 시도해 주세요' });
+        return;
+      }
+      me.spawnAngle = Math.random() * Math.PI * 2;
+      me.alive = true;
+      me.lifeStartedAt = spawnNow;
+      me.state = null;
+      me.movementBudget = 40;
+      me.movementAt = spawnNow;
+      me.ammo = 3;
+      me.ammoAt = spawnNow;
+      me.shots = [];
+      if (!room.order.includes(me.id)) room.order.push(me.id);
+      bcast(room, {
+        t: 'spawned', id: me.id, name: me.name, angle: me.spawnAngle,
+        profile: me.aeroProfile, commands: me.foldCommands, kills: me.kills
+      });
       return;
     }
 
@@ -734,7 +814,7 @@ wss.on('connection', (ws) => {
 
     /* -- 비행 상태 (클라이언트 → 15Hz) -- */
     if (m.t === 's') {
-      if (room.phase !== 'playing' || !me.alive) return;
+      if (!isFlightPhase(room) || !me.alive) return;
       if (!finiteVec3(m.p, 10000) || !finiteVec3(m.r, 10)) return;
       const stateNow = Date.now();
       const movementElapsed = Math.max(0, Math.min((stateNow - me.movementAt) / 1000, 2));
@@ -758,7 +838,7 @@ wss.on('connection', (ws) => {
 
     /* -- 발사 중계 (아레나) -- */
     if (m.t === 'shoot') {
-      if (room.mode !== 'ARENA' || room.phase !== 'playing' || !me.alive || !me.state ||
+      if (room.mode !== 'ARENA' || !isFlightPhase(room) || !me.alive || !me.state ||
           !finiteVec3(m.o, 10000) || !finiteVec3(m.v, 1000)) return;
       const shotNow = Date.now();
       const regenerated = Math.floor((shotNow - me.ammoAt) / 2500);
@@ -780,7 +860,7 @@ wss.on('connection', (ws) => {
 
     /* -- 피격 판정 (발사자가 신고, 서버가 근접 검증) -- */
     if (m.t === 'hit') {
-      if (room.mode !== 'ARENA' || room.phase !== 'playing' || !me.alive ||
+      if (room.mode !== 'ARENA' || !isFlightPhase(room) || !me.alive ||
           typeof m.id !== 'string' || !finiteVec3(m.p, 10000)) return;
       const target = room.players.get(m.id);
       if (!target || !target.alive || target.id === me.id || !target.state) return;
@@ -802,7 +882,7 @@ wss.on('connection', (ws) => {
       const dy = target.state.p[1] - m.p[1];
       const dz = target.state.p[2] - m.p[2];
       if (dx * dx + dy * dy + dz * dz > 35 * 35) return;
-      onCrash(room, target, me.name);
+      onCrash(room, target, me);
       return;
     }
   });
@@ -830,7 +910,7 @@ wss.on('connection', (ws) => {
 /* ---------- 상태 브로드캐스트 (20Hz) ---------- */
 const stateBroadcastTimer = setInterval(() => {
   for (const room of rooms.values()) {
-    if (room.phase !== 'playing') continue;
+    if (!isFlightPhase(room)) continue;
     const a = [];
     for (const p of room.players.values())
       if (p.state) a.push([p.id, p.state.p, p.state.r, p.alive ? 1 : 0, Math.round(p.score)]);
@@ -842,7 +922,7 @@ stateBroadcastTimer.unref();
 const leaderboardBroadcastTimer = setInterval(() => {
   const now = Date.now();
   for (const room of rooms.values()) {
-    if (room.phase === 'playing') bcast(room, leaderboardMessage(room, now));
+    if (isFlightPhase(room)) bcast(room, leaderboardMessage(room, now));
   }
 }, 250);
 leaderboardBroadcastTimer.unref();

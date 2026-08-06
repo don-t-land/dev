@@ -3,7 +3,10 @@
 const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const WebSocket = require('ws');
+const { getPresetCommands } = require('../public/paper-fold-model.js');
 const { httpServer, wss } = require('../server');
+
+const DART_COMMANDS = JSON.stringify(getPresetCommands('dart'));
 
 let baseUrl;
 
@@ -178,5 +181,156 @@ test('room 목록에서 ARENA live 방은 인원 미만이면 joinable이다', a
     assert.equal(entry.joinable, true);
   } finally {
     await Promise.all([host.close(), browser.close()]);
+  }
+});
+
+function spawnPosition(angle) {
+  return [Math.cos(angle) * 130, 130, Math.sin(angle) * 130];
+}
+
+async function createAndJoinLiveArena(hostName, guestName) {
+  const host = await connectClient();
+  const guest = await connectClient();
+  const hostHello = await establishSession(host, hostName);
+  host.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
+  const created = await host.next(message => message.t === 'room');
+  const guestHello = await establishSession(guest, guestName);
+  guest.send({ t: 'join', code: created.code });
+  await guest.next(message => message.t === 'room' && message.players.length === 2);
+  await host.next(message => message.t === 'room' && message.players.length === 2);
+  return { host, guest, hostHello, guestHello };
+}
+
+test('live 방 접기 → fold_ok → spawn → spawned 브로드캐스트', async () => {
+  const { host, guest, guestHello } = await createAndJoinLiveArena('방장', '손님');
+  try {
+    guest.send({ t: 'fold_done', commands: DART_COMMANDS });
+    const foldOk = await guest.next(message => message.t === 'fold_ok');
+    assert.equal(typeof foldOk.profile, 'object');
+
+    guest.send({ t: 'spawn' });
+    const [hostSpawned, guestSpawned] = await Promise.all([
+      host.next(message => message.t === 'spawned' && message.id === guestHello.id),
+      guest.next(message => message.t === 'spawned' && message.id === guestHello.id)
+    ]);
+    assert.equal(hostSpawned.name, '손님');
+    assert.equal(typeof hostSpawned.angle, 'number');
+    assert.equal(typeof hostSpawned.profile, 'object');
+    assert.equal(typeof hostSpawned.commands, 'string');
+    assert.equal(hostSpawned.kills, 0);
+    assert.deepEqual(guestSpawned, hostSpawned);
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
+  }
+});
+
+test('spawn 가드: 미접기 FOLD_REQUIRED, 생존 중 ALREADY_ALIVE, 사망 직후 RESPAWN_COOLDOWN', async () => {
+  const { host, guest } = await createAndJoinLiveArena('방장', '손님');
+  try {
+    guest.send({ t: 'spawn' });
+    const foldRequired = await guest.next(message => message.t === 'error');
+    assert.equal(foldRequired.code, 'FOLD_REQUIRED');
+
+    guest.send({ t: 'fold_done', commands: DART_COMMANDS });
+    await guest.next(message => message.t === 'fold_ok');
+    guest.send({ t: 'spawn' });
+    await guest.next(message => message.t === 'spawned');
+
+    guest.send({ t: 'spawn' });
+    const alreadyAlive = await guest.next(message => message.t === 'error');
+    assert.equal(alreadyAlive.code, 'ALREADY_ALIVE');
+
+    guest.send({ t: 'crash' });
+    await host.next(message => message.t === 'crashed');
+    guest.send({ t: 'spawn' });
+    const cooldown = await guest.next(message => message.t === 'error');
+    assert.equal(cooldown.code, 'RESPAWN_COOLDOWN');
+
+    await new Promise(resolve => setTimeout(resolve, 2_100));
+    guest.send({ t: 'spawn' });
+    const respawned = await guest.next(message => message.t === 'spawned');
+    assert.equal(respawned.kills, 0);
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
+  }
+});
+
+test('격추 시 killer의 kills가 증가하고 리더보드가 kills/생존초 형식이다', async () => {
+  const { host, guest, hostHello, guestHello } = await createAndJoinLiveArena('저격수', '표적');
+  try {
+    host.send({ t: 'fold_done', commands: DART_COMMANDS });
+    await host.next(message => message.t === 'fold_ok');
+    guest.send({ t: 'fold_done', commands: DART_COMMANDS });
+    await guest.next(message => message.t === 'fold_ok');
+
+    host.send({ t: 'spawn' });
+    const hostSpawned = await host.next(message => message.t === 'spawned' && message.id === hostHello.id);
+    guest.send({ t: 'spawn' });
+    const guestSpawned = await guest.next(message => message.t === 'spawned' && message.id === guestHello.id);
+    await host.next(message => message.t === 'spawned' && message.id === guestHello.id);
+
+    const shooterPos = spawnPosition(hostSpawned.angle);
+    const targetPos = spawnPosition(guestSpawned.angle);
+    host.send({ t: 's', p: shooterPos, r: [0, 0, 0] });
+    guest.send({ t: 's', p: targetPos, r: [0, 0, 0] });
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const elapsed = 2.5;
+    const v = [
+      (targetPos[0] - shooterPos[0]) / elapsed,
+      (targetPos[1] - shooterPos[1] + 4 * elapsed * elapsed) / elapsed,
+      (targetPos[2] - shooterPos[2]) / elapsed
+    ];
+    host.send({ t: 'shoot', o: shooterPos, v });
+    await guest.next(message => message.t === 'shot');
+
+    await new Promise(resolve => setTimeout(resolve, elapsed * 1000));
+    host.send({ t: 'hit', id: guestHello.id, p: targetPos });
+    const crashed = await guest.next(message => message.t === 'crashed');
+    assert.equal(crashed.id, guestHello.id);
+    assert.equal(crashed.by, '저격수');
+
+    const leaderboard = await host.next(message => message.t === 'leaderboard' &&
+      message.rows.some(row => row.id === hostHello.id && row.kills === 1), 1_500);
+    const shooterRow = leaderboard.rows.find(row => row.id === hostHello.id);
+    const targetRow = leaderboard.rows.find(row => row.id === guestHello.id);
+    assert.equal(shooterRow.kills, 1);
+    assert.equal(typeof shooterRow.score, 'number');
+    assert.equal(shooterRow.alive, true);
+    assert.equal(targetRow.alive, false);
+    assert.ok(leaderboard.rows.indexOf(shooterRow) < leaderboard.rows.indexOf(targetRow));
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
+  }
+});
+
+test('live 방에서는 전원이 죽어도 방이 끝나지 않는다', async () => {
+  const { host, guest } = await createAndJoinLiveArena('방장', '손님');
+  try {
+    host.send({ t: 'fold_done', commands: DART_COMMANDS });
+    await host.next(message => message.t === 'fold_ok');
+    guest.send({ t: 'fold_done', commands: DART_COMMANDS });
+    await guest.next(message => message.t === 'fold_ok');
+
+    host.send({ t: 'spawn' });
+    await host.next(message => message.t === 'spawned');
+    guest.send({ t: 'spawn' });
+    await guest.next(message => message.t === 'spawned');
+
+    host.send({ t: 'crash' });
+    guest.send({ t: 'crash' });
+    await host.next(message => message.t === 'crashed');
+    await host.next(message => message.t === 'crashed');
+
+    await assert.rejects(
+      host.next(message => message.t === 'phase' || message.t === 'room' && message.phase !== 'live', 300),
+      /timed out/
+    );
+
+    host.send({ t: 'fold_done', commands: DART_COMMANDS });
+    const foldOk = await host.next(message => message.t === 'fold_ok');
+    assert.equal(typeof foldOk.profile, 'object');
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
   }
 });

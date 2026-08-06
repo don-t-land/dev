@@ -8,7 +8,11 @@ import {
 } from '../public/flight-physics-rapier.mjs';
 
 const require = createRequire(import.meta.url);
-const { createPaperModel, applyFold } = require('../public/paper-fold-model.js');
+const {
+  createPaperModel,
+  applyFold,
+  applyPanelFold
+} = require('../public/paper-fold-model.js');
 const { deriveAerodynamicProfile } = require('../public/paper-aero-profile.js');
 
 function initialState() {
@@ -39,6 +43,40 @@ test('square paper produces a non-degenerate folded-shape collider hull', () => 
   assert.equal(vertices.length, 24);
   assert.ok([...vertices].every(Number.isFinite));
   assert.ok(new Set([...vertices].map(value => value.toFixed(3))).size > 3);
+});
+
+function axisExtent(vertices, axis) {
+  const values = [];
+  for (let index = axis; index < vertices.length; index += 3) values.push(vertices[index]);
+  return Math.max(...values) - Math.min(...values);
+}
+
+test('90 degree and sequential selected-face folds retain their 3D height in collider vertices', () => {
+  const first = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90
+  });
+  const standing = first.faces.find(face => face.folds.includes('fold-1'));
+  const sequential = applyPanelFold(first, {
+    start: [0, 0], end: [0, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, seedFaceId: standing.id
+  });
+
+  assert.ok(axisExtent(makeColliderVertices(first), 1) > 1.3,
+    'a standing panel must have flight-space vertical extent');
+  assert.ok(axisExtent(makeColliderVertices(sequential), 1) > 1.3,
+    'a sequential selected-face fold must preserve flight-space vertical extent');
+});
+
+test('collider generation retains the legacy 2D face fallback', () => {
+  const vertices = makeColliderVertices({
+    faces: [{ poly: [[-1, -1], [1, -1], [1, 1], [-1, 1]], layer: 2 }]
+  });
+
+  assert.equal(vertices.length, 24);
+  assert.ok(axisExtent(vertices, 0) > 2.6);
+  assert.ok(axisExtent(vertices, 1) >= .07 - 1e-6);
+  assert.ok(axisExtent(vertices, 2) > 2.6);
 });
 
 test('Rapier fixed-step flight is independent of render cadence', async () => {

@@ -468,7 +468,6 @@
     <div class="panel waiting-room-panel">
       <header class="waiting-room-top">
         <div class="waiting-room-title">
-          <div class="tag" id="room-visibility">PRIVATE · CODE ONLY</div>
           <h2 id="room-mode-title" tabindex="-1">오래 날기</h2>
         </div>
         <div class="waiting-room-code">
@@ -569,21 +568,48 @@
 
 <section id="folding-screen" class="hide" aria-labelledby="fold-title">
   <header class="fold-top">
-    <div><div class="fold-kicker">BUILD YOUR GLIDER</div><h2 id="fold-title">나만의 종이비행기를 접어!</h2></div>
-    <div id="fold-timer" class="fold-timer">01:00</div>
+    <div><div class="fold-kicker">FREEFORM FOLD WORKBENCH</div><h2 id="fold-title">나만의 종이비행기 작업대</h2></div>
+    <div class="fold-round-meta">
+      <span id="fold-side" class="fold-side-badge">앞면</span>
+      <div id="fold-timer" class="fold-timer" aria-label="남은 시간">01:00</div>
+    </div>
   </header>
-  <main class="fold-stage">
-    <canvas id="fold-paper-canvas"></canvas>
-    <div class="fold-hint">접을 선을 그으세요 · 선을 그은 방향의 왼쪽 면이 접힙니다</div>
+  <main class="fold-workspace">
+    <section class="fold-stage" aria-label="종이 편집 화면">
+      <canvas id="fold-paper-canvas" aria-label="3D 종이접기 작업대. 포인터 또는 키보드로 보이는 면을 선택하고 접습니다." aria-describedby="fold-canvas-help" tabindex="0"></canvas>
+      <div id="fold-canvas-help" class="fold-hint">보이는 면을 선택하고 접을 선을 그으세요 · 키보드: 왼쪽/오른쪽 화살표로 면 선택, H 가로 · V 세로 · D 대각선 · Enter 기본 접기</div>
+    </section>
+    <aside class="fold-inspector" aria-label="접기 도구와 히스토리">
+      <section class="fold-tool-section fold-selection-card" aria-labelledby="fold-selection-label">
+        <div class="fold-section-heading"><span id="fold-selection-label">현재 선택</span><span class="fold-selection-dot" aria-hidden="true"></span></div>
+        <strong id="fold-selection">선택된 면 없음</strong>
+        <small>청록색 테두리의 한 면만 다음 접기에 움직입니다.</small>
+      </section>
+      <section class="fold-tool-section" aria-labelledby="fold-direction-label">
+        <div id="fold-direction-label" class="fold-section-heading">접기 방향</div>
+        <div class="fold-direction">
+          <button id="fold-dir-valley" class="fold-btn active" type="button" aria-label="골접기 방향 선택">골접기 ↗</button>
+          <button id="fold-dir-mountain" class="fold-btn" type="button" aria-label="산접기 방향 선택">산접기 ↙</button>
+        </div>
+      </section>
+      <section class="fold-tool-section" aria-labelledby="fold-target-label">
+        <div id="fold-target-label" class="fold-section-heading">다음 접기 목표각</div>
+        <div class="fold-target-angles">
+          <button id="fold-angle-90" class="fold-btn active" type="button" aria-label="다음 접기 목표각 90도">90° <small>패널</small></button>
+          <button id="fold-angle-180" class="fold-btn" type="button" aria-label="다음 접기 목표각 180도">180° <small>완전 접기</small></button>
+        </div>
+      </section>
+      <button id="fold-flip-btn" class="fold-btn fold-flip" type="button" aria-label="종이를 앞뒤로 뒤집기">종이 앞/뒤 뒤집기</button>
+      <section class="fold-tool-section fold-history-section" aria-labelledby="fold-history-label">
+        <div class="fold-section-heading"><span id="fold-history-label">접기 히스토리</span><span id="fold-count">0 folds</span></div>
+        <div id="fold-history" class="fold-history-list" aria-live="polite"></div>
+      </section>
+    </aside>
   </main>
   <footer class="fold-controls">
-    <div class="fold-direction">
-      <button id="fold-dir-valley" class="fold-btn active" type="button">골접기 ↗</button>
-      <button id="fold-dir-mountain" class="fold-btn" type="button">산접기 ↙</button>
-    </div>
-    <div id="fold-status" role="status">0/10번 접음</div>
-    <div>
-      <button id="fold-undo-btn" class="fold-btn" type="button">한 번 펴기</button>
+    <div id="fold-status" role="status" aria-live="polite">면을 선택해 자유롭게 접어 보세요</div>
+    <div class="fold-footer-actions">
+      <button id="fold-undo-btn" class="fold-btn" type="button">마지막 동작 취소</button>
       <button id="fold-complete-btn" class="fold-btn finish" type="button">비행기 완성</button>
     </div>
   </footer>
@@ -602,6 +628,7 @@
 <script src="./waiting-room-state.js"></script>
 <script src="./paper-fold-model.js"></script>
 <script src="./paper-aero-profile.js"></script>
+<script src="./paper-fold-viewport.js"></script>
 <script src="./paper-fold-ui.js"></script>
 <script src="./home-screen.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
@@ -968,7 +995,6 @@ function enterRoomLobby(room, resultsPending = false) {
   window.paperFoldingStage?.leave();
   clearWorld();
   $('room-mode-title').textContent = room.mode === 'ARENA' ? '오래 날기' : '멀리 날기';
-  $('room-visibility').textContent = room.visibility === 'private' ? 'PRIVATE · CODE ONLY' : 'PUBLIC ROOM';
   $('room-code-display').textContent = room.code;
   $('room-count').textContent = `${room.players.length} / ${room.maxPlayers}`;
 
@@ -1323,13 +1349,27 @@ function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {
   if (!model?.commands?.length || !Array.isArray(model.faces)) return null;
   const visual = new THREE.Group();
   visual.name = 'foldedCraftVisual';
+  const paperScale = 1.35;
+  const layerSpacing = .026;
   const maxLayer = Math.max(1, ...model.faces.map(face => Number(face.layer) || 0));
   model.faces.forEach((face, faceIndex) => {
-    if (!Array.isArray(face.poly) || face.poly.length < 3) return;
+    const spatial = Array.isArray(face.vertices3d)
+      && face.vertices3d.length >= 3
+      && face.vertices3d.every(point => Array.isArray(point)
+        && Number.isFinite(point[0]) && Number.isFinite(point[1]) && Number.isFinite(point[2]))
+      ? face.vertices3d
+      : (face.poly || []).map(point => [point?.[0], point?.[1], 0]);
+    if (spatial.length < 3 || spatial.some(point => point.some(value => !Number.isFinite(value)))) return;
     const vertices = [];
-    for (let index = 1; index < face.poly.length - 1; index += 1) {
-      for (const point of [face.poly[0], face.poly[index], face.poly[index + 1]]) {
-        vertices.push(point[0] * 1.35, (Number(face.layer) || 0) * .026, -point[1] * 1.35);
+    const layerOffset = (Number(face.layer) || 0) * layerSpacing;
+    for (let index = 1; index < spatial.length - 1; index += 1) {
+      for (const point of [spatial[0], spatial[index], spatial[index + 1]]) {
+        // Fold-model (sheet x, sheet y, height) -> flight (right, up, back).
+        vertices.push(
+          point[0] * paperScale,
+          point[2] * paperScale + layerOffset,
+          -point[1] * paperScale
+        );
       }
     }
     const geometry = new THREE.BufferGeometry();

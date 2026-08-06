@@ -88,7 +88,6 @@
 }
 .waiting-room-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
 .waiting-room-title h2 { margin: 2px 0 5px !important; font: 900 clamp(30px,4vw,58px)/1 sans-serif !important; letter-spacing: -.055em !important; }
-.waiting-room-title .tag { margin: 0 !important; color: #72e7f2 !important; }
 .waiting-room-code { display: flex; align-items: center; gap: 12px; padding: 10px 13px 10px 18px; border: 1px solid rgba(126,218,241,.25); border-radius: 16px; background: rgba(6,13,45,.5); }
 .waiting-room-code small { color: #86a0c6; font-size: 9px; letter-spacing: .15em; }
 #room-code-display { display: block; margin-top: 2px; font-size: 20px !important; font-weight: 900; letter-spacing: .18em !important; color: #f4d071 !important; }
@@ -127,22 +126,66 @@
 #room-start-btn:disabled { opacity:.35; cursor:not-allowed; }
 
 /* Paper folding game */
-#folding-screen { z-index: 55; grid-template-rows: auto 1fr auto; padding: clamp(14px,2.6vw,32px); background: radial-gradient(circle at 50% 48%,#23357a 0,#111842 53%,#090d27 100%); }
-.fold-top { width: min(1180px,100%); display:flex; align-items:flex-start; justify-content:space-between; gap:20px; z-index:2; }
+#folding-screen {
+  z-index:55;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  place-items:stretch center;
+  gap:14px;
+  padding:clamp(14px,2.3vw,28px);
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 42% 45%,rgba(71,120,210,.38),transparent 42%),
+    radial-gradient(circle at 80% 15%,rgba(90,224,238,.1),transparent 26%),
+    linear-gradient(145deg,#172252,#0b102f 70%);
+}
+.fold-top { width:min(1240px,100%); display:flex; align-items:flex-start; justify-content:space-between; gap:20px; z-index:2; }
 .fold-kicker { color:#72e7f2; font-size:10px; font-weight:900; letter-spacing:.24em; }
-.fold-top h2 { margin-top:4px; font-size:clamp(28px,4vw,54px); letter-spacing:-.05em; }
-.fold-timer { min-width:92px; text-align:center; font:900 clamp(34px,5vw,62px)/1 ui-monospace,monospace; color:#f4d071; text-shadow:0 0 26px rgba(244,208,113,.35); }
+.fold-top h2 { margin:4px 0 0; font-size:clamp(26px,3.5vw,48px); letter-spacing:-.05em; }
+.fold-round-meta { display:flex; align-items:center; gap:14px; }
+.fold-side-badge { padding:7px 11px; border:1px solid rgba(113,229,242,.3); border-radius:99px; color:#9bedf3; background:rgba(4,12,38,.55); font-size:10px; font-weight:900; letter-spacing:.08em; }
+.fold-timer { min-width:92px; text-align:center; font:900 clamp(32px,4vw,54px)/1 ui-monospace,monospace; color:#f4d071; text-shadow:0 0 26px rgba(244,208,113,.35); }
 .fold-timer.low { color:#ff857b; animation:foldPulse .8s infinite alternate; }
 @keyframes foldPulse { to { transform:scale(1.06); } }
-.fold-stage { position:relative; width:min(1180px,100%); min-height:0; border:1px solid rgba(134,220,245,.18); border-radius:26px; overflow:hidden; background:radial-gradient(circle at 50% 50%,rgba(102,210,238,.12),transparent 48%); box-shadow:inset 0 0 80px rgba(5,8,29,.65); }
-#fold-paper-canvas { width:100%; height:100%; touch-action:none; cursor:crosshair; }
-.fold-hint { position:absolute; left:50%; top:18px; transform:translateX(-50%); padding:8px 13px; border-radius:99px; color:#b9c9e3; background:rgba(4,9,29,.6); font-size:11px; pointer-events:none; }
-.fold-controls { width:min(1180px,100%); display:grid; grid-template-columns:auto 1fr auto; gap:13px; align-items:center; z-index:2; }
-.fold-direction { display:flex; gap:8px; }
-.fold-btn { min-height:46px; padding:0 16px; border:1px solid rgba(134,196,230,.25); border-radius:13px; color:#dfeafa; background:rgba(255,255,255,.06); font:800 12px sans-serif; cursor:pointer; }
+.fold-workspace { width:min(1240px,100%); height:100%; min-height:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(270px, 330px); gap:14px; }
+.fold-stage { position:relative; min-width:0; min-height:0; border:1px solid rgba(134,220,245,.2); border-radius:22px; overflow:hidden; background:radial-gradient(circle at 50% 50%,rgba(102,210,238,.12),transparent 52%); box-shadow:inset 0 0 80px rgba(5,8,29,.72),0 18px 50px rgba(2,5,25,.25); }
+#fold-paper-canvas { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; outline:none; }
+#fold-paper-canvas:focus-visible { box-shadow:inset 0 0 0 3px #71e4ed; }
+#fold-paper-canvas[aria-disabled="true"] { cursor:not-allowed; }
+.fold-hint { position:absolute; z-index:3; left:50%; top:14px; max-width:calc(100% - 24px); transform:translateX(-50%); padding:8px 13px; border:1px solid rgba(142,213,240,.14); border-radius:99px; color:#b9c9e3; background:rgba(4,9,29,.72); font-size:11px; text-align:center; white-space:nowrap; pointer-events:none; }
+.fold-inspector { min-height:0; padding:10px; display:flex; flex-direction:column; gap:7px; overflow-x:hidden; overflow-y:auto; border:1px solid rgba(134,220,245,.17); border-radius:22px; background:rgba(5,11,37,.66); box-shadow:inset 0 1px rgba(255,255,255,.05); }
+.fold-tool-section { padding:8px; border:1px solid rgba(134,196,230,.13); border-radius:14px; background:rgba(255,255,255,.035); }
+.fold-selection-card { border-color:rgba(94,226,225,.3); background:linear-gradient(135deg,rgba(54,205,211,.11),rgba(255,255,255,.025)); }
+.fold-selection-card strong { display:block; overflow:hidden; color:#85eff0; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+.fold-selection-card small { display:block; margin-top:3px; color:#8298b9; font-size:9px; line-height:1.35; }
+.fold-section-heading { min-height:12px; margin-bottom:5px; display:flex; align-items:center; justify-content:space-between; color:#8fa6c8; font-size:9px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+.fold-section-heading #fold-count { color:#69dfe7; letter-spacing:.04em; text-transform:none; }
+.fold-selection-dot { width:7px; height:7px; border-radius:50%; background:#67e5e6; box-shadow:0 0 12px #67e5e6; }
+.fold-direction,.fold-target-angles { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.fold-btn { min-height:36px; padding:0 13px; border:1px solid rgba(134,196,230,.24); border-radius:11px; color:#dfeafa; background:rgba(255,255,255,.06); font:800 11px sans-serif; cursor:pointer; transition:transform .16s ease,border-color .16s ease,background .16s ease; }
+.fold-btn:hover:not(:disabled) { transform:translateY(-1px); border-color:rgba(111,226,238,.58); background:rgba(111,226,238,.1); }
+.fold-btn:focus-visible { outline:2px solid #79e9ef; outline-offset:2px; }
+.fold-btn:disabled { opacity:.38; cursor:not-allowed; transform:none; }
 .fold-btn.active { color:#071d39; border-color:transparent; background:#76e5ef; }
-.fold-btn.finish { color:#111536; border-color:transparent; background:#f4cd6c; }
-#fold-status { text-align:center; color:#9dafcc; font-size:12px; }
+.fold-target-angles .fold-btn { min-height:40px; font-size:17px; }
+.fold-target-angles .fold-btn small { display:block; margin-top:2px; font-size:8px; }
+.fold-flip { width:100%; flex:0 0 auto; color:#d9ccff; border-color:rgba(171,137,244,.3); }
+.fold-history-section { min-height:0; display:flex; flex:1 1 auto; flex-direction:column; }
+.fold-history-list { min-height:95px; padding-right:3px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; overscroll-behavior:contain; scrollbar-color:#4c668f transparent; }
+.fold-history-empty { padding:16px 8px; color:#667a9b; font-size:10px; text-align:center; }
+.fold-history-card { padding:10px; border:1px solid rgba(135,193,225,.15); border-radius:11px; background:rgba(3,9,30,.56); }
+.fold-history-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.fold-history-title { color:#d8e7f8; font-size:10px; font-weight:900; }
+.fold-history-direction { color:#748cac; font-size:9px; }
+.fold-history-angle { margin-top:8px; display:grid; grid-template-columns:1fr auto; align-items:center; gap:7px; }
+.fold-history-angle input { width:100%; accent-color:#69e2e7; }
+.fold-history-angle output { min-width:35px; color:#73e8ea; font:900 11px ui-monospace,monospace; text-align:right; }
+.fold-history-actions { margin-top:7px; display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+.fold-history-actions button { min-height:27px; padding:0 4px; border:1px solid rgba(132,190,222,.18); border-radius:7px; color:#aebfda; background:rgba(255,255,255,.045); font-size:9px; font-weight:800; cursor:pointer; }
+.fold-history-actions button:last-child { color:#ffaaa3; border-color:rgba(255,132,122,.23); }
+.fold-controls { width:min(1240px,100%); min-height:48px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:13px; align-items:center; z-index:2; }
+#fold-status { min-width:0; color:#9dafcc; font-size:12px; line-height:1.45; }
+.fold-footer-actions { display:flex; gap:8px; }
+.fold-btn.finish { min-width:130px; color:#111536; border-color:transparent; background:#f4cd6c; }
 
 @media (max-width:760px) {
   .room-entry-card { padding:27px 20px 20px; }
@@ -158,8 +201,24 @@
   .waiting-room-bottom { grid-template-columns:1fr; }
   .waiting-room-actions { display:grid; grid-template-columns:1fr 1fr 1fr; }
   #ui #room-lobby .action-btn { padding:0 9px; }
-  .fold-controls { grid-template-columns:1fr; gap:8px; }
-  .fold-direction { display:grid; grid-template-columns:1fr 1fr; }
-  #fold-status { order:-1; }
-  .fold-controls > .fold-btn.finish { min-height:50px; }
+  #folding-screen { display:block; padding:12px; overflow-y:auto; }
+  .fold-top { align-items:center; }
+  .fold-top h2 { font-size:26px; }
+  .fold-kicker { font-size:8px; }
+  .fold-round-meta { gap:7px; }
+  .fold-side-badge { display:none; }
+  .fold-timer { min-width:72px; font-size:31px; }
+  .fold-workspace { margin-top:12px; grid-template-columns:1fr; gap:10px; }
+  .fold-stage { min-height:360px; height:45vh; }
+  #fold-paper-canvas { min-height:360px; }
+  .fold-hint { top:10px; overflow:hidden; font-size:9px; text-overflow:ellipsis; }
+  .fold-inspector { overflow:visible; }
+  .fold-btn { min-height:44px; }
+  .fold-target-angles .fold-btn { min-height:50px; }
+  .fold-history-section { min-height:auto; }
+  .fold-history-list { max-height:230px; overflow-y:auto; }
+  .fold-controls { margin-top:10px; grid-template-columns:1fr; gap:8px; }
+  .fold-footer-actions { display:grid; grid-template-columns:1fr 1fr; }
+  #fold-status { order:-1; min-height:34px; text-align:center; }
+  .fold-btn.finish { min-height:50px; }
 }

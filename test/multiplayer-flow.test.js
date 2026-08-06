@@ -36,6 +36,15 @@ test('both flight modes use one mode-aware room popup and four-slot waiting room
   assert.match(flowCss, /grid-template-columns:\s*repeat\(4,1fr\)/);
 });
 
+test('waiting room title omits the code-only kicker while keeping invite-code controls', () => {
+  assert.match(html, /<div class="waiting-room-title">\s*<h2 id="room-mode-title"/);
+  assert.doesNotMatch(html, /id=["']room-visibility["']/);
+  assert.doesNotMatch(html, /\$\(['"]room-visibility['"]\)\.textContent/);
+  assert.doesNotMatch(html, /PRIVATE\s*·\s*CODE ONLY|PUBLIC ROOM/);
+  assert.equal(hasId('room-code-display'), true);
+  assert.equal(hasId('copy-code-btn'), true);
+});
+
 test('room entry stays translucent over the home scene', () => {
   assert.match(flowCss, /#room-entry\s*\{[\s\S]*rgba\([^)]*,\s*\.72\)[\s\S]*\}/);
   assert.match(flowCss, /\.room-entry-card\s*\{[\s\S]*rgba\([^)]*,\s*\.82\)/);
@@ -56,17 +65,61 @@ test('waiting room actors are larger and layered in front of slot boxes', () => 
   assert.match(flowCss, /\.room-player-info\s*\{[^}]*z-index:\s*3/s);
 });
 
-test('folding UI exposes direction, unfold, completion and synchronized progress', () => {
+test('free-form folding workbench exposes selection, target angles, flip, history and accessible help', () => {
   for (const id of [
-    'folding-screen', 'fold-timer', 'fold-paper-canvas', 'fold-dir-valley',
-    'fold-dir-mountain', 'fold-undo-btn', 'fold-complete-btn'
+    'folding-screen', 'fold-timer', 'fold-paper-canvas', 'fold-selection',
+    'fold-dir-valley', 'fold-dir-mountain', 'fold-angle-90', 'fold-angle-180',
+    'fold-flip-btn', 'fold-history', 'fold-undo-btn', 'fold-complete-btn'
   ]) assert.equal(hasId(id), true, `missing #${id}`);
-  assert.match(foldUi, /api\.applyFold\(model, completed\.start, completed\.end, direction\)/);
-  assert.match(html, /선을 그은 방향의 왼쪽 면/);
-  assert.doesNotMatch(foldUi, /const creasePoint = \[\(drag\.start/);
+  assert.match(html, /<canvas[^>]*id="fold-paper-canvas"[^>]*aria-label="[^"]+"/);
+  assert.match(html, /보이는 면을 선택[^<]*접을 선/);
+  assert.match(html, /왼쪽\/오른쪽[^<]*H[^<]*V[^<]*D[^<]*Enter/);
+  assert.match(html, /마지막 동작 취소/);
+  assert.match(html, /<script src="\.\/paper-fold-viewport\.js"><\/script>\s*<script src="\.\/paper-fold-ui\.js"><\/script>/);
+  assert.match(flowCss, /\.fold-workspace[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(/s);
+  assert.match(flowCss, /@media \(max-width:760px\)[\s\S]*\.fold-workspace[^}]*grid-template-columns:\s*1fr/s);
+  assert.match(flowCss, /@media \(max-width:760px\)[\s\S]*#fold-paper-canvas[^}]*min-height:/s);
+  assert.match(flowCss, /@media \(max-width:760px\)[\s\S]*\.fold-history-list[^}]*overflow-y:\s*auto/s);
+  assert.match(flowCss, /#folding-screen\s*\{[^}]*place-items:\s*stretch center[^}]*overflow:\s*hidden/s);
+  assert.match(flowCss, /\.fold-workspace\s*\{[^}]*height:\s*100%/s);
+  assert.match(flowCss, /\.fold-stage\s*\{[^}]*min-height:\s*0/s);
+  assert.match(flowCss, /\.fold-inspector\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(flowCss, /\.fold-history-list\s*\{[^}]*min-height:\s*95px/s);
+});
+
+test('folding UI issues material-space single-face panel commands and renders 3D geometry', () => {
+  assert.match(foldUi, /api\.applyPanelFold\(model,\s*\{/);
+  assert.match(foldUi, /coordinateSpace:\s*['"]material['"]/);
+  assert.match(foldUi, /seedFaceId:\s*completed\.faceId/);
+  assert.doesNotMatch(foldUi, /api\.applyFold\(/);
+  assert.match(foldUi, /viewport\.hitTestFaces\(/);
+  assert.match(foldUi, /viewport\.screenToMaterial\(/);
+  assert.match(foldUi, /viewport\.projectFace\(face,/);
+  assert.match(foldUi, /face\.vertices3d/);
+  assert.doesNotMatch(foldUi, /paperToScreen\(point/);
+});
+
+test('folding history edits angles, deletes atomically, flips paper and keeps selection/status coherent', () => {
+  assert.match(foldUi, /api\.updateFoldAngle\(model,\s*foldId,\s*angle\)/);
+  assert.match(foldUi, /api\.removeFold\(model,\s*foldId\)/);
+  assert.match(foldUi, /api\.flipPaper\(model\)/);
+  assert.match(foldUi, /if \(next === model\)[\s\S]*후속 접기/);
+  assert.match(foldUi, /function reconcileSelection\(/);
+  assert.match(foldUi, /setStatus\([^)]*각도/);
+  assert.match(foldUi, /setStatus\([^)]*삭제/);
   assert.match(foldUi, /model = api\.undoFold\(model\)/);
   assert.match(foldUi, /setRoomProgress\(done, total\)/);
   assert.match(html, /onComplete: fold => send\(\{ t: 'fold_done', commands: fold\.commands \}\)/);
+});
+
+test('locked folding state disables every editing control including dynamic history controls', () => {
+  assert.match(foldUi, /const EDIT_CONTROL_IDS = \[/);
+  for (const id of [
+    'fold-dir-valley', 'fold-dir-mountain', 'fold-angle-90', 'fold-angle-180',
+    'fold-flip-btn', 'fold-undo-btn'
+  ]) assert.match(foldUi, new RegExp(`['"]${id}['"]`));
+  assert.match(foldUi, /querySelectorAll\([^)]*data-fold-edit[^)]*\)[\s\S]*disabled = locked/);
+  assert.match(foldUi, /canvas\.setAttribute\(['"]aria-disabled['"],\s*String\(locked\)\)/);
 });
 
 test('active room snapshots are idempotent and launch is server-authoritative', () => {

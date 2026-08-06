@@ -4,6 +4,9 @@ export const FIXED_HZ = 120;
 export const FIXED_DT = 1 / FIXED_HZ;
 const GRAVITY = 21;
 const BASE_SPEED = 22;
+const PAPER_SCALE = 1.35;
+const PAPER_HALF_THICKNESS = .035;
+const PAPER_LAYER_SPACING = .026;
 const REQUIRED_PROFILE_FIELDS = [
   'liftScale', 'dragScale', 'stallSpeed', 'stability',
   'rollBias', 'pitchBias', 'span', 'chord'
@@ -53,14 +56,26 @@ export function makeColliderVertices(model) {
   const points = [];
   const seen = new Set();
   for (const face of model?.faces || []) {
-    for (const point of face?.poly || []) {
-      if (!Array.isArray(point) || !finite(point[0]) || !finite(point[1])) continue;
-      const x = point[0] * 1.35;
-      const z = -point[1] * 1.35;
-      const key = `${x.toFixed(6)}:${z.toFixed(6)}`;
+    const spatial = Array.isArray(face?.vertices3d)
+      && face.vertices3d.length >= 3
+      && face.vertices3d.every(point => Array.isArray(point)
+        && finite(point[0]) && finite(point[1]) && finite(point[2]))
+      ? face.vertices3d
+      : (face?.poly || []).map(point => [point?.[0], point?.[1], 0]);
+    const layerOffset = (finite(face?.layer) ? face.layer : 0) * PAPER_LAYER_SPACING;
+    for (const point of spatial) {
+      if (!Array.isArray(point) || !finite(point[0]) || !finite(point[1]) || !finite(point[2])) continue;
+      // Fold-model (sheet x, sheet y, height) -> flight (right, up, back).
+      const x = point[0] * PAPER_SCALE;
+      const y = point[2] * PAPER_SCALE + layerOffset;
+      const z = -point[1] * PAPER_SCALE;
+      const key = `${x.toFixed(6)}:${y.toFixed(6)}:${z.toFixed(6)}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      points.push(x, -.035, z, x, .035, z);
+      points.push(
+        x, y - PAPER_HALF_THICKNESS, z,
+        x, y + PAPER_HALF_THICKNESS, z
+      );
     }
   }
   return new Float32Array(points);

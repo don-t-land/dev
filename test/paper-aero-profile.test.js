@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createPaperModel, applyFold } = require('../public/paper-fold-model.js');
+const { createPaperModel, applyFold, applyPanelFold, flipPaper } = require('../public/paper-fold-model.js');
 const { deriveAerodynamicProfile } = require('../public/paper-aero-profile.js');
 
 function approx(actual, expected, tolerance = 1e-6) {
@@ -77,4 +77,53 @@ test('profile calculation is deterministic, bounded, and does not mutate the fol
   assert.ok(first.stallSpeed >= 8 && first.stallSpeed <= 42);
   assert.ok(first.rollBias >= -.65 && first.rollBias <= .65);
   assert.ok(first.pitchBias >= -.55 && first.pitchBias <= .55);
+});
+
+test('partial 3D folds preserve physical area while horizontal planform and lift stay bounded', () => {
+  const model = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], direction: 1, targetAngle: 90
+  });
+  const first = deriveAerodynamicProfile(model);
+  const second = deriveAerodynamicProfile(model);
+
+  approx(first.physicalArea, 4);
+  approx(first.planformArea, 2);
+  approx(first.areaRatio, .5);
+  assert.deepEqual(first, second);
+  for (const value of Object.values(first)) {
+    if (typeof value === 'number') assert.ok(Number.isFinite(value));
+  }
+  assert.ok(first.liftScale >= .15 && first.liftScale <= 1.8);
+  assert.ok(first.stallSpeed >= 8 && first.stallSpeed <= 42);
+});
+
+test('a supported sequential fold on a tilted seed keeps all material area in aero metrics', () => {
+  const first = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90
+  });
+  const seed = first.faces.find(face => face.folds.includes('fold-1'));
+  const second = applyPanelFold(first, {
+    start: [0, 0], end: [0, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, seedFaceId: seed.id
+  });
+  const profile = deriveAerodynamicProfile(second);
+
+  assert.equal(second.faces.length, 3);
+  approx(profile.physicalArea, 4);
+  assert.ok(profile.planformArea > 0);
+  assert.ok(profile.areaRatio >= .02 && profile.areaRatio <= 1);
+});
+
+test('flips are not aerodynamic folds and a double flip restores the entire profile', () => {
+  const folded = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], direction: 1, targetAngle: 90
+  });
+  const before = deriveAerodynamicProfile(folded);
+  const once = deriveAerodynamicProfile(flipPaper(folded));
+  const twice = deriveAerodynamicProfile(flipPaper(flipPaper(folded)));
+
+  assert.equal(before.foldCount, 1);
+  assert.equal(once.foldCount, 1);
+  assert.deepEqual(twice, before);
 });

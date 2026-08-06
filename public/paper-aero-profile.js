@@ -64,6 +64,34 @@
     };
   }
 
+  function polygonMetrics3d(vertices) {
+    if (!Array.isArray(vertices) || vertices.length < 3
+        || !vertices.every(point => Array.isArray(point) && point.length === 3
+          && point.every(Number.isFinite))) return null;
+    const origin = vertices[0];
+    let area = 0;
+    let weightedX = 0;
+    let weightedY = 0;
+    for (let index = 1; index < vertices.length - 1; index += 1) {
+      const a = [0, 1, 2].map(axis => vertices[index][axis] - origin[axis]);
+      const b = [0, 1, 2].map(axis => vertices[index + 1][axis] - origin[axis]);
+      const cross3d = [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0]
+      ];
+      const triangleArea = Math.hypot(...cross3d) / 2;
+      if (triangleArea <= EPSILON) continue;
+      const cx = (origin[0] + vertices[index][0] + vertices[index + 1][0]) / 3;
+      const cy = (origin[1] + vertices[index][1] + vertices[index + 1][1]) / 3;
+      area += triangleArea;
+      weightedX += cx * triangleArea;
+      weightedY += cy * triangleArea;
+    }
+    if (area <= EPSILON) return { area: 0, cx: 0, cy: 0 };
+    return { area, cx: weightedX / area, cy: weightedY / area };
+  }
+
   function deriveAerodynamicProfile(model) {
     const faces = Array.isArray(model?.faces) ? model.faces : [];
     const points = [];
@@ -74,12 +102,16 @@
     let maxLayer = 0;
 
     faces.forEach(face => {
-      const metrics = polygonMetrics(face?.poly);
-      if (metrics.area <= EPSILON) return;
+      const projectedMetrics = polygonMetrics(face?.poly);
+      const metrics3d = polygonMetrics3d(face?.vertices3d);
+      const metrics = metrics3d || projectedMetrics;
+      if (metrics.area <= EPSILON || projectedMetrics.area < 0) return;
       physicalArea += metrics.area;
       weightedX += metrics.cx * metrics.area;
       weightedY += metrics.cy * metrics.area;
-      points.push(...face.poly.map(point => [Number(point[0]), Number(point[1])]));
+      if (Array.isArray(face.poly)) {
+        points.push(...face.poly.map(point => [Number(point[0]), Number(point[1])]));
+      }
       const layer = Number.isFinite(face.layer) ? face.layer : 0;
       minLayer = Math.min(minLayer, layer);
       maxLayer = Math.max(maxLayer, layer);
@@ -111,7 +143,9 @@
     const normalizedX = (massCenterX - pressureCenterX) / Math.max(span / 2, EPSILON);
     const normalizedY = (massCenterY - pressureCenterY) / Math.max(chord / 2, EPSILON);
     const asymmetry = clamp(Math.abs(normalizedX), 0, 1);
-    const foldCount = Array.isArray(model?.commands) ? model.commands.length : 0;
+    const foldCount = Array.isArray(model?.commands)
+      ? model.commands.filter(command => command?.type === 'fold' || command?.type == null).length
+      : 0;
     const layerCount = Math.max(1, Math.round(maxLayer - minLayer + 1));
 
     const liftScale = clamp(areaRatio * Math.sqrt(aspectRatio) * (1 - .28 * asymmetry), .15, 1.8);
@@ -148,5 +182,5 @@
     };
   }
 
-  return { convexHull, polygonMetrics, deriveAerodynamicProfile };
+  return { convexHull, polygonMetrics, polygonMetrics3d, deriveAerodynamicProfile };
 }));

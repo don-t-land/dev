@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>종이비행기 온라인</title>
+<link rel="stylesheet" href="./home-screen.css">
+<link rel="stylesheet" href="./multiplayer-flow.css">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0f1620; }
@@ -306,9 +308,95 @@
 
 <canvas id="c"></canvas>
 
+<section id="home-screen" aria-labelledby="home-title">
+  <div class="home-aurora" aria-hidden="true"></div>
+  <div class="home-stars" aria-hidden="true"></div>
+  <div class="home-map" aria-hidden="true">
+    <div class="home-map-haze"></div>
+    <div class="home-map-grid"></div>
+    <div class="home-map-route"></div>
+    <div class="home-map-island home-map-island-two"><i></i><i></i></div>
+    <div class="home-map-ring home-map-ring-one"></div>
+    <div class="home-map-ring home-map-ring-two"></div>
+  </div>
+
+  <div class="home-plane-stage" aria-hidden="true">
+    <canvas id="home-plane-canvas"></canvas>
+    <div class="home-plane-fallback">
+      <div class="home-plane-aura"></div>
+      <div class="home-plane-ground-shadow"></div>
+      <svg class="home-vertical-plane" viewBox="0 0 370 590" role="presentation">
+      <polygon class="home-plane-depth" points="185,14 356,508 185,412 14,508"></polygon>
+      <polygon class="home-plane-right-face" points="185,31 335,496 185,399"></polygon>
+      <polygon class="home-plane-left-face" points="185,31 185,399 34,496"></polygon>
+      <polygon class="home-plane-keel" points="185,31 259,474 185,399"></polygon>
+      <polyline class="home-plane-fold-line" points="185,31 185,399 335,496"></polyline>
+      <polyline class="home-plane-fold-line home-plane-fold-line-soft" points="185,31 34,496"></polyline>
+      </svg>
+    </div>
+  </div>
+
+  <main class="home-content">
+    <div class="home-brand">
+      <h1 id="home-title" class="home-wordmark">Don't <span>Land</span></h1>
+    </div>
+
+    <div class="home-actions" role="group" aria-label="메뉴 선택">
+      <div class="home-mode-grid">
+        <button class="home-mode-card home-mode-distance" type="button" data-home-mode="distance">
+          <span class="home-mode-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32"><path d="M5 23c5-1 7-5 9-10 2-4 6-6 13-5"></path><path d="m21 4 6 4-5 5"></path><circle cx="7" cy="23" r="2.5"></circle></svg>
+          </span>
+          <span class="home-mode-label">멀리 날기</span>
+          <span class="home-mode-arrow" aria-hidden="true">›</span>
+        </button>
+        <button class="home-mode-card home-mode-survival" type="button" data-home-mode="survival">
+          <span class="home-mode-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32"><circle cx="16" cy="17" r="10"></circle><path d="M16 11v7l5 3M12 4h8"></path></svg>
+          </span>
+          <span class="home-mode-label">오래 날기</span>
+          <span class="home-mode-arrow" aria-hidden="true">›</span>
+        </button>
+        <button class="home-mode-card home-mode-costume" type="button" data-home-action="costume">
+          <span class="home-mode-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32"><path d="m11 7-7 5 4 6 3-2v10h10V16l3 2 4-6-7-5c-1 3-9 3-10 0Z"></path></svg>
+          </span>
+          <span class="home-mode-label">코스튬</span>
+          <span class="home-mode-arrow" aria-hidden="true">›</span>
+        </button>
+      </div>
+    </div>
+  </main>
+</section>
+
+<section id="survival-entry" class="hide" aria-modal="true" role="dialog" aria-labelledby="entry-title">
+  <div class="room-entry-backdrop" data-entry-close></div>
+  <div class="room-entry-card">
+    <button class="room-entry-close" type="button" aria-label="닫기" data-entry-close>×</button>
+    <div class="room-entry-kicker">UP TO 4 PLAYERS</div>
+    <h2 id="entry-title">오래 날기</h2>
+    <p>방을 만들거나 초대 코드로 친구의 방에 들어가세요.</p>
+    <div class="room-entry-field">
+      <label for="entry-name">닉네임</label>
+      <input id="entry-name" maxlength="12" placeholder="닉네임을 입력하세요" autocomplete="off">
+    </div>
+    <div class="room-entry-actions">
+      <button id="entry-create-btn" class="room-entry-action primary" type="button">방 만들기<small>내가 HOST가 됩니다</small></button>
+      <div class="room-entry-field" style="margin:0">
+        <label for="entry-code">방 입장</label>
+        <div class="room-entry-join">
+          <input id="entry-code" maxlength="6" placeholder="6자리 코드" autocomplete="off">
+          <button id="entry-join-btn" type="button">입장</button>
+        </div>
+      </div>
+    </div>
+    <div id="entry-status" role="status"></div>
+  </div>
+</section>
+
 <div id="ui">
 
-  <div id="lobby">
+  <div id="lobby" class="hide">
     <div id="lobby-flight-scene" aria-hidden="true">
       <span class="lobby-sun"></span>
       <span class="cloud cloud-a"></span><span class="cloud cloud-b"></span><span class="cloud cloud-c"></span>
@@ -377,19 +465,32 @@
   </div>
 
   <div id="room-lobby" class="hide">
-    <div class="panel">
-      <div class="room-head"><div><h2 id="room-mode-title" tabindex="-1">멀리 날기</h2><div class="tag" id="room-visibility">PUBLIC ROOM</div></div><span id="room-count">1 / 8</span></div>
-      <div class="room-code-box">
-        <small>초대 코드</small>
-        <div class="room-head"><strong id="room-code-display">------</strong><button id="copy-code-btn" class="action-btn">코드 복사</button></div>
-      </div>
-      <div class="section-title">참가 조종사</div>
-      <div id="room-player-list"></div>
-      <div class="button-row">
-        <button id="room-start-btn" class="action-btn primary">라운드 시작</button>
-        <button id="room-leave-btn" class="action-btn danger">방 나가기</button>
-      </div>
-      <div id="room-status"></div>
+    <div class="panel waiting-room-panel">
+      <header class="waiting-room-top">
+        <div class="waiting-room-title">
+          <div class="tag" id="room-visibility">PRIVATE · CODE ONLY</div>
+          <h2 id="room-mode-title" tabindex="-1">오래 날기</h2>
+        </div>
+        <div class="waiting-room-code">
+          <div><small>ROOM CODE</small><strong id="room-code-display">------</strong></div>
+          <button id="copy-code-btn" class="action-btn">복사</button>
+        </div>
+      </header>
+      <main class="waiting-room-stage">
+        <canvas id="waiting-room-canvas" aria-hidden="true"></canvas>
+        <div id="room-player-list" aria-label="참가 플레이어"></div>
+      </main>
+      <footer class="waiting-room-bottom">
+        <div class="waiting-room-status-wrap">
+          <span id="room-count">1 / 4</span>
+          <div id="room-status" role="status"></div>
+        </div>
+        <div class="waiting-room-actions">
+          <button id="room-ready-btn" class="action-btn">READY</button>
+          <button id="room-start-btn" class="action-btn primary">START</button>
+          <button id="room-leave-btn" class="action-btn danger">나가기</button>
+        </div>
+      </footer>
     </div>
   </div>
 
@@ -399,7 +500,8 @@
       <div class="big"><span id="s-main">0</span><small id="s-unit">m</small></div>
       <div class="sub">
         고도 <b><span id="s-alt">0</span>m</b><br>
-        승수 <b><span id="s-wins">0</span></b>
+        승수 <b><span id="s-wins">0</span></b><br>
+        기체 <b><span id="s-aero">양력 100% · 항력 117%</span></b>
       </div>
     </div>
 
@@ -412,7 +514,7 @@
 
     <div id="gauge">
       <div class="lbl"><span>속도</span><span id="s-spd">0</span></div>
-      <div class="track"><div class="stallzone"></div><div class="fill" id="s-fill"></div></div>
+      <div class="track"><div class="stallzone" id="s-stall"></div><div class="fill" id="s-fill"></div></div>
     </div>
 
     <div id="thermal">상승기류</div>
@@ -465,6 +567,28 @@
 
 </div>
 
+<section id="folding-screen" class="hide" aria-labelledby="fold-title">
+  <header class="fold-top">
+    <div><div class="fold-kicker">BUILD YOUR GLIDER</div><h2 id="fold-title">나만의 종이비행기를 접어!</h2></div>
+    <div id="fold-timer" class="fold-timer">01:00</div>
+  </header>
+  <main class="fold-stage">
+    <canvas id="fold-paper-canvas"></canvas>
+    <div class="fold-hint">접을 선을 그으세요 · 선을 그은 방향의 왼쪽 면이 접힙니다</div>
+  </main>
+  <footer class="fold-controls">
+    <div class="fold-direction">
+      <button id="fold-dir-valley" class="fold-btn active" type="button">골접기 ↗</button>
+      <button id="fold-dir-mountain" class="fold-btn" type="button">산접기 ↙</button>
+    </div>
+    <div id="fold-status" role="status">0/10번 접음</div>
+    <div>
+      <button id="fold-undo-btn" class="fold-btn" type="button">한 번 펴기</button>
+      <button id="fold-complete-btn" class="fold-btn finish" type="button">비행기 완성</button>
+    </div>
+  </footer>
+</section>
+
 <script type="importmap">
 {
   "imports": {
@@ -475,12 +599,21 @@
 <script src="./input-policy.js"></script>
 <script src="./room-state.js"></script>
 <script src="./flight-controls.js"></script>
+<script src="./waiting-room-state.js"></script>
+<script src="./paper-fold-model.js"></script>
+<script src="./paper-aero-profile.js"></script>
+<script src="./paper-fold-ui.js"></script>
+<script src="./home-screen.js"></script>
+<script type="module" src="./home-plane-3d.js"></script>
+<script type="module" src="./waiting-room-3d.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
+import { makeStandingPlaneMascot } from './home-plane-3d.js';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
+const { getWaitingSlots, canStart, getLocalReady } = window.waitingRoomStatePolicy;
 
 /* ============================================================
    유틸
@@ -540,10 +673,11 @@ function connect() {
     net.id = null;
     net.room = null;
     net.ws = null;
-    if (wasInRoom) enterLobby('서버와의 연결이 끊어졌습니다');
+    if (wasInRoom) enterHome('서버와의 연결이 끊어졌습니다');
+    else if (!$('survival-entry').classList.contains('hide')) $('entry-status').textContent = '서버 연결이 끊어졌습니다';
     else $('lob-status').textContent = '서버 연결이 끊어졌습니다 — 새로고침을 눌러 주세요';
   };
-  ws.onerror = () => { $('lob-status').textContent = '서버에 연결할 수 없습니다'; };
+  ws.onerror = () => showNetworkError('서버에 연결할 수 없습니다');
 }
 
 function send(obj) {
@@ -578,14 +712,50 @@ function withSession(action) {
   }
 }
 
+function disposeObject3D(object) {
+  if (!object) return;
+  object.removeFromParent();
+  object.traverse(child => {
+    child.geometry?.dispose?.();
+    const materials = Array.isArray(child.material) ? child.material : child.material ? [child.material] : [];
+    materials.forEach(material => {
+      for (const value of Object.values(material)) {
+        if (value?.isTexture) value.dispose();
+      }
+      material.dispose?.();
+    });
+  });
+}
+
 function clearRemotePlayers() {
-  for (const player of net.players.values()) scene.remove(player.remote.group);
+  for (const player of net.players.values()) disposeObject3D(player.remote.group);
   net.players.clear();
 }
 
 function syncRoomPlayers(players) {
-  clearRemotePlayers();
-  for (const player of players) if (player.id !== net.id) addRemote(player);
+  const incoming = new Map(players.filter(player => player.id !== net.id).map(player => [player.id, player]));
+  for (const [id, existing] of net.players) {
+    if (incoming.has(id)) continue;
+    disposeObject3D(existing.remote.group);
+    net.players.delete(id);
+  }
+  for (const [id, player] of incoming) {
+    if (!net.players.has(id)) addRemote(player);
+    const existing = net.players.get(id);
+    if (!existing) continue;
+    existing.name = player.name;
+    existing.wins = player.wins;
+    existing.alive = Boolean(player.alive);
+    existing.ready = Boolean(player.ready);
+    existing.connected = player.connected !== false;
+  }
+}
+
+function isSameRoundPhase(snapshot) {
+  if (!snapshot || Number(snapshot.seed) !== Number(game.seed)) return false;
+  if (snapshot.phase === 'folding') return game.phase === 'folding';
+  if (snapshot.phase === 'launch') return game.phase === 'launch' || game.phase === 'launch_done';
+  return snapshot.phase === 'playing' && game.phase === 'playing';
 }
 
 function handle(m) {
@@ -607,35 +777,59 @@ function handle(m) {
       renderRoomList(net.rooms);
       break;
 
-    case 'room':
+    case 'room': {
+      const sameRoundPhase = isSameRoundPhase(m);
       net.room = m;
       game.mode = m.mode;
       const self = (m.players || []).find(player => player.id === net.id);
       if (self) $('s-wins').textContent = self.wins;
       if (m.phase === 'waiting') net.leaderboard = [];
       syncRoomPlayers(m.players || []);
+      if (m.phase === 'launch' || m.phase === 'playing' || m.phase === 'results') {
+        applyCraftSnapshots(m.crafts);
+      }
+      if (sameRoundPhase) {
+        if (m.phase === 'folding') {
+          window.paperFoldingStage?.setRoomProgress(
+            (m.players || []).filter(player => player.foldDone).length,
+            (m.order || []).length || (m.players || []).length
+          );
+        }
+        refreshBoard();
+        break;
+      }
       if (m.phase === 'waiting') enterRoomLobby(m);
       else if (m.phase === 'results' && !shouldShowResults(m, net.id)) {
         enterRoomLobby(m, true);
       } else {
-        enterGame();
+        if (m.phase === 'folding') enterFolding();
+        else enterGame();
         applyPhase(m);
       }
       break;
+    }
 
     case 'pj': addRemote(m.pl); refreshBoard(); break;
 
     case 'pl': {
       const player = net.players.get(m.id);
-      if (player) { scene.remove(player.remote.group); net.players.delete(m.id); }
+      if (player) { disposeObject3D(player.remote.group); net.players.delete(m.id); }
       refreshBoard();
       break;
     }
 
     case 'phase':
-      if (m.phase === 'countdown') enterGame();
       if (net.room) net.room.phase = m.phase;
+      if (m.phase === 'folding') enterFolding();
+      if (m.phase === 'launch' || m.phase === 'countdown' || m.phase === 'playing') enterGame();
       applyPhase(m);
+      break;
+
+    case 'fold_status':
+      window.paperFoldingStage?.setRoomProgress(
+        Array.isArray(m.doneIds) ? m.doneIds.length : 0,
+        Number(m.total) || game.order.length
+      );
       break;
 
     case 'leaderboard':
@@ -685,7 +879,7 @@ function handle(m) {
     case 'left':
       net.room = null;
       net.leaderboard = [];
-      enterLobby();
+      enterHome();
       break;
 
     case 'error':
@@ -699,10 +893,40 @@ function handle(m) {
    ============================================================ */
 let myName = '';
 
+function enterHome(msg) {
+  $('home-screen').classList.remove('hide');
+  $('survival-entry').classList.add('hide');
+  $('lobby').classList.add('hide');
+  $('room-lobby').classList.add('hide');
+  $('hud').classList.add('hide');
+  $('results').classList.add('hide');
+  window.paperFoldingStage?.leave();
+  clearWorld();
+  clearRemotePlayers();
+  game.phase = 'lobby';
+  game.frozen = true;
+  if (msg) console.warn(msg);
+}
+
+function openSurvivalEntry() {
+  $('entry-name').value = localStorage.getItem('pp_name') || $('lob-name').value || '';
+  $('entry-code').value = '';
+  $('entry-status').textContent = '';
+  $('survival-entry').classList.remove('hide');
+  setTimeout(() => $('entry-name').focus(), 0);
+}
+
+function closeSurvivalEntry() {
+  $('survival-entry').classList.add('hide');
+}
+
 function enterLobby(msg) {
   game.phase = 'lobby';
+  game.frozen = true;
   closePauseMenu();
   releaseFlightPointerLock();
+  $('home-screen').classList.add('hide');
+  $('survival-entry').classList.add('hide');
   $('lobby').classList.remove('hide');
   $('room-lobby').classList.add('hide');
   $('hud').classList.add('hide');
@@ -714,6 +938,8 @@ function enterLobby(msg) {
 }
 
 function enterRoomLobby(room, resultsPending = false) {
+  $('home-screen').classList.add('hide');
+  $('survival-entry').classList.add('hide');
   game.phase = room.phase;
   game.frozen = true;
   closePauseMenu();
@@ -722,30 +948,64 @@ function enterRoomLobby(room, resultsPending = false) {
   $('hud').classList.add('hide');
   $('room-lobby').classList.remove('hide');
   hideResults();
+  window.paperFoldingStage?.leave();
   clearWorld();
   $('room-mode-title').textContent = room.mode === 'ARENA' ? '오래 날기' : '멀리 날기';
   $('room-visibility').textContent = room.visibility === 'private' ? 'PRIVATE · CODE ONLY' : 'PUBLIC ROOM';
   $('room-code-display').textContent = room.code;
   $('room-count').textContent = `${room.players.length} / ${room.maxPlayers}`;
-  $('room-player-list').innerHTML = room.players.map(player =>
-    `<div class="room-player"><span>${escapeHtml(player.name)} · ${player.wins}승</span>` +
-    `<span class="host-badge">${player.id === room.hostId ? '방장' : ''}</span></div>`).join('');
+
+  const slots = getWaitingSlots(room, room.mode === 'ARENA' ? 4 : Math.min(8, room.maxPlayers));
+  $('room-player-list').innerHTML = slots.map((slot, slotIndex) => {
+    if (!slot.player) return `<div class="room-player-slot empty" data-slot-index="${slotIndex}"><div class="room-player-info"><div class="room-player-name">빈 자리</div><div class="room-player-meta"><span class="role-badge client">WAITING</span></div></div></div>`;
+    const role = slot.role === 'host' ? 'HOST' : 'CLIENT';
+    return `<div class="room-player-slot occupied ${slot.ready ? 'ready' : ''}" data-slot-index="${slotIndex}"><div class="room-player-info">` +
+      `<div class="room-player-name">${escapeHtml(slot.player.name)}</div><div class="room-player-meta">` +
+      `<span class="role-badge ${slot.role}">${role}</span>` +
+      `<span class="ready-badge ${slot.ready ? 'on' : ''}">${slot.ready ? 'READY' : 'NOT READY'}</span>` +
+      `</div></div></div>`;
+  }).join('');
+  window.waitingRoomStage?.update(room.players || [], room.hostId);
+
   const isHost = room.hostId === net.id;
+  const localReady = getLocalReady(room, net.id);
+  const startAllowed = !resultsPending && canStart(room, net.id);
+  $('room-ready-btn').textContent = localReady ? 'READY ✓' : 'READY';
+  $('room-ready-btn').classList.toggle('ready', localReady);
+  $('room-ready-btn').classList.toggle('hide', resultsPending || room.mode !== 'ARENA');
   $('room-start-btn').classList.toggle('hide', !isHost || resultsPending);
+  $('room-start-btn').disabled = !startAllowed;
   if (resultsPending) {
     const acknowledged = Array.isArray(room.readyIds) && room.readyIds.includes(net.id);
     $('room-status').textContent = acknowledged
       ? '결과 확인 완료 · 다른 참가자가 대기실로 돌아오기를 기다리는 중입니다'
       : '진행 중이던 라운드의 결과 확인이 끝나기를 기다리는 중입니다';
+  } else if (room.mode === 'ARENA') {
+    if (startAllowed) $('room-status').textContent = '모두 READY · START를 누르면 60초 종이접기가 시작됩니다';
+    else if (isHost) $('room-status').textContent = '모든 플레이어가 READY가 되면 시작할 수 있습니다';
+    else $('room-status').textContent = localReady ? '방장의 START를 기다리는 중입니다' : 'READY를 눌러 준비를 완료하세요';
   } else {
-    $('room-status').textContent = isHost
-      ? '참가자를 확인한 뒤 라운드를 시작하세요'
-      : '방장이 라운드를 시작하기를 기다리는 중입니다';
+    $('room-status').textContent = isHost ? '참가자를 확인한 뒤 라운드를 시작하세요' : '방장이 라운드를 시작하기를 기다리는 중입니다';
   }
+}
+
+function enterFolding() {
+  closePauseMenu();
+  releaseFlightPointerLock();
+  $('home-screen').classList.add('hide');
+  $('survival-entry').classList.add('hide');
+  $('lobby').classList.add('hide');
+  $('room-lobby').classList.add('hide');
+  $('hud').classList.add('hide');
+  hideResults();
+  game.phase = 'folding';
+  game.frozen = true;
 }
 
 function enterGame() {
   closePauseMenu();
+  $('home-screen').classList.add('hide');
+  $('survival-entry').classList.add('hide');
   $('lobby').classList.add('hide');
   $('room-lobby').classList.add('hide');
   $('hud').classList.remove('hide');
@@ -758,8 +1018,9 @@ function enterGame() {
 }
 
 function showNetworkError(message) {
-  const inRoomLobby = !$('room-lobby').classList.contains('hide');
-  $(inRoomLobby ? 'room-status' : 'lob-status').textContent = message;
+  if (!$('survival-entry').classList.contains('hide')) $('entry-status').textContent = message;
+  else if (!$('room-lobby').classList.contains('hide')) $('room-status').textContent = message;
+  else $('lob-status').textContent = message;
 }
 
 function renderRoomList(rooms) {
@@ -786,6 +1047,42 @@ function joinByCode(code) {
 }
 
 $('lob-name').value = localStorage.getItem('pp_name') || '';
+$('entry-name').value = $('lob-name').value;
+
+document.querySelector('[data-home-mode="survival"]').addEventListener('click', openSurvivalEntry);
+document.querySelector('[data-home-mode="distance"]').addEventListener('click', () => enterLobby());
+document.querySelectorAll('[data-entry-close]').forEach(element => element.addEventListener('click', closeSurvivalEntry));
+
+function withEntrySession(action) {
+  const name = $('entry-name').value.trim();
+  if (!name) {
+    $('entry-status').textContent = '닉네임을 입력하세요';
+    $('entry-name').focus();
+    return;
+  }
+  $('lob-name').value = name;
+  $('entry-status').textContent = '서버에 연결 중…';
+  withSession(action);
+}
+
+function joinFromEntry() {
+  const code = $('entry-code').value.trim().toUpperCase();
+  if (!/^[A-HJ-NP-Z2-9]{6}$/.test(code)) {
+    $('entry-status').textContent = '6자리 방 코드를 확인해 주세요';
+    return;
+  }
+  withEntrySession(() => send({ t: 'join', code }));
+}
+
+$('entry-create-btn').addEventListener('click', () => withEntrySession(() => send({
+  t: 'create', mode: 'ARENA', visibility: 'private'
+})));
+$('entry-join-btn').addEventListener('click', joinFromEntry);
+$('entry-code').addEventListener('keydown', event => { if (event.key === 'Enter') joinFromEntry(); });
+$('entry-name').addEventListener('keydown', event => {
+  if (event.key === 'Enter') $('entry-create-btn').click();
+});
+
 document.querySelectorAll('[data-mode]').forEach(button => {
   button.addEventListener('click', () => withSession(() => send({ t: 'join', mode: button.dataset.mode })));
 });
@@ -806,6 +1103,10 @@ $('room-list').addEventListener('click', event => {
 $('refresh-rooms-btn').addEventListener('click', () => {
   connect();
   send({ t: 'list' });
+});
+$('room-ready-btn').addEventListener('click', () => {
+  if (!net.room || net.room.phase !== 'waiting') return;
+  send({ t: 'ready', ready: !getLocalReady(net.room, net.id) });
 });
 $('room-start-btn').addEventListener('click', () => {
   $('room-status').textContent = '라운드를 시작하는 중…';
@@ -937,14 +1238,15 @@ function addRemote(pl) {
   const color = idColor(pl.id);
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
-  group.add(makePlaneMesh(color));
+  const baseVisual = makePlaneMesh(color);
+  group.add(baseVisual);
   group.add(makeLabel(pl.name, '#' + color.getHexString()));
   group.visible = false;
   scene.add(group);
   net.players.set(pl.id, {
     name: pl.name, wins: pl.wins, alive: !!pl.alive, score: 0,
     remote: {
-      group, color,
+      group, baseVisual, color,
       tp: new THREE.Vector3(), tr: new THREE.Vector3(), seen: false
     }
   });
@@ -955,10 +1257,136 @@ function addRemote(pl) {
    ============================================================ */
 const craft = new THREE.Group();
 craft.rotation.order = 'YXZ';
-craft.add(makePlaneMesh(0xfdfcf7));
+const baseCraftVisual = makePlaneMesh(0xfdfcf7);
+craft.add(baseCraftVisual);
 scene.add(craft);
 
-const GRAVITY = 21, DRAG = 0.0062, STALL = 11, MAX_ALT = 420;
+const defaultPaperModel = window.paperFoldModel.createPaperModel();
+let activePaperModel = defaultPaperModel;
+let aeroProfile = window.PaperAeroProfile.deriveAerodynamicProfile(defaultPaperModel);
+let rapierApi = null;
+let rapierFlight = null;
+
+function updateAeroHud() {
+  const engine = rapierFlight ? ' · Rapier' : '';
+  $('s-aero').textContent = `양력 ${Math.round(aeroProfile.liftScale * 100)}% · 항력 ${Math.round(aeroProfile.dragScale * 100)}%${engine}`;
+  $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / 48 * 100)}%`;
+}
+
+function syncRapierMap() {
+  rapierFlight?.setMapColliders({ spires, rocks });
+}
+
+function syncRapierFromCraft() {
+  if (!rapierFlight) return;
+  const velocity = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(craft.quaternion)
+    .multiplyScalar(Math.max(3, me.speed));
+  rapierFlight.reset({
+    position: { x: craft.position.x, y: craft.position.y, z: craft.position.z },
+    rotation: { x: craft.quaternion.x, y: craft.quaternion.y, z: craft.quaternion.z, w: craft.quaternion.w },
+    velocity: { x: velocity.x, y: velocity.y, z: velocity.z }
+  });
+}
+
+void import('./flight-physics-rapier.mjs')
+  .then(async api => {
+    rapierApi = api;
+    rapierFlight = await api.createPaperFlightPhysics();
+    rapierFlight.configure(aeroProfile, api.makeColliderVertices(activePaperModel));
+    syncRapierMap();
+    syncRapierFromCraft();
+    updateAeroHud();
+  })
+  .catch(error => console.warn('Rapier 물리 초기화 실패 — 기존 물리로 전환합니다.', error));
+
+
+function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {
+  if (!model?.commands?.length || !Array.isArray(model.faces)) return null;
+  const visual = new THREE.Group();
+  visual.name = 'foldedCraftVisual';
+  const maxLayer = Math.max(1, ...model.faces.map(face => Number(face.layer) || 0));
+  model.faces.forEach((face, faceIndex) => {
+    if (!Array.isArray(face.poly) || face.poly.length < 3) return;
+    const vertices = [];
+    for (let index = 1; index < face.poly.length - 1; index += 1) {
+      for (const point of [face.poly[0], face.poly[index], face.poly[index + 1]]) {
+        vertices.push(point[0] * 1.35, (Number(face.layer) || 0) * .026, -point[1] * 1.35);
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    const layerRatio = (Number(face.layer) || 0) / maxLayer;
+    const faceColor = tint.clone().lerp(new THREE.Color(0xffffff), .46 - layerRatio * .2);
+    faceColor.offsetHSL(faceIndex * .008, 0, -layerRatio * .08);
+    const material = new THREE.MeshStandardMaterial({
+      color: faceColor, roughness: .72, side: THREE.DoubleSide, flatShading: true
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    visual.add(mesh);
+  });
+  return visual.children.length ? visual : null;
+}
+
+function setFoldedCraftVisual(owner, baseVisual, model, tint, commandKey = '[]') {
+  const cacheKey = typeof commandKey === 'string' ? commandKey : JSON.stringify(commandKey || []);
+  if (owner.userData.foldCommandKey === cacheKey) return;
+  disposeObject3D(owner.getObjectByName('foldedCraftVisual'));
+  const visual = makeFoldedCraftVisual(model, tint);
+  baseVisual.visible = !visual;
+  if (visual) owner.add(visual);
+  owner.userData.foldCommandKey = cacheKey;
+}
+
+function setCraftFromFoldModel(model, authoritativeProfile = null, commandKey = '[]') {
+  const sourceModel = Array.isArray(model?.faces) ? model : defaultPaperModel;
+  const derivedProfile = window.PaperAeroProfile.deriveAerodynamicProfile(sourceModel);
+  const requiredAeroFields = [
+    'liftScale', 'dragScale', 'stallSpeed', 'stability',
+    'rollBias', 'pitchBias', 'span', 'chord'
+  ];
+  const serverProfileIsValid = authoritativeProfile
+    && requiredAeroFields.every(field => Number.isFinite(authoritativeProfile[field]));
+  aeroProfile = serverProfileIsValid ? authoritativeProfile : derivedProfile;
+  activePaperModel = sourceModel;
+  craft.userData.aeroProfile = aeroProfile;
+  updateAeroHud();
+  if (rapierFlight && rapierApi && craft.userData.physicsCommandKey !== commandKey) {
+    rapierFlight.configure(aeroProfile, rapierApi.makeColliderVertices(sourceModel));
+    craft.userData.physicsCommandKey = commandKey;
+  }
+  setFoldedCraftVisual(craft, baseCraftVisual, model, new THREE.Color(0xfdfcf7), commandKey);
+}
+
+function applyCraftSnapshots(crafts) {
+  if (!Array.isArray(crafts)) return;
+  const snapshots = new Map(crafts.filter(item => item?.id).map(item => [item.id, item]));
+  const applyOne = (owner, baseVisual, tint, snapshot, isLocal = false) => {
+    const model = window.paperFoldModel.replayFoldCommands(snapshot?.commands ?? '[]');
+    if (!model) {
+      if (isLocal) setCraftFromFoldModel(defaultPaperModel, null, '[]');
+      else setFoldedCraftVisual(owner, baseVisual, null, tint, '[]');
+      return;
+    }
+    if (isLocal) setCraftFromFoldModel(model, snapshot?.aeroProfile, snapshot?.commands ?? '[]');
+    else setFoldedCraftVisual(owner, baseVisual, model, tint, snapshot?.commands ?? '[]');
+  };
+
+  applyOne(craft, baseCraftVisual, new THREE.Color(0xfdfcf7), snapshots.get(net.id), true);
+  for (const [id, player] of net.players) {
+    applyOne(
+      player.remote.group,
+      player.remote.baseVisual,
+      player.remote.color,
+      snapshots.get(id),
+      false
+    );
+  }
+}
+
+const GRAVITY = 21, DRAG = 0.0062, MAX_ALT = 420;
 const me = { yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false, dist: 0, surv: 0, ammo: 3, ammoT: 0 };
 
 /* ============================================================
@@ -1015,6 +1443,7 @@ const unitRock = new THREE.IcosahedronGeometry(1, 0);
 const dummy = new THREE.Object3D();
 
 function clearWorld() {
+  if (typeof launchState !== 'undefined') clearLaunchActors();
   world.traverse(o => {
     if (o.isMesh && o.geometry !== unitBox && o.geometry !== unitCone && o.geometry !== unitRock)
       o.geometry.dispose?.();
@@ -1217,6 +1646,143 @@ function buildArena(seed) {
   world.add(bound);
 }
 
+/* ---- 오래 날기 출발 연출: 각 스폰 지점의 옥상에서 달려 점프 ---- */
+const launchState = { active: false, startedAt: 0, duration: 4400, actors: [] };
+
+function arenaSpawnPoint(index, count, radius = 130) {
+  const angle = (index / Math.max(1, count)) * Math.PI * 2;
+  return new THREE.Vector3(Math.cos(angle) * radius, 130, Math.sin(angle) * radius);
+}
+
+function buildLaunchTowers() {
+  if (game.mode !== 'ARENA') return;
+  const count = Math.max(1, game.order.length);
+  const rng = mulberry32((game.seed ^ 0x51f15e) >>> 0);
+  for (let index = 0; index < count; index += 1) {
+    const angle = (index / count) * Math.PI * 2;
+    const radius = 146;
+    const width = 24 + rng() * 5;
+    const depth = 22 + rng() * 6;
+    const tower = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(width, 128, depth),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(.60 + rng() * .06, .28, .21 + rng() * .08),
+        roughness: .72,
+        metalness: .12
+      })
+    );
+    body.position.y = 64;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    tower.add(body);
+
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(width + 1.5, .8, depth + 1.5),
+      new THREE.MeshStandardMaterial({ color: 0x6de1ed, emissive: 0x266d91, emissiveIntensity: .7, roughness: .5 })
+    );
+    roof.position.y = 128.4;
+    tower.add(roof);
+
+    const stripeMaterial = new THREE.MeshBasicMaterial({ color: index % 2 ? 0xf4cd6c : 0x76e6ef });
+    for (let floor = 0; floor < 7; floor += 1) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(width + .15, .32, depth + .18), stripeMaterial);
+      stripe.position.y = 17 + floor * 15;
+      tower.add(stripe);
+    }
+    tower.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    tower.rotation.y = -angle;
+    world.add(tower);
+  }
+}
+
+function clearLaunchActors() {
+  launchState.actors.forEach(actor => disposeObject3D(actor.group || actor.mascot));
+  launchState.actors = [];
+  launchState.active = false;
+}
+
+function startLaunchSequence(phase) {
+  clearLaunchActors();
+  const count = Math.max(1, game.order.length);
+  const localIndex = Math.max(0, game.order.indexOf(net.id));
+  game.order.forEach((id, index) => {
+    const mascot = makeStandingPlaneMascot();
+    mascot.scale.setScalar(.92);
+    const start = arenaSpawnPoint(index, count, 146);
+    const end = arenaSpawnPoint(index, count, 130);
+    const direction = end.clone().sub(start).setY(0).normalize();
+    mascot.position.copy(start).add(new THREE.Vector3(0, 131.2 - start.y, 0));
+    mascot.lookAt(mascot.position.clone().add(direction));
+    world.add(mascot);
+    launchState.actors.push({ id, group: mascot, mascot, start, end, direction });
+  });
+  launchState.duration = Math.max(1, Number(phase?.duration) || 4400);
+  const elapsed = Math.max(0, launchState.duration - Math.max(0, Number(phase?.ends) - Date.now()));
+  launchState.startedAt = performance.now() - elapsed;
+  launchState.active = true;
+  game.phase = 'launch';
+  game.frozen = true;
+  me.alive = false;
+  craft.visible = false;
+  const local = launchState.actors[localIndex];
+  if (local) craft.position.copy(local.start);
+  showCenter(null, '옥상 출발 준비', '신호에 맞춰 달려서 점프하세요');
+}
+
+function updateLaunch(now) {
+  if (!launchState.active) return;
+  const progress = THREE.MathUtils.clamp((now - launchState.startedAt) / launchState.duration, 0, 1);
+  const runProgress = THREE.MathUtils.smoothstep(progress, .08, .67);
+  const jumpProgress = THREE.MathUtils.smoothstep(progress, .65, .92);
+  const stride = Math.sin(progress * Math.PI * 20);
+  const count = Math.max(1, game.order.length);
+  const localIndex = Math.max(0, game.order.indexOf(net.id));
+
+  launchState.actors.forEach((actor, index) => {
+    const pathStart = arenaSpawnPoint(index, count, 146);
+    const roofEdge = arenaSpawnPoint(index, count, 133);
+    const position = pathStart.clone().lerp(roofEdge, runProgress);
+    if (progress > .65) {
+      position.lerp(actor.end, jumpProgress);
+      position.y += Math.sin(jumpProgress * Math.PI) * 8;
+    }
+    const { body, leftLeg, rightLeg } = actor.mascot.userData;
+    const left = leftLeg.userData;
+    const right = rightLeg.userData;
+    const bounce = progress < .67 ? Math.abs(stride) * .18 : 0;
+    actor.mascot.position.copy(position).add(new THREE.Vector3(0, 3.05 + bounce, 0));
+    body.rotation.x = progress > .67 ? -.22 * jumpProgress : .04 * stride;
+    left.hip.rotation.x = stride * .58;
+    right.hip.rotation.x = -stride * .58;
+    left.knee.rotation.x = .18 + Math.max(0, -stride) * .65;
+    right.knee.rotation.x = .18 + Math.max(0, stride) * .65;
+    left.shoe.rotation.x = -.08 - Math.max(0, -stride) * .18;
+    right.shoe.rotation.x = -.08 - Math.max(0, stride) * .18;
+    const fade = THREE.MathUtils.smoothstep(progress, .86, .96);
+    actor.mascot.scale.setScalar(.92 * (1 - fade * .7));
+    actor.mascot.visible = progress < .96;
+    if (index === localIndex) craft.position.copy(position);
+  });
+
+  if (progress < .18) showCenter(3, '준비', null);
+  else if (progress < .39) showCenter(2, '달릴 준비', null);
+  else if (progress < .66) showCenter(1, '달려!', null);
+  else if (progress < .92) showCenter(null, '점프!', '접은 종이비행기를 펼쳐 날아오릅니다');
+
+  if (progress >= .88) craft.visible = true;
+  if (progress >= 1) {
+    launchState.active = false;
+    launchState.actors.forEach(actor => { actor.mascot.visible = false; });
+    craft.position.copy(arenaSpawnPoint(localIndex, count, 130));
+    craft.visible = true;
+    game.phase = 'launch_done';
+    game.frozen = true;
+    me.alive = false;
+    showCenter(null, '비행 준비 완료', '서버 출발 신호를 기다리는 중');
+  }
+}
+
 /* ============================================================
    다트 (아레나 전용 발사체)
    ============================================================ */
@@ -1306,27 +1872,89 @@ function applyPhase(m) {
     return;
   }
 
+  if (m.phase === 'folding') {
+    game.phase = 'folding';
+    game.frozen = true;
+    net.leaderboard = [];
+    game.seed = Number(m.seed) || 0;
+    game.ends = Number(m.ends) || Date.now() + 60000;
+    game.order = Array.isArray(m.order) ? m.order : [];
+    $('results').classList.add('hide');
+    buildArena(game.seed);
+    buildLaunchTowers();
+    spawnSelf();
+    setCraftFromFoldModel(null);
+    for (const player of net.players.values()) {
+      player.alive = true;
+      player.score = 0;
+      player.remote.seen = false;
+      player.remote.group.visible = false;
+      setFoldedCraftVisual(
+        player.remote.group,
+        player.remote.baseVisual,
+        null,
+        player.remote.color,
+        '[]'
+      );
+    }
+    window.paperFoldingStage?.enter({
+      ends: game.ends,
+      onComplete: fold => send({ t: 'fold_done', commands: fold.commands })
+    });
+    const roomPlayers = net.room?.players || [];
+    window.paperFoldingStage?.setRoomProgress(
+      roomPlayers.filter(player => player.foldDone).length,
+      game.order.length || roomPlayers.length
+    );
+    refreshBoard();
+    return;
+  }
+
+  if (m.phase === 'launch') {
+    window.paperFoldingStage?.leave();
+    game.seed = Number(m.seed) || game.seed;
+    game.ends = Number(m.ends) || Date.now() + 4400;
+    game.order = Array.isArray(m.order) ? m.order : game.order;
+    applyCraftSnapshots(m.crafts);
+    startLaunchSequence(m);
+    return;
+  }
+
   if (m.phase === 'playing') {
-    game.phase = 'playing';
+    const wasLaunch = game.phase === 'launch' || game.phase === 'launch_done';
+    window.paperFoldingStage?.leave();
+    game.seed = Number(m.seed) || game.seed;
+    game.order = Array.isArray(m.order) ? m.order : game.order;
     game.ends = m.ends;
+    applyCraftSnapshots(m.crafts);
     game.frozen = false;
-    if (m.t === 'room') {
-      const role = getLocalRoundRole(m, net.id);
-      if (role === 'spectator') {
-        if (!world.children.length) (game.mode === 'ARENA' ? buildArena : buildDistance)(m.seed);
-        me.alive = false;
-        showCenter(null, '라운드 진행 중', '다음 라운드부터 참가합니다');
-      } else if (role === 'crashed') {
-        me.alive = false;
-        showCenter('비행 종료', '관전 중', '다음 라운드를 기다리세요');
-      } else {
-        me.alive = true;
-        hideCenter();
-      }
+    const role = m.t === 'room'
+      ? getLocalRoundRole(m, net.id)
+      : (game.order.includes(net.id) ? 'active' : 'spectator');
+
+    if (m.t === 'room' && !world.children.length) {
+      (game.mode === 'ARENA' ? buildArena : buildDistance)(m.seed);
+    }
+    if (role === 'spectator') {
+      game.phase = 'playing';
+      me.alive = false;
+      showCenter(null, '라운드 진행 중', '다음 라운드부터 참가합니다');
+    } else if (role === 'crashed') {
+      game.phase = 'playing';
+      me.alive = false;
+      showCenter('비행 종료', '관전 중', '다음 라운드를 기다리세요');
+    } else if (game.mode === 'ARENA' && wasLaunch) {
+      clearLaunchActors();
+      game.phase = 'playing';
+      me.alive = true;
+      craft.visible = true;
+      hideCenter();
     } else {
+      game.phase = 'playing';
       me.alive = true;
       hideCenter();
     }
+    if (role === 'active') syncRapierFromCraft();
     return;
   }
 
@@ -1337,6 +1965,8 @@ function applyPhase(m) {
       readyIds: Array.isArray(m.readyIds) ? m.readyIds : []
     };
     net.room = resultRoom;
+    clearLaunchActors();
+    window.paperFoldingStage?.leave();
     game.phase = 'results';
     game.ends = m.ends;
     game.frozen = true;
@@ -1371,6 +2001,9 @@ function spawnSelf() {
   me.ammo = 3; me.ammoT = 0;
   game.frozen = true;
   craft.visible = true;
+  craft.rotation.set(me.pitch, me.yaw, -me.roll);
+  syncRapierMap();
+  syncRapierFromCraft();
 }
 
 function dieLocal(report = true) {
@@ -1606,21 +2239,67 @@ const tmpV = new THREE.Vector3();
 let sendAcc = 0, roundClock = 0;
 
 function physics(dt) {
-  Object.assign(me, updateAttitude(me, keys, dt, game.mode));
-
-  me.speed += (-Math.sin(me.pitch) * GRAVITY - DRAG * me.speed * me.speed) * dt;
-  me.speed = Math.max(me.speed, 3);
-  if (me.speed < STALL) {
-    me.pitch -= (STALL - me.speed) * 0.34 * dt;
-    if (game.mode === 'DIST') me.pitch = normalizeAngle(me.pitch);
+  let inTh = 0;
+  for (const thermal of thermals) {
+    const distance = Math.hypot(
+      craft.position.x - thermal.position.x,
+      craft.position.z - thermal.position.z
+    );
+    if (distance < THERMAL_R && craft.position.y < 340) {
+      inTh = Math.max(inTh, 1 - (distance / THERMAL_R) * .75);
+    }
   }
 
-  dir.set(
-    -Math.sin(me.yaw) * Math.cos(me.pitch),
-     Math.sin(me.pitch),
-    -Math.cos(me.yaw) * Math.cos(me.pitch)
-  );
-  craft.position.addScaledVector(dir, me.speed * dt);
+  if (rapierFlight) {
+    const state = rapierFlight.advance(dt, {
+      pitch: (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0),
+      roll: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0),
+      thermalLift: THERMAL_LIFT * inTh
+    });
+    craft.position.set(state.position.x, state.position.y, state.position.z);
+    craft.quaternion.set(state.rotation.x, state.rotation.y, state.rotation.z, state.rotation.w);
+    me.pitch = craft.rotation.x;
+    me.yaw = craft.rotation.y;
+    me.roll = craft.rotation.z;
+    me.speed = Math.max(3, state.speed);
+  } else {
+    const controlAuthority = THREE.MathUtils.clamp(1.35 - aeroProfile.stability * .25, .9, 1.3);
+    Object.assign(me, updateAttitude(me, keys, dt * controlAuthority, game.mode));
+
+    const stabilityRate = THREE.MathUtils.clamp(aeroProfile.stability, .2, 1.25);
+    if (!keys.KeyA && !keys.KeyD) {
+      const rollTarget = aeroProfile.rollBias * .55;
+      me.roll += (rollTarget - me.roll) * (1 - Math.pow(.12, dt * stabilityRate));
+    }
+    if (!keys.KeyW && !keys.KeyS) {
+      const dynamicLift = THREE.MathUtils.clamp(
+        (aeroProfile.liftScale * Math.pow(me.speed / 22, 2) - 1) * .12,
+        -.16,
+        .12
+      );
+      const pitchTarget = -.09 + aeroProfile.pitchBias * .34 + dynamicLift;
+      me.pitch += (pitchTarget - me.pitch) * (1 - Math.pow(.35, dt * stabilityRate));
+    }
+
+    me.pitch = game.mode === 'DIST'
+      ? normalizeAngle(me.pitch)
+      : THREE.MathUtils.clamp(me.pitch, -.95, .75);
+    me.roll = THREE.MathUtils.clamp(me.roll, -.95, .95);
+
+    const dragCoefficient = DRAG * aeroProfile.dragScale;
+    me.speed += (-Math.sin(me.pitch) * GRAVITY - dragCoefficient * me.speed * me.speed) * dt;
+    me.speed = Math.max(me.speed, 3);
+    if (me.speed < aeroProfile.stallSpeed) {
+      me.pitch -= (aeroProfile.stallSpeed - me.speed) * .34 * dt;
+    }
+
+    dir.set(
+      -Math.sin(me.yaw) * Math.cos(me.pitch),
+       Math.sin(me.pitch),
+      -Math.cos(me.yaw) * Math.cos(me.pitch)
+    );
+    craft.position.addScaledVector(dir, me.speed * dt);
+  }
 
   /* 경계 */
   if (game.mode === 'DIST') {
@@ -1628,6 +2307,11 @@ function physics(dt) {
     if (over > 0) {
       craft.position.x = Math.sign(craft.position.x) * (DIST_HALF - 6);
       me.speed *= Math.pow(0.55, dt);
+      me.yaw += -Math.sign(craft.position.x) * 1.2 * dt;
+      if (rapierFlight) {
+        rapierFlight.scaleVelocity(Math.pow(.55, dt));
+        rapierFlight.addAngularVelocity({ x: 0, y: -Math.sign(craft.position.x) * 1.2 * dt, z: 0 });
+      }
     }
     me.dist = Math.max(me.dist, -craft.position.z);
     if (-craft.position.z > DIST_LEN - 60) craft.position.z = -(DIST_LEN - 60); // 코스 끝
@@ -1641,6 +2325,10 @@ function physics(dt) {
       tmpV.set(-craft.position.x, 0, -craft.position.z).normalize();
       const cross = fwdH.z * tmpV.x - fwdH.x * tmpV.z;
       me.yaw += Math.sign(cross) * 1.4 * dt;
+      if (rapierFlight) {
+        rapierFlight.scaleVelocity(Math.pow(.55, dt));
+        rapierFlight.addAngularVelocity({ x: 0, y: Math.sign(cross) * 1.4 * dt, z: 0 });
+      }
     }
     me.surv = roundClock;
     // 탄약 재생
@@ -1648,16 +2336,15 @@ function physics(dt) {
     if (me.ammoT > 2.5 && me.ammo < 3) { me.ammo++; me.ammoT = 0; }
   }
 
-  /* 상승기류 */
-  let inTh = 0;
-  for (const t of thermals) {
-    const d = Math.hypot(craft.position.x - t.position.x, craft.position.z - t.position.z);
-    if (d < THERMAL_R && craft.position.y < 340)
-      inTh = Math.max(inTh, 1 - (d / THERMAL_R) * 0.75);
-  }
-  if (inTh > 0) craft.position.y += THERMAL_LIFT * inTh * dt;
+  /* 상승기류: Rapier에서는 고정 스텝 외력으로 이미 적용됩니다. */
+  if (inTh > 0 && !rapierFlight) craft.position.y += THERMAL_LIFT * inTh * dt;
   $('thermal').classList.toggle('on', inTh > 0);
   craft.position.y = Math.min(craft.position.y, MAX_ALT);
+  rapierFlight?.setPosition({
+    x: craft.position.x,
+    y: craft.position.y,
+    z: craft.position.z
+  });
 
   /* 충돌 */
   if (craft.position.y <= 1.2) return dieLocal();
@@ -1677,7 +2364,10 @@ function physics(dt) {
       ring.userData.taken = true;
       ring.visible = false;
       if (game.mode === 'ARENA') me.ammo = Math.min(3, me.ammo + 1);
-      else me.speed += 6;   // 부스트
+      else {
+        me.speed += 6;
+        rapierFlight?.boostSpeed(6);
+      }
     }
   }
 }
@@ -1694,6 +2384,8 @@ renderer.setAnimationLoop(() => {
     const left = Math.max(0, (game.ends - now) / 1000);
     showCenter(Math.ceil(left), game.mode === 'ARENA' ? '오래 날기' : '멀리 날기', null);
   }
+
+  if (game.phase === 'launch') updateLaunch(performance.now());
 
   if (game.phase === 'playing') {
     roundClock = Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
@@ -1776,19 +2468,19 @@ renderer.setAnimationLoop(() => {
   $('s-spd').textContent = Math.floor(me.speed * 3.6);
   const fill = $('s-fill');
   fill.style.width = Math.min(100, (me.speed / 48) * 100) + '%';
-  fill.classList.toggle('stall', me.speed < STALL);
+  fill.classList.toggle('stall', me.speed < aeroProfile.stallSpeed);
 
   if (game.mode === 'ARENA') {
     const pips = $('ammo').children;
     for (let i = 0; i < 3; i++) pips[i].classList.toggle('on', i < me.ammo);
   }
 
-  if (game.phase === 'playing' || game.phase === 'countdown') {
+  if (game.phase === 'playing' || game.phase === 'countdown' || game.phase === 'launch') {
     const left = Math.max(0, (game.ends - now) / 1000);
     const mm = String(Math.floor(left / 60)).padStart(2, '0');
     const ss = String(Math.floor(left % 60)).padStart(2, '0');
-    $('timer').textContent = game.phase === 'playing' ? `${mm}:${ss}` : '--:--';
-    $('timer').classList.toggle('low', game.phase === 'playing' && left < 20);
+    $('timer').textContent = (game.phase === 'playing' || game.phase === 'launch') ? `${mm}:${ss}` : '--:--';
+    $('timer').classList.toggle('low', (game.phase === 'playing' || game.phase === 'launch') && left < 20);
   }
 
   renderer.render(scene, camera);

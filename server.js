@@ -4,8 +4,9 @@
    - HTTP: public/ 정적 파일 서빙
    - WebSocket: 방·세션·라운드 관리, 상태 중계
    - 세션: 토큰으로 재접속 시 이름·승수 유지 (서버 생존 동안)
-   - 방: 공개/비공개 생성, 초대 코드, 최대 8명
-   - 라운드: waiting → countdown(4s) → playing → results → 참가자별 확인 → waiting
+   - 방: 공개/비공개 생성, 초대 코드, DIST 최대 8명 / ARENA 최대 4명
+   - 라운드: DIST는 countdown(4s), ARENA는 folding(60s) → launch → playing,
+             이후 results → 참가자별 확인 → waiting
    ============================================================ */
 'use strict';
 
@@ -14,6 +15,14 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
+const {
+  createPaperModel,
+  replayFoldCommands,
+  serializeFoldCommands
+} = require('./public/paper-fold-model.js');
+const { deriveAerodynamicProfile } = require('./public/paper-aero-profile.js');
+
+const DEFAULT_AERO_PROFILE = deriveAerodynamicProfile(createPaperModel());
 
 const PORT = Number(process.env.PORT || 3000);
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('PORT must be an integer from 1 to 65535');
@@ -22,6 +31,7 @@ const PUB = path.join(__dirname, 'public');
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
   '.css': 'text/css',
   '.png': 'image/png'
 };
@@ -59,7 +69,19 @@ const sessions = new Map(); // token -> { name, wins }
 
 /* ---------- 방 ---------- */
 const ROUND_SEC = { DIST: 150, ARENA: 180 };
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = { DIST: 8, ARENA: 4 };
+const configuredFoldingMs = Number(process.env.FOLDING_MS || 60_000);
+const FOLDING_MS = Number.isFinite(configuredFoldingMs) && configuredFoldingMs >= 0
+  ? configuredFoldingMs
+  : 60_000;
+const configuredLaunchMs = Number(process.env.LAUNCH_MS || 4_400);
+const LAUNCH_MS = Number.isFinite(configuredLaunchMs) && configuredLaunchMs >= 0
+  ? configuredLaunchMs
+  : 4_400;
+const configuredReconnectGraceMs = Number(process.env.RECONNECT_GRACE_MS || 10_000);
+const RECONNECT_GRACE_MS = Number.isFinite(configuredReconnectGraceMs) && configuredReconnectGraceMs >= 0
+  ? configuredReconnectGraceMs
+  : 10_000;
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let roomSeq = 0;
 const rooms = new Map();
@@ -98,10 +120,14 @@ function makeRoom(mode, visibility = 'public') {
   return room;
 }
 
+function maxPlayers(room) {
+  return MAX_PLAYERS[room.mode];
+}
+
 function findRoom(mode) {
   for (const room of rooms.values()) {
     if (room.visibility === 'public' && room.mode === mode && room.phase === 'waiting' &&
-        room.players.size < MAX_PLAYERS) return room;
+        room.players.size < maxPlayers(room)) return room;
   }
   return makeRoom(mode, 'public');
 }
@@ -109,7 +135,7 @@ function findRoom(mode) {
 function bcast(room, msg, exceptId) {
   const s = JSON.stringify(msg);
   for (const p of room.players.values()) {
-    if (p.ws.readyState !== 1 || p.id === exceptId) continue;
+    if (!p.ws || p.ws.readyState !== 1 || p.id === exceptId) continue;
     if (p.ws.bufferedAmount > 256 * 1024) {
       p.ws.terminate();
       continue;
@@ -145,9 +171,9 @@ function roomSummary(room) {
     mode: room.mode,
     phase: room.phase,
     players: room.players.size,
-    maxPlayers: MAX_PLAYERS,
+    maxPlayers: maxPlayers(room),
     hostName: host ? host.name : '무명',
-    joinable: room.players.size < MAX_PLAYERS
+    joinable: room.phase === 'waiting' && room.players.size < maxPlayers(room)
   };
 }
 
@@ -192,6 +218,17 @@ function broadcastRoomList() {
   roomListBroadcastTimer.unref();
 }
 
+function craftSnapshots(room) {
+  return room.order.map(id => {
+    const player = room.players.get(id);
+    return {
+      id,
+      commands: player?.foldCommands || '[]',
+      aeroProfile: player?.aeroProfile || DEFAULT_AERO_PROFILE
+    };
+  });
+}
+
 function snapshot(room) {
   return {
     t: 'room',
@@ -199,24 +236,38 @@ function snapshot(room) {
     code: room.code,
     visibility: room.visibility,
     hostId: room.hostId,
-    maxPlayers: MAX_PLAYERS,
+    maxPlayers: maxPlayers(room),
     mode: room.mode,
     phase: room.phase,
     seed: room.seed,
     ends: room.phaseEnds,
     order: room.order,
+    crafts: craftSnapshots(room),
     results: room.results,
     readyIds: [...room.readyIds],
     players: [...room.players.values()].map(p => ({
-      id: p.id, name: p.name, wins: p.wins, alive: p.alive
+      id: p.id, name: p.name, wins: p.wins, alive: p.alive, ready: p.ready,
+      foldDone: Boolean(p.foldDone), foldCommands: p.foldCommands || '[]',
+      aeroProfile: p.aeroProfile || DEFAULT_AERO_PROFILE,
+      connected: Boolean(p.ws && p.ws.readyState === 1)
     }))
   };
 }
 
+function bindSessionToRoom(player, room) {
+  const session = sessions.get(player.token);
+  if (!session) return;
+  session.roomId = room?.id || null;
+  session.playerId = room ? player.id : null;
+}
+
 function removePlayerFromRoom(room, player) {
+  clearTimeout(player.disconnectTimer);
+  player.disconnectTimer = null;
   room.players.delete(player.id);
-  room.order = room.order.filter(id => id !== player.id);
+  if (room.phase === 'waiting') room.order = room.order.filter(id => id !== player.id);
   room.readyIds.delete(player.id);
+  bindSessionToRoom(player, null);
   bcast(room, { t: 'pl', id: player.id });
   if (room.hostId === player.id) room.hostId = room.players.keys().next().value || null;
   if (room.players.size === 0) {
@@ -231,6 +282,10 @@ function removePlayerFromRoom(room, player) {
 }
 
 function resetPlayerForRoom(player) {
+  player.ready = false;
+  player.foldDone = false;
+  player.foldCommands = '[]';
+  player.aeroProfile = DEFAULT_AERO_PROFILE;
   player.alive = false;
   player.score = 0;
   player.state = null;
@@ -239,19 +294,24 @@ function resetPlayerForRoom(player) {
   player.movementAt = Date.now();
   player.shots = [];
   player.lastShotAt = 0;
+  player.ammo = 3;
+  player.ammoAt = Date.now();
 }
 
 /* ---------- 라운드 흐름 ---------- */
-function startCountdown(room) {
+function startPreparation(room, phase, duration, nextPhase) {
   clearTimeout(room.timer);
-  room.phase = 'countdown';
+  room.phase = phase;
   room.seed = (Math.random() * 0x7fffffff) | 0;
-  room.phaseEnds = Date.now() + 4000;
+  room.phaseEnds = Date.now() + duration;
   room.order = [...room.players.keys()];
   room.results = [];
   room.readyIds.clear();
   for (const p of room.players.values()) {
     p.alive = true;
+    p.foldDone = false;
+    p.foldCommands = '[]';
+    p.aeroProfile = DEFAULT_AERO_PROFILE;
     p.score = 0;
     p.state = null;
     p.stateAt = 0;
@@ -259,9 +319,32 @@ function startCountdown(room) {
     p.movementAt = Date.now();
     p.shots = [];
     p.lastShotAt = 0;
+    p.ammo = 3;
+    p.ammoAt = Date.now();
   }
-  bcast(room, { t: 'phase', phase: 'countdown', seed: room.seed, ends: room.phaseEnds, order: room.order });
-  room.timer = setTimeout(() => startPlaying(room), 4000);
+  bcast(room, { t: 'phase', phase, seed: room.seed, ends: room.phaseEnds, order: room.order });
+  room.timer = setTimeout(() => nextPhase(room), duration);
+}
+
+function startCountdown(room) {
+  startPreparation(room, 'countdown', 4000, startPlaying);
+}
+
+function startFolding(room) {
+  startPreparation(room, 'folding', FOLDING_MS, startLaunch);
+}
+
+function startLaunch(room) {
+  if (!rooms.has(room.id) || room.phase !== 'folding') return;
+  room.phase = 'launch';
+  room.phaseEnds = Date.now() + LAUNCH_MS;
+  bcast(room, {
+    t: 'phase', phase: 'launch', seed: room.seed,
+    ends: room.phaseEnds, order: room.order, duration: LAUNCH_MS,
+    crafts: craftSnapshots(room)
+  });
+  broadcastRoomList();
+  room.timer = setTimeout(() => startPlaying(room), LAUNCH_MS);
 }
 
 function startPlaying(room) {
@@ -273,7 +356,10 @@ function startPlaying(room) {
     return;
   }
   room.phaseEnds = Date.now() + ROUND_SEC[room.mode] * 1000;
-  bcast(room, { t: 'phase', phase: 'playing', ends: room.phaseEnds });
+  bcast(room, {
+    t: 'phase', phase: 'playing', seed: room.seed,
+    ends: room.phaseEnds, order: room.order, crafts: craftSnapshots(room)
+  });
   broadcastRoomList();
   room.timer = setTimeout(() => endRound(room), ROUND_SEC[room.mode] * 1000);
 }
@@ -327,7 +413,10 @@ function finishResultsIfReady(room) {
   room.order = [];
   room.results = [];
   room.readyIds.clear();
-  for (const player of room.players.values()) player.alive = false;
+  for (const player of room.players.values()) {
+    player.ready = false;
+    player.alive = false;
+  }
   bcast(room, snapshot(room));
   broadcastRoomList();
   return true;
@@ -429,10 +518,25 @@ wss.on('connection', (ws) => {
       if (!token || !sessions.has(token)) {
         token = crypto.randomBytes(12).toString('hex');
         if (sessions.size >= 10000) sessions.delete(sessions.keys().next().value);
-        sessions.set(token, { name: '', wins: 0 });
+        sessions.set(token, { name: '', wins: 0, roomId: null, playerId: null });
       }
       const s = sessions.get(token);
       if (m.name) s.name = String(m.name).slice(0, 12).trim() || s.name;
+
+      const resumeRoom = s.roomId ? rooms.get(s.roomId) : null;
+      const resumePlayer = resumeRoom?.players.get(s.playerId);
+      if (resumePlayer && (!resumePlayer.ws || resumePlayer.ws.readyState !== 1)) {
+        me = resumePlayer;
+        room = resumeRoom;
+        clearTimeout(me.disconnectTimer);
+        me.disconnectTimer = null;
+        me.ws = ws;
+        me.name = s.name || me.name;
+        sendJson(ws, { t: 'hello', id: me.id, token, name: me.name, wins: me.wins, resumed: true });
+        sendJson(ws, snapshot(room));
+        bcast(room, snapshot(room), me.id);
+        return;
+      }
 
       me = {
         id: crypto.randomBytes(4).toString('hex'),
@@ -440,6 +544,8 @@ wss.on('connection', (ws) => {
         name: s.name || '무명',
         wins: s.wins,
         ws,
+        ready: false,
+        foldDone: false,
         alive: false,
         score: 0,
         state: null,
@@ -447,17 +553,24 @@ wss.on('connection', (ws) => {
         movementBudget: 40,
         movementAt: Date.now(),
         shots: [],
-        lastShotAt: 0
+        lastShotAt: 0,
+        ammo: 3,
+        ammoAt: Date.now(),
+        disconnectTimer: null
       };
-      ws.send(JSON.stringify({ t: 'hello', id: me.id, token, name: me.name, wins: me.wins }));
+      sendJson(ws, { t: 'hello', id: me.id, token, name: me.name, wins: me.wins, resumed: false });
       return;
     }
     if (!me) return;
 
     /* -- 로비/대기방 이름 변경 -- */
     if (m.t === 'rename') {
+      if (room && room.phase !== 'waiting') {
+        sendJson(ws, { t: 'error', code: 'ROOM_NOT_WAITING', message: '대기 중에만 이름을 바꿀 수 있습니다' });
+        return;
+      }
       const name = String(m.name || '').slice(0, 12).trim();
-      if (!name) return;
+      if (!name || name === me.name) return;
       me.name = name;
       const session = sessions.get(me.token);
       if (session) session.name = name;
@@ -476,6 +589,7 @@ wss.on('connection', (ws) => {
       room.hostId = me.id;
       resetPlayerForRoom(me);
       room.players.set(me.id, me);
+      bindSessionToRoom(me, room);
       sendJson(ws, snapshot(room));
       broadcastRoomList();
       return;
@@ -494,13 +608,17 @@ wss.on('connection', (ws) => {
       } else {
         targetRoom = findRoom(m.mode === 'ARENA' ? 'ARENA' : 'DIST');
       }
-      if (targetRoom.players.size >= MAX_PLAYERS && !targetRoom.players.has(me.id)) {
-        sendJson(ws, { t: 'error', code: 'ROOM_FULL', message: '방이 가득 찼습니다' });
-        return;
-      }
       ws.roomListSubscribed = false;
       if (room === targetRoom) {
         sendJson(ws, snapshot(room));
+        return;
+      }
+      if (targetRoom.phase !== 'waiting') {
+        sendJson(ws, { t: 'error', code: 'ROOM_NOT_JOINABLE', message: '이미 시작한 방에는 참가할 수 없습니다' });
+        return;
+      }
+      if (targetRoom.players.size >= maxPlayers(targetRoom)) {
+        sendJson(ws, { t: 'error', code: 'ROOM_FULL', message: '방이 가득 찼습니다' });
         return;
       }
 
@@ -509,6 +627,7 @@ wss.on('connection', (ws) => {
       room = targetRoom;
       resetPlayerForRoom(me);
       room.players.set(me.id, me);
+      bindSessionToRoom(me, room);
       if (!room.hostId) room.hostId = me.id;
 
       bcast(room, snapshot(room));
@@ -529,6 +648,42 @@ wss.on('connection', (ws) => {
 
     if (!room) return;
 
+    /* -- 대기 상태는 방장 여부와 무관하게 각 플레이어가 직접 설정합니다 -- */
+    if (m.t === 'ready') {
+      if (room.phase !== 'waiting') {
+        sendJson(ws, { t: 'error', code: 'ROOM_NOT_WAITING', message: '대기 중에만 준비 상태를 바꿀 수 있습니다' });
+        return;
+      }
+      if (typeof m.ready !== 'boolean' || me.ready === m.ready) return;
+      me.ready = m.ready;
+      bcast(room, snapshot(room));
+      return;
+    }
+
+    /* -- 접기 명령은 서버에서 재생·검증한 뒤 공력 프로필로 변환합니다 -- */
+    if (m.t === 'fold_done') {
+      if (room.phase !== 'folding' || me.foldDone) return;
+      const commands = m.commands === undefined ? '[]' : m.commands;
+      const foldModel = replayFoldCommands(commands);
+      if (!foldModel) {
+        sendJson(ws, {
+          t: 'error', code: 'INVALID_FOLD',
+          message: '접기 명령을 확인할 수 없습니다. 접기선을 다시 그려 주세요'
+        });
+        return;
+      }
+      me.foldCommands = serializeFoldCommands(foldModel);
+      me.aeroProfile = deriveAerodynamicProfile(foldModel);
+      me.foldDone = true;
+      const doneIds = room.order.filter(id => room.players.get(id)?.foldDone);
+      const profiles = Object.fromEntries(doneIds.map(id => [
+        id,
+        room.players.get(id).aeroProfile
+      ]));
+      bcast(room, { t: 'fold_status', doneIds, total: room.order.length, profiles });
+      return;
+    }
+
     /* -- 라운드 시작은 현재 방장만 요청할 수 있습니다 -- */
     if (m.t === 'start') {
       if (room.hostId !== me.id) {
@@ -539,7 +694,12 @@ wss.on('connection', (ws) => {
         sendJson(ws, { t: 'error', code: 'ROOM_NOT_WAITING', message: '대기 중인 방만 시작할 수 있습니다' });
         return;
       }
-      startCountdown(room);
+      if (room.mode === 'ARENA' && ![...room.players.values()].every(player => player.ready)) {
+        sendJson(ws, { t: 'error', code: 'NOT_ALL_READY', message: '모든 플레이어가 준비해야 시작할 수 있습니다' });
+        return;
+      }
+      if (room.mode === 'ARENA') startFolding(room);
+      else startCountdown(room);
       broadcastRoomList();
       return;
     }
@@ -581,10 +741,17 @@ wss.on('connection', (ws) => {
       if (room.mode !== 'ARENA' || room.phase !== 'playing' || !me.alive || !me.state ||
           !finiteVec3(m.o, 10000) || !finiteVec3(m.v, 1000)) return;
       const shotNow = Date.now();
+      const regenerated = Math.floor((shotNow - me.ammoAt) / 2500);
+      if (regenerated > 0) {
+        me.ammo = Math.min(3, me.ammo + regenerated);
+        me.ammoAt += regenerated * 2500;
+      }
+      if (me.ammo <= 0) return;
       const speedSquared = m.v[0] ** 2 + m.v[1] ** 2 + m.v[2] ** 2;
       if (vecDistanceSquared(me.state.p, m.o) > 15 ** 2 || speedSquared < 1 || speedSquared > 250 ** 2 ||
           shotNow - me.lastShotAt < 100) return;
       me.lastShotAt = shotNow;
+      me.ammo -= 1;
       me.shots = me.shots.filter(shot => shotNow - shot.at <= 3000);
       me.shots.push({ at: shotNow, o: m.o, v: m.v });
       bcast(room, { t: 'shot', id: me.id, o: m.o, v: m.v }, me.id);
@@ -621,8 +788,21 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    if (!room || !me) return;
-    removePlayerFromRoom(room, me);
+    if (!room || !me || me.ws !== ws) return;
+    if (room.phase !== 'waiting' && RECONNECT_GRACE_MS > 0) {
+      const disconnectedRoom = room;
+      me.ws = null;
+      clearTimeout(me.disconnectTimer);
+      me.disconnectTimer = setTimeout(() => {
+        if (!me.ws && disconnectedRoom.players.get(me.id) === me) {
+          removePlayerFromRoom(disconnectedRoom, me);
+        }
+      }, RECONNECT_GRACE_MS);
+      me.disconnectTimer.unref?.();
+      bcast(disconnectedRoom, snapshot(disconnectedRoom));
+    } else {
+      removePlayerFromRoom(room, me);
+    }
     room = null;
   });
 });

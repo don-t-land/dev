@@ -2,6 +2,9 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { after, before, test } = require('node:test');
 const WebSocket = require('ws');
+process.env.FOLDING_MS = '120';
+process.env.LAUNCH_MS = '80';
+process.env.RECONNECT_GRACE_MS = '250';
 const { httpServer, wss } = require('../server');
 
 let baseUrl;
@@ -198,29 +201,75 @@ test('a private room stays unlisted and can only be joined by its code', async (
   }
 });
 
-test('only the host can start an arena room', async () => {
+test('an arena room requires every player to be ready before its host starts folding', async () => {
   const host = await connectClient();
   const guest = await connectClient();
   try {
-    await establishSession(host, '방장');
+    const hostHello = await establishSession(host, '방장');
     host.send({ t: 'create', mode: 'ARENA', visibility: 'public' });
     const created = await host.next(message => message.t === 'room');
+    assert.equal(created.maxPlayers, 4);
+    assert.equal(created.players[0].ready, false);
 
-    await establishSession(guest, '손님');
+    const guestHello = await establishSession(guest, '손님');
     guest.send({ t: 'join', code: created.code });
-    await guest.next(message => message.t === 'room');
+    const joined = await guest.next(message => message.t === 'room');
+    assert.equal(joined.players.every(player => player.ready === false), true);
 
     guest.send({ t: 'start' });
     const denied = await guest.next(message => message.t === 'error');
     assert.equal(denied.code, 'NOT_HOST');
 
     host.send({ t: 'start' });
+    const notReady = await host.next(message => message.t === 'error');
+    assert.equal(notReady.code, 'NOT_ALL_READY');
+
+    host.send({ t: 'ready', ready: true });
+    await guest.next(message => message.t === 'room' &&
+      message.players.find(player => player.id === hostHello.id)?.ready === true);
+    guest.send({ t: 'ready', ready: true });
+    const allReady = await host.next(message => message.t === 'room' &&
+      message.players.every(player => player.ready));
+    assert.equal(allReady.players.find(player => player.id === guestHello.id).ready, true);
+
+    const requestedAt = Date.now();
+    host.send({ t: 'start' });
     const [hostPhase, guestPhase] = await Promise.all([
-      host.next(message => message.t === 'phase' && message.phase === 'countdown'),
-      guest.next(message => message.t === 'phase' && message.phase === 'countdown')
+      host.next(message => message.t === 'phase' && message.phase === 'folding'),
+      guest.next(message => message.t === 'phase' && message.phase === 'folding')
     ]);
     assert.deepEqual(hostPhase.order, guestPhase.order);
     assert.equal(hostPhase.order.length, 2);
+    assert.ok(hostPhase.ends - requestedAt >= 90);
+
+    const halfFold = JSON.stringify([{
+      start: [-1, 0], end: [1, 0], direction: 1
+    }]);
+    host.send({ t: 'fold_done', commands: halfFold });
+    const oneDone = await guest.next(message => message.t === 'fold_status' && message.doneIds.length === 1);
+    assert.deepEqual(oneDone.doneIds, [hostHello.id]);
+    assert.equal(oneDone.total, 2);
+    assert.equal(oneDone.profiles[hostHello.id].planformArea, 2);
+
+    guest.send({
+      t: 'fold_done',
+      commands: JSON.stringify([{ start: [0, 0], end: [0, 0], direction: 1 }])
+    });
+    const invalidFold = await guest.next(message => message.t === 'error');
+    assert.equal(invalidFold.code, 'INVALID_FOLD');
+
+    guest.send({ t: 'fold_done', commands: '[]' });
+    const allDoneStatus = await host.next(message => message.t === 'fold_status' && message.doneIds.length === 2);
+    assert.deepEqual(new Set(allDoneStatus.doneIds), new Set([hostHello.id, guestHello.id]));
+    assert.equal(allDoneStatus.total, 2);
+    assert.equal(allDoneStatus.profiles[guestHello.id].planformArea, 4);
+
+    const launch = await host.next(message => message.t === 'phase' && message.phase === 'launch');
+    assert.equal(launch.order.length, 2);
+    assert.equal(launch.crafts.length, 2);
+    assert.equal(launch.crafts.find(craft => craft.id === hostHello.id).aeroProfile.planformArea, 2);
+    assert.ok(launch.ends > Date.now());
+    await host.next(message => message.t === 'phase' && message.phase === 'playing');
   } finally {
     await Promise.all([host.close(), guest.close()]);
   }
@@ -256,8 +305,10 @@ test('playing rooms publish a server-authoritative live leaderboard', async () =
     const hello = await establishSession(host, '생존자');
     host.send({ t: 'create', mode: 'ARENA', visibility: 'public' });
     await host.next(message => message.t === 'room');
+    host.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players[0].ready === true);
     host.send({ t: 'start' });
-    await host.next(message => message.t === 'phase' && message.phase === 'playing', 5000);
+    await host.next(message => message.t === 'phase' && message.phase === 'playing');
 
     const leaderboard = await host.next(message => message.t === 'leaderboard', 1500);
     assert.equal(leaderboard.rows[0].id, hello.id);
@@ -281,6 +332,10 @@ test('round participants return to the waiting room only after individual acknow
     await guest.next(message => message.t === 'room' && message.players.length === 2);
     host.takeAll(message => message.t === 'room');
 
+    host.send({ t: 'ready', ready: true });
+    guest.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players.every(player => player.ready));
+    host.takeAll(message => message.t === 'room');
     host.send({ t: 'start' });
     await guest.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);
     guest.send({ t: 'crash' });
@@ -305,6 +360,9 @@ test('round participants return to the waiting room only after individual acknow
     assert.equal(guestWaiting.results.length, 0);
     assert.deepEqual(hostWaiting.readyIds, []);
     assert.deepEqual(guestWaiting.readyIds, []);
+    assert.deepEqual(hostWaiting.order, []);
+    assert.equal(hostWaiting.players.every(player => player.ready === false), true);
+    assert.equal(hostWaiting.players.every(player => player.alive === false), true);
     assert.deepEqual(new Set(hostWaiting.players.map(player => player.id)), new Set([hostHello.id, guestHello.id]));
   } finally {
     await Promise.all([host.close(), guest.close()]);
@@ -323,6 +381,10 @@ test('disconnecting an unacknowledged participant releases the remaining ready p
     await guest.next(message => message.t === 'room' && message.players.length === 2);
     host.takeAll(message => message.t === 'room');
 
+    host.send({ t: 'ready', ready: true });
+    guest.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players.every(player => player.ready));
+    host.takeAll(message => message.t === 'room');
     host.send({ t: 'start' });
     await guest.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);
     guest.send({ t: 'crash' });
@@ -333,40 +395,16 @@ test('disconnecting an unacknowledged participant releases the remaining ready p
 
     await guest.close();
     const waiting = await host.next(message => message.t === 'room' && message.phase === 'waiting' &&
-      message.players.length === 1);
+      message.players.length === 1, 1_500);
     assert.deepEqual(waiting.players.map(player => player.id), [hostHello.id]);
     assert.deepEqual(waiting.readyIds, []);
+    assert.equal(waiting.players[0].ready, false);
   } finally {
     await Promise.all([host.close(), guest.close()]);
   }
 });
 
-test('a spectator room returns to waiting when every round participant leaves', async () => {
-  const host = await connectClient();
-  const spectator = await connectClient();
-  try {
-    await establishSession(host, '떠나는참가자');
-    const spectatorHello = await establishSession(spectator, '남은관전자');
-    host.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
-    const created = await host.next(message => message.t === 'room');
-    host.send({ t: 'start' });
-    await host.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);
-
-    spectator.send({ t: 'join', code: created.code });
-    await spectator.next(message => message.t === 'room' && message.phase === 'playing');
-    host.send({ t: 'leave' });
-
-    const waiting = await spectator.next(message => message.t === 'room' && message.phase === 'waiting', 1_500);
-    assert.deepEqual(waiting.order, []);
-    assert.deepEqual(waiting.results, []);
-    assert.deepEqual(waiting.readyIds, []);
-    assert.equal(waiting.hostId, spectatorHello.id);
-  } finally {
-    await Promise.all([host.close(), spectator.close()]);
-  }
-});
-
-test('results survive membership changes and late joins', async () => {
+test('started rooms reject joins and reset readiness after result acknowledgements', async () => {
   const host = await connectClient();
   const guest = await connectClient();
   const lateJoiner = await connectClient();
@@ -379,16 +417,33 @@ test('results survive membership changes and late joins', async () => {
     await guest.next(message => message.t === 'room' && message.players.length === 2);
     host.takeAll(message => message.t === 'room');
 
+    host.send({ t: 'ready', ready: true });
+    guest.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players.every(player => player.ready));
+    host.takeAll(message => message.t === 'room');
     host.send({ t: 'start' });
-    await guest.next(message => message.t === 'phase' && message.phase === 'playing', 5_000);
+    await guest.next(message => message.t === 'phase' && message.phase === 'playing');
+
+    await establishSession(lateJoiner, '늦은참가자');
+    lateJoiner.send({ t: 'list' });
+    const listing = await lateJoiner.next(message => message.t === 'rooms');
+    assert.equal(listing.rooms.find(room => room.code === created.code).joinable, false);
+    lateJoiner.send({ t: 'join', code: created.code });
+    const denied = await lateJoiner.next(message => message.t === 'error');
+    assert.equal(denied.code, 'ROOM_NOT_JOINABLE');
+
     guest.send({ t: 'crash' });
     const finished = await host.next(message => message.t === 'phase' && message.phase === 'results');
     assert.equal(finished.results.length, 2);
 
-    await establishSession(lateJoiner, '늦은참가자');
-    lateJoiner.send({ t: 'join', code: created.code });
-    const snapshot = await lateJoiner.next(message => message.t === 'room' && message.phase === 'results');
-    assert.deepEqual(snapshot.results, finished.results);
+    host.send({ t: 'results-ready' });
+    guest.send({ t: 'results-ready' });
+    const waiting = await host.next(message => message.t === 'room' && message.phase === 'waiting', 1_500);
+    assert.equal(waiting.players.every(player => player.ready === false), true);
+    assert.equal(waiting.players.every(player => player.alive === false), true);
+    assert.deepEqual(waiting.order, []);
+    assert.deepEqual(waiting.results, []);
+    assert.deepEqual(waiting.readyIds, []);
   } finally {
     await Promise.all([host.close(), guest.close(), lateJoiner.close()]);
   }
@@ -432,6 +487,7 @@ test('a room rejects the ninth player', async () => {
     await Promise.all(clients.map((client, index) => establishSession(client, `조종사${index + 1}`)));
     clients[0].send({ t: 'create', mode: 'DIST', visibility: 'public' });
     const room = await clients[0].next(message => message.t === 'room');
+    assert.equal(room.maxPlayers, 8);
 
     for (let index = 1; index < 8; index++) {
       clients[index].send({ t: 'join', code: room.code });
@@ -443,6 +499,79 @@ test('a room rejects the ninth player', async () => {
     assert.equal(denied.code, 'ROOM_FULL');
   } finally {
     await Promise.all(clients.map(client => client.close()));
+  }
+});
+
+test('an arena room rejects the fifth player', async () => {
+  const clients = await Promise.all(Array.from({ length: 5 }, () => connectClient()));
+  try {
+    await Promise.all(clients.map((client, index) => establishSession(client, `아레나${index + 1}`)));
+    clients[0].send({ t: 'create', mode: 'ARENA', visibility: 'public' });
+    const room = await clients[0].next(message => message.t === 'room');
+    assert.equal(room.maxPlayers, 4);
+
+    for (let index = 1; index < 4; index++) {
+      clients[index].send({ t: 'join', code: room.code });
+      await clients[index].next(message => message.t === 'room' && message.players.length === index + 1);
+    }
+
+    clients[4].send({ t: 'join', code: room.code });
+    const denied = await clients[4].next(message => message.t === 'error');
+    assert.equal(denied.code, 'ROOM_FULL');
+  } finally {
+    await Promise.all(clients.map(client => client.close()));
+  }
+});
+
+test('ready state resets when a player moves to another room', async () => {
+  const player = await connectClient();
+  try {
+    await establishSession(player, '이동자');
+    player.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
+    await player.next(message => message.t === 'room');
+    player.send({ t: 'ready', ready: true });
+    await player.next(message => message.t === 'room' && message.players[0].ready === true);
+
+    player.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
+    const moved = await player.next(message => message.t === 'room');
+    assert.equal(moved.players[0].ready, false);
+  } finally {
+    await player.close();
+  }
+});
+
+test('active arena rooms block rename and resume the same player during the disconnect grace period', async () => {
+  const host = await connectClient();
+  const guest = await connectClient();
+  let resumed;
+  try {
+    const hostHello = await establishSession(host, '고정방장');
+    const guestHello = await establishSession(guest, '재접속자');
+    host.send({ t: 'create', mode: 'ARENA', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    guest.send({ t: 'join', code: created.code });
+    await guest.next(message => message.t === 'room' && message.players.length === 2);
+    host.send({ t: 'ready', ready: true });
+    guest.send({ t: 'ready', ready: true });
+    await host.next(message => message.t === 'room' && message.players.every(player => player.ready));
+    host.send({ t: 'start' });
+    await guest.next(message => message.t === 'phase' && message.phase === 'folding');
+
+    host.send({ t: 'rename', name: '경기중변경' });
+    const renameDenied = await host.next(message => message.t === 'error');
+    assert.equal(renameDenied.code, 'ROOM_NOT_WAITING');
+
+    await guest.close();
+    resumed = await connectClient();
+    resumed.send({ t: 'hello', token: guestHello.token, name: '재접속자' });
+    const resumedHello = await resumed.next(message => message.t === 'hello');
+    assert.equal(resumedHello.id, guestHello.id);
+    const resumedRoom = await resumed.next(message => message.t === 'room');
+    assert.equal(resumedRoom.id, created.id);
+    assert.equal(resumedRoom.phase, 'folding');
+    assert.deepEqual(resumedRoom.order, [hostHello.id, guestHello.id]);
+  } finally {
+    await Promise.all([host.close(), guest.close(), resumed?.close()]);
   }
 });
 

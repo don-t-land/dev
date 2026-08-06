@@ -135,3 +135,124 @@ test('the client implements room lifecycle and authoritative leaderboard message
   assert.match(html, /send\(\{\s*t:\s*['"]leave['"]/);
   assert.match(html, /id="game-leave-btn"/);
 });
+
+test('the first screen is a modular paper-plane home screen with two flight modes and a costume action', () => {
+  const homeScreen = require('../public/home-screen.js');
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.deepEqual(homeScreen.homeModes, [
+    { id: 'distance', label: '멀리 날기', description: '끝없이 펼쳐진 하늘을 향해' },
+    { id: 'survival', label: '오래 날기', description: '구름 위에서 가장 오래 버티기' }
+  ]);
+  assert.match(html, /<link rel="stylesheet" href="\.\/home-screen\.css">/);
+  assert.match(html, /id="home-screen"/);
+  assert.match(html, /data-home-mode="distance"/);
+  assert.match(html, /data-home-mode="survival"/);
+  assert.match(html, /data-home-action="costume"/);
+  assert.match(html, /class="home-vertical-plane"/);
+  assert.match(html, /<script src="\.\/home-screen\.js"><\/script>/);
+});
+
+test('the home screen keeps all three menu rows usable on a short mobile viewport', () => {
+  const css = fs.readFileSync(path.join(projectRoot, 'public/home-screen.css'), 'utf8');
+
+  assert.match(css, /@media \(max-width: 780px\) and \(max-height: 720px\)/);
+  assert.match(css, /@media \(max-width: 780px\) and \(max-height: 720px\)[\s\S]*?\.home-mode-grid \{ grid-template-columns: 1fr;/);
+  assert.match(css, /@media \(max-width: 780px\) and \(max-height: 720px\)[\s\S]*?\.home-mode-card \{ min-height: 64px;/);
+});
+
+test('the home screen preserves an accessible faceless paper-plane fallback while the WebGL mascot loads', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'public/home-screen.css'), 'utf8');
+
+  assert.match(html, /id="home-title"[^>]*>Don['’]t <span>Land<\/span>/);
+  assert.doesNotMatch(html, /home-plane-(eye|smile)/);
+  assert.match(html, /home-plane-fallback/);
+  assert.match(html, /id="home-plane-canvas"/);
+  assert.match(css, /\.home-wordmark/);
+  assert.match(css, /perspective:/);
+});
+
+test('the short mobile layout reserves a visible stage for the animated mascot', () => {
+  const css = fs.readFileSync(path.join(projectRoot, 'public/home-screen.css'), 'utf8');
+
+  assert.match(css, /@media \(max-width: 780px\) and \(max-height: 720px\)[\s\S]*?\.home-plane-stage \{[^}]*top: 9%;[^}]*height: 37vh;/);
+});
+
+test('the mascot uses an unmistakable folded paper-plane silhouette instead of an aircraft fuselage', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  assert.match(html, /<svg class="home-vertical-plane"/);
+  assert.match(html, /points="185,14 356,508 185,412 14,508"/);
+  assert.doesNotMatch(html, /home-plane-(body|nose|wing)/);
+});
+
+test('the home screen composes an original 3D map menu with a vertical paper-plane hero and Korean web-font fallback', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'public', 'home-screen.css'), 'utf8');
+  assert.match(html, /class="home-map"/);
+  assert.match(html, /class="home-vertical-plane"/);
+  assert.match(html, /class="home-map-grid"/);
+  assert.match(css, /font-family:\s*"Noto Sans KR"/);
+  assert.match(css, /\.home-map-grid[\s\S]*rotateX\(/);
+  assert.match(css, /\.home-vertical-plane[\s\S]*rotateY\(/);
+});
+
+test('the refined hero keeps Dont Land as one enlarged line and delegates the standing mascot to WebGL', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'public', 'home-screen.css'), 'utf8');
+  const mascot = fs.readFileSync(path.join(projectRoot, 'public', 'home-plane-3d.js'), 'utf8');
+
+  assert.doesNotMatch(html, /PAPER WING CLUB/);
+  assert.doesNotMatch(html, /구름과 절벽 사이/);
+  assert.match(html, /id="home-plane-canvas"/);
+  assert.match(html, /<script type="module" src="\.\/home-plane-3d\.js"><\/script>/);
+  assert.match(css, /\.home-wordmark[\s\S]*white-space:\s*nowrap/);
+  assert.match(css, /\.home-wordmark[\s\S]*font-size:\s*clamp\(104px, 11\.5vw, 176px\)/);
+  assert.match(css, /\.home-content[\s\S]*padding:\s*clamp\(128px, 16vh, 178px\)/);
+  assert.match(css, /\.home-actions\s*\{[^}]*width:\s*min\(100%, 620px\)/);
+  assert.match(mascot, /new THREE\.WebGLRenderer/);
+  assert.match(mascot, /function makeStandingPlaneMascot/);
+  assert.match(mascot, /requestAnimationFrame\(render\)/);
+});
+
+test('the standing 3D mascot uses articulated legs, modeled shoes, and a weight-shifting idle animation', () => {
+  const mascot = fs.readFileSync(path.join(projectRoot, 'public', 'home-plane-3d.js'), 'utf8');
+
+  assert.match(mascot, /function makeLeg\(/);
+  assert.match(mascot, /function makeShoe\(/);
+  assert.match(mascot, /THREE\.CapsuleGeometry/);
+  assert.match(mascot, /left\.knee\.rotation\.x/);
+  assert.match(mascot, /right\.shoe\.rotation\.x/);
+  assert.match(mascot, /pointerX \* \.16/);
+});
+
+test('the mascot has no hanging center keel or dangling underside panels between its legs', () => {
+  const mascot = fs.readFileSync(path.join(projectRoot, 'public', 'home-plane-3d.js'), 'utf8');
+
+  assert.doesNotMatch(mascot, /const keel\s*=/);
+  assert.doesNotMatch(mascot, /makeFacet\(\[nose, center, keel\]/);
+  assert.doesNotMatch(mascot, /navy: new THREE\.MeshStandardMaterial/);
+  assert.doesNotMatch(mascot, /makeFacet\(\[\[0, 3\.31, -\.35\]/);
+  assert.match(mascot, /hip\.position\.set\(side \* \.51, -1\.12, \.34\)/);
+});
+
+test('the home map does not place a decorative tower cluster behind the mascot legs', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+
+  assert.doesNotMatch(html, /home-map-island-one/);
+  assert.match(html, /home-map-island-two/);
+});
+
+test('the menu uses three long single-line rows with only an icon, label, and arrow', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'public', 'home-screen.css'), 'utf8');
+
+  assert.match(html, /class="home-mode-label">멀리 날기<\/span>/);
+  assert.match(html, /class="home-mode-label">오래 날기<\/span>/);
+  assert.match(html, /class="home-mode-label">코스튬<\/span>/);
+  assert.match(html, /data-home-action="costume"/);
+  assert.doesNotMatch(html, /home-mode-(kicker|meta|cta|copy|bottom|scan)/);
+  assert.match(css, /\.home-mode-grid\s*\{[^}]*grid-template-columns:\s*1fr/);
+  assert.match(css, /\.home-mode-card\s*\{[^}]*grid-template-columns:\s*58px 1fr 34px/);
+  assert.match(css, /\.home-mode-card\s*\{[^}]*min-height:\s*76px/);
+});

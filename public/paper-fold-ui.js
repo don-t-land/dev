@@ -4,8 +4,7 @@
   const api = root.paperFoldModel;
   const viewport = root.paperFoldViewport;
   const EDIT_CONTROL_IDS = [
-    'fold-dir-valley', 'fold-dir-mountain', 'fold-angle-90', 'fold-angle-180',
-    'fold-flip-btn', 'fold-undo-btn'
+    'fold-dir-valley', 'fold-dir-mountain', 'fold-flip-btn', 'fold-undo-btn'
   ];
   const ANIMATION_MS = 300;
   const CLICK_DISTANCE = 8;
@@ -21,7 +20,6 @@
   let animationToken = 0;
   let ends = 0;
   let direction = 1;
-  let targetAngle = 90;
   let drag = null;
   let orbitDrag = null;
   let cameraOrbit = null;
@@ -367,7 +365,7 @@
       end: completed.end,
       coordinateSpace: 'material',
       direction,
-      targetAngle,
+      targetAngle: 0,
       seedFaceId: completed.faceId
     });
     if (next === model) {
@@ -376,12 +374,10 @@
     }
     model = next;
     const foldId = foldCommands().at(-1).id;
-    previewModel = api.updateFoldAngle(model, foldId, 0);
     selectionMaterial = completed.start.slice();
     reconcileSelection(previousId, foldId, selectionMaterial);
-    setStatus(`선택 면을 ${targetAngle}°로 접는 중…`);
+    setStatus('접기 선을 만들었습니다 · 히스토리에서 각도를 조절하세요');
     updateStats();
-    animateFold(foldId, targetAngle);
   }
 
   function changeFoldAngle(foldId, angle, renderCards) {
@@ -438,7 +434,6 @@
     previewModel = null;
     ends = Number(options?.ends) || Date.now() + 60000;
     direction = 1;
-    targetAngle = 90;
     drag = null;
     orbitDrag = null;
     cameraOrbit = { ...viewport.DEFAULT_ORBIT };
@@ -454,7 +449,6 @@
     active = true;
     $('folding-screen').classList.remove('hide');
     setDirection(1);
-    setTargetAngle(90);
     $('fold-complete-btn').disabled = false;
     $('fold-complete-btn').textContent = '비행기 완성';
     updateStats();
@@ -483,15 +477,6 @@
     $('fold-dir-mountain').setAttribute('aria-pressed', String(next < 0));
   }
 
-  function setTargetAngle(next) {
-    if (locked || animating) return;
-    targetAngle = next;
-    $('fold-angle-90').classList.toggle('active', next === 90);
-    $('fold-angle-180').classList.toggle('active', next === 180);
-    $('fold-angle-90').setAttribute('aria-pressed', String(next === 90));
-    $('fold-angle-180').setAttribute('aria-pressed', String(next === 180));
-    setStatus(`다음 접기 목표각을 ${next}°로 설정했습니다`);
-  }
 
   function projectedArea(points) {
     return Math.abs((points || []).reduce((sum, point, index) => {
@@ -634,7 +619,7 @@
         event.preventDefault();
         const screen = localPoint(event);
         const basis = viewport.cameraBasisFromOrbit(
-          orbitDrag.azimuth + (screen[0] - orbitDrag.startScreen[0]) * ORBIT_SENSITIVITY,
+          orbitDrag.azimuth - (screen[0] - orbitDrag.startScreen[0]) * ORBIT_SENSITIVITY,
           orbitDrag.elevation - (screen[1] - orbitDrag.startScreen[1]) * ORBIT_SENSITIVITY
         );
         cameraOrbit = { azimuth: basis.azimuth, elevation: basis.elevation };
@@ -691,8 +676,6 @@
     });
     $('fold-dir-valley').addEventListener('click', () => setDirection(1));
     $('fold-dir-mountain').addEventListener('click', () => setDirection(-1));
-    $('fold-angle-90').addEventListener('click', () => setTargetAngle(90));
-    $('fold-angle-180').addEventListener('click', () => setTargetAngle(180));
     $('fold-flip-btn').addEventListener('click', () => {
       if (locked || animating) return;
       const next = api.flipPaper(model);

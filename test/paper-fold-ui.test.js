@@ -106,19 +106,20 @@ function makeHarness() {
   return { elements, stage: window.paperFoldingStage, raf, viewport };
 }
 
-test('completing during fold animation serializes the selected final angle, never preview zero', () => {
+test('drawing a crease records zero degrees and waits for explicit angle adjustment', () => {
   const { elements, stage } = makeHarness();
   let completion;
   stage.enter({ ends: Date.now() + 60_000, onComplete: payload => { completion = payload; } });
 
   elements['fold-paper-canvas'].dispatch('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 });
   elements['fold-paper-canvas'].dispatch('pointerup', { clientX: 100, clientY: 10, pointerId: 1 });
+  assert.match(elements['fold-status'].textContent, /각도.*조절/);
   elements['fold-complete-btn'].dispatch('click');
 
   const commands = JSON.parse(completion.commands);
   assert.equal(commands.length, 1);
-  assert.equal(commands[0].targetAngle, 90);
-  assert.equal(stage.getModel().commands[0].targetAngle, 90);
+  assert.equal(commands[0].targetAngle, 0);
+  assert.equal(stage.getModel().commands[0].targetAngle, 0);
 });
 
 test('canvas keyboard selection and H/V/D/Enter creases create folds without pointer input', () => {
@@ -140,8 +141,8 @@ test('canvas keyboard selection and H/V/D/Enter creases create folds without poi
     assert.equal(foldEvent.defaultPrevented, true, foldKey);
     assert.match(elements['fold-selection'].textContent, /면 \d+/);
     assert.equal(stage.getModel().commands.filter(command => command.type === 'fold').length, 1);
-    assert.equal(stage.getModel().commands[0].targetAngle, 90);
-    assert.match(elements['fold-status'].textContent, /90°/);
+    assert.equal(stage.getModel().commands[0].targetAngle, 0);
+    assert.match(elements['fold-status'].textContent, /각도.*조절/);
   }
 });
 
@@ -167,6 +168,8 @@ test('middle-button drag orbits around the paper without creating a fold', () =>
 
   assert.equal(down.defaultPrevented, true);
   assert.notDeepEqual(stage.getViewState(), initial);
+  assert.ok(stage.getViewState().azimuth > initial.azimuth,
+    'dragging left must make the paper appear to rotate clockwise');
   assert.equal(stage.getModel().commands.length, 0);
 
   canvas.dispatch('pointerdown', { button: 0, clientX: 10, clientY: 10, pointerId: 8 });

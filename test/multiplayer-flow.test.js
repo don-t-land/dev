@@ -74,12 +74,16 @@ test('waiting room actors fit inside one horizontal row on mobile and stay layer
   assert.match(flowCss, /\.room-player-info\s*\{[^}]*z-index:\s*3/s);
 });
 
-test('free-form folding workbench exposes selection, target angles, flip, history and accessible help', () => {
+test('free-form folding workbench exposes selection, post-crease angle history, flip and accessible help', () => {
   for (const id of [
     'folding-screen', 'fold-timer', 'fold-paper-canvas', 'fold-selection',
-    'fold-dir-valley', 'fold-dir-mountain', 'fold-angle-90', 'fold-angle-180',
-    'fold-flip-btn', 'fold-history', 'fold-undo-btn', 'fold-complete-btn'
+    'fold-dir-valley', 'fold-dir-mountain', 'fold-flip-btn', 'fold-history',
+    'fold-undo-btn', 'fold-complete-btn'
   ]) assert.equal(hasId(id), true, `missing #${id}`);
+  assert.equal(hasId('fold-angle-90'), false);
+  assert.equal(hasId('fold-angle-180'), false);
+  assert.match(html, /id="fold-timer"[^>]*>02:00<\/div>/);
+  assert.doesNotMatch(html, /다음 접기 목표각/);
   assert.match(html, /<canvas[^>]*id="fold-paper-canvas"[^>]*aria-label="[^"]+"/);
   assert.match(html, /보이는 면을 선택[^<]*접을 선/);
   assert.match(html, /왼쪽\/오른쪽[^<]*H[^<]*V[^<]*D[^<]*Enter/);
@@ -124,8 +128,7 @@ test('folding history edits angles, deletes atomically, flips paper and keeps se
 test('locked folding state disables every editing control including dynamic history controls', () => {
   assert.match(foldUi, /const EDIT_CONTROL_IDS = \[/);
   for (const id of [
-    'fold-dir-valley', 'fold-dir-mountain', 'fold-angle-90', 'fold-angle-180',
-    'fold-flip-btn', 'fold-undo-btn'
+    'fold-dir-valley', 'fold-dir-mountain', 'fold-flip-btn', 'fold-undo-btn'
   ]) assert.match(foldUi, new RegExp(`['"]${id}['"]`));
   assert.match(foldUi, /querySelectorAll\([^)]*data-fold-edit[^)]*\)[\s\S]*disabled = locked/);
   assert.match(foldUi, /canvas\.setAttribute\(['"]aria-disabled['"],\s*String\(locked\)\)/);
@@ -136,7 +139,9 @@ test('active room snapshots are idempotent and launch is server-authoritative', 
   assert.match(html, /case 'room':[\s\S]*isSameRoundPhase\(m\)/);
   assert.match(html, /m\.phase === 'launch'/);
   assert.match(html, /case 'phase':[\s\S]*m\.phase === 'launch'/);
-  assert.match(html, /m\.t === 'room' && !world\.children\.length[\s\S]*buildLaunchTowers\(\);[\s\S]*spawnSelf\(\)/);
+  assert.match(html, /m\.t === 'room' && !world\.children\.length[\s\S]*ensureLaunchTowers\(\);[\s\S]*spawnSelf\(\)/);
+  assert.match(html, /if \(sameRoundPhase\)[\s\S]*m\.phase === 'launch'[\s\S]*getLaunchLayoutKey[\s\S]*applyPhase\(m\)/);
+  assert.match(html, /if \(sameRoundPhase\)[\s\S]*m\.phase === 'playing'[\s\S]*game\.order = Array\.isArray\(m\.order\)/);
   assert.doesNotMatch(html, /setCraftFromFoldModel\(foldedModel\);\s*startLaunchSequence\(\)/s);
 });
 
@@ -149,6 +154,8 @@ test('remote and launch Three.js resources are explicitly disposed', () => {
 test('DIST and ARENA share READY and folding flow while retaining mode-specific play maps', () => {
   assert.match(html, /getWaitingSlots\(room, 4\)/);
   assert.match(html, /room-ready-btn'[\s\S]*resultsPending/);
+  assert.match(html, /모두 READY · START를 누르면 2분 종이접기가 시작됩니다/);
+  assert.doesNotMatch(html, /60초 종이접기/);
   assert.doesNotMatch(html, /room-ready-btn'[\s\S]{0,180}room\.mode !== 'ARENA'/);
   const waiting3d = fs.readFileSync(path.join(publicDir, 'waiting-room-3d.js'), 'utf8');
   assert.match(waiting3d, /index < 4/);
@@ -165,6 +172,7 @@ test('fold-derived aerodynamic profile drives the actual flight loop and HUD', (
   assert.match(html, /function applyCraftSnapshots\(crafts\)/);
   assert.match(html, /replayFoldCommands\(snapshot\?\.commands/);
   assert.match(html, /setCraftFromFoldModel\(model, snapshot\?\.aeroProfile/);
+  assert.match(html, /shouldReuseFoldedVisual\(/);
   assert.match(html, /DRAG \* aeroProfile\.dragScale/);
   assert.match(html, /aeroProfile\.stallSpeed/);
   assert.match(html, /aeroProfile\.stability/);
@@ -178,10 +186,28 @@ test('folded craft and server-timed rooftop launch sequence are connected to are
   assert.match(html, /function setFoldedCraftVisual\(owner, baseVisual, model, tint/);
   assert.match(html, /player\.remote\.baseVisual/);
   assert.match(html, /function buildLaunchTowers\(\)/);
+  assert.match(html, /function ensureLaunchTowers\(\)/);
+  assert.match(html, /launchState\.towerGroup/);
+  assert.match(html, /const towerStart = launchSpawnPoint\(index, count, 'start'\)/);
   assert.match(html, /function startLaunchSequence\(phase\)/);
   assert.match(html, /function updateLaunch\(now\)/);
   assert.match(html, /game\.phase = 'launch'/);
   assert.match(html, /applyCraftSnapshots\(m\.crafts\);\s*startLaunchSequence\(m\)/s);
+  assert.match(html, /game\.order = Array\.isArray\(m\.order\)[^;]+;\s*ensureLaunchTowers\(\)/s);
+});
+
+test('rooftop launch uses each player folded model from the first frame and removes only the legs during jump', () => {
+  assert.match(html, /<script src="\.\/launch-transition\.js"><\/script>/);
+  assert.match(html, /const snapshots = new Map\(\(phase\?\.crafts/);
+  assert.match(html, /replayFoldCommands\(snapshot\?\.commands/);
+  assert.match(html, /makeFoldedCraftVisual\(model, tint\)/);
+  assert.match(html, /mascot\.remove\(defaultBody\)/);
+  assert.match(html, /mascot\.add\(body\)/);
+  assert.match(html, /getLaunchPose\(progress\)/);
+  assert.match(html, /body\.rotation\.x = pose\.bodyPitch/);
+  assert.match(html, /setLaunchLegFade\(leftLeg, pose\.legFade\)/);
+  assert.match(html, /setLaunchLegFade\(rightLeg, pose\.legFade\)/);
+  assert.doesNotMatch(html, /if \(progress >= \.88\) craft\.visible = true/);
 });
 
 test('Rapier fixed-step physics is wired to folded colliders, forces, and map collisions', () => {

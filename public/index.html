@@ -571,7 +571,7 @@
     <div><div class="fold-kicker">FREEFORM FOLD WORKBENCH</div><h2 id="fold-title">나만의 종이비행기 작업대</h2></div>
     <div class="fold-round-meta">
       <span id="fold-side" class="fold-side-badge">앞면</span>
-      <div id="fold-timer" class="fold-timer" aria-label="남은 시간">01:00</div>
+      <div id="fold-timer" class="fold-timer" aria-label="남은 시간">02:00</div>
     </div>
   </header>
   <main class="fold-workspace">
@@ -590,13 +590,6 @@
         <div class="fold-direction">
           <button id="fold-dir-valley" class="fold-btn active" type="button" aria-label="골접기 방향 선택">골접기 ↗</button>
           <button id="fold-dir-mountain" class="fold-btn" type="button" aria-label="산접기 방향 선택">산접기 ↙</button>
-        </div>
-      </section>
-      <section class="fold-tool-section" aria-labelledby="fold-target-label">
-        <div id="fold-target-label" class="fold-section-heading">다음 접기 목표각</div>
-        <div class="fold-target-angles">
-          <button id="fold-angle-90" class="fold-btn active" type="button" aria-label="다음 접기 목표각 90도">90° <small>패널</small></button>
-          <button id="fold-angle-180" class="fold-btn" type="button" aria-label="다음 접기 목표각 180도">180° <small>완전 접기</small></button>
         </div>
       </section>
       <button id="fold-flip-btn" class="fold-btn fold-flip" type="button" aria-label="종이를 앞뒤로 뒤집기">종이 앞/뒤 뒤집기</button>
@@ -630,6 +623,7 @@
 <script src="./paper-aero-profile.js"></script>
 <script src="./paper-fold-viewport.js"></script>
 <script src="./paper-fold-ui.js"></script>
+<script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./waiting-room-3d.js"></script>
@@ -637,6 +631,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
+const { getLaunchPose, localDeadline, shouldReuseFoldedVisual, getLaunchLayoutKey } = window.launchTransition;
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
@@ -821,6 +816,15 @@ function handle(m) {
             (m.players || []).filter(player => player.foldDone).length,
             (m.order || []).length || (m.players || []).length
           );
+        } else if (m.phase === 'launch') {
+          const nextOrder = Array.isArray(m.order) ? m.order : game.order;
+          const nextLayoutKey = getLaunchLayoutKey(m.mode, m.seed, nextOrder);
+          if (launchState.towerLayoutKey !== nextLayoutKey) {
+            game.order = nextOrder;
+            applyPhase(m);
+          }
+        } else if (m.phase === 'playing') {
+          game.order = Array.isArray(m.order) ? m.order : game.order;
         }
         refreshBoard();
         break;
@@ -1024,7 +1028,7 @@ function enterRoomLobby(room, resultsPending = false) {
       ? '결과 확인 완료 · 다른 참가자가 대기실로 돌아오기를 기다리는 중입니다'
       : '진행 중이던 라운드의 결과 확인이 끝나기를 기다리는 중입니다';
   } else if (startAllowed) {
-    $('room-status').textContent = '모두 READY · START를 누르면 60초 종이접기가 시작됩니다';
+    $('room-status').textContent = '모두 READY · START를 누르면 2분 종이접기가 시작됩니다';
   } else if (isHost) {
     $('room-status').textContent = '모든 플레이어가 READY가 되면 시작할 수 있습니다';
   } else {
@@ -1346,7 +1350,7 @@ void import('./flight-physics-rapier.mjs')
 
 
 function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {
-  if (!model?.commands?.length || !Array.isArray(model.faces)) return null;
+  if (!Array.isArray(model?.faces)) return null;
   const visual = new THREE.Group();
   visual.name = 'foldedCraftVisual';
   const paperScale = 1.35;
@@ -1390,8 +1394,15 @@ function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {
 
 function setFoldedCraftVisual(owner, baseVisual, model, tint, commandKey = '[]') {
   const cacheKey = typeof commandKey === 'string' ? commandKey : JSON.stringify(commandKey || []);
-  if (owner.userData.foldCommandKey === cacheKey) return;
-  disposeObject3D(owner.getObjectByName('foldedCraftVisual'));
+  const existingVisual = owner.getObjectByName('foldedCraftVisual');
+  const expectsVisual = Array.isArray(model?.faces);
+  if (shouldReuseFoldedVisual(
+    owner.userData.foldCommandKey,
+    Boolean(existingVisual),
+    cacheKey,
+    expectsVisual
+  )) return;
+  disposeObject3D(existingVisual);
   const visual = makeFoldedCraftVisual(model, tint);
   baseVisual.visible = !visual;
   if (visual) owner.add(visual);
@@ -1501,7 +1512,10 @@ const unitRock = new THREE.IcosahedronGeometry(1, 0);
 const dummy = new THREE.Object3D();
 
 function clearWorld() {
-  if (typeof launchState !== 'undefined') clearLaunchActors();
+  if (typeof launchState !== 'undefined') {
+    clearLaunchActors();
+    clearLaunchTowers();
+  }
   world.traverse(o => {
     if (o.isMesh && o.geometry !== unitBox && o.geometry !== unitCone && o.geometry !== unitRock)
       o.geometry.dispose?.();
@@ -1705,7 +1719,10 @@ function buildArena(seed) {
 }
 
 /* ---- 공통 출발 연출: 모드별 스폰 지점의 옥상에서 달려 점프 ---- */
-const launchState = { active: false, startedAt: 0, duration: 4400, actors: [] };
+const launchState = {
+  active: false, startedAt: 0, duration: 4400, actors: [],
+  towerGroup: null, towerLayoutKey: ''
+};
 
 function arenaSpawnPoint(index, count, radius = 130) {
   const angle = (index / Math.max(1, count)) * Math.PI * 2;
@@ -1722,9 +1739,12 @@ function launchSpawnPoint(index, count, stage = 'end') {
 }
 
 function buildLaunchTowers() {
+  clearLaunchTowers();
   const arena = game.mode === 'ARENA';
   const count = Math.max(1, game.order.length);
   const rng = mulberry32((game.seed ^ 0x51f15e) >>> 0);
+  const towerGroup = new THREE.Group();
+  towerGroup.name = 'launchTowerGroup';
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2;
     const height = arena ? 128 : 148;
@@ -1757,14 +1777,27 @@ function buildLaunchTowers() {
       stripe.position.y = height * (floor + 1) / 8;
       tower.add(stripe);
     }
-    if (arena) {
-      tower.position.set(Math.cos(angle) * 146, 0, Math.sin(angle) * 146);
-      tower.rotation.y = -angle;
-    } else {
-      tower.position.set((index - (count - 1) / 2) * 10, 0, 16);
-    }
-    world.add(tower);
+    const towerStart = launchSpawnPoint(index, count, 'start');
+    tower.position.set(towerStart.x, 0, towerStart.z);
+    if (arena) tower.rotation.y = -angle;
+    towerGroup.add(tower);
   }
+  world.add(towerGroup);
+  launchState.towerGroup = towerGroup;
+  launchState.towerLayoutKey = getLaunchLayoutKey(game.mode, game.seed, game.order);
+}
+
+function clearLaunchTowers() {
+  if (!launchState.towerGroup) return;
+  disposeObject3D(launchState.towerGroup);
+  launchState.towerGroup = null;
+  launchState.towerLayoutKey = '';
+}
+
+function ensureLaunchTowers() {
+  const layoutKey = getLaunchLayoutKey(game.mode, game.seed, game.order);
+  if (launchState.towerGroup?.parent === world && launchState.towerLayoutKey === layoutKey) return;
+  buildLaunchTowers();
 }
 
 function clearLaunchActors() {
@@ -1773,12 +1806,38 @@ function clearLaunchActors() {
   launchState.active = false;
 }
 
+function setLaunchLegFade(leg, fade) {
+  const remaining = Math.max(0, 1 - fade);
+  leg.scale.setScalar(Math.max(.001, remaining));
+  leg.visible = remaining > .01;
+  leg.traverse(part => {
+    const materials = Array.isArray(part.material) ? part.material : [part.material];
+    materials.filter(Boolean).forEach(material => {
+      material.transparent = fade > 0;
+      material.opacity = remaining;
+      material.depthWrite = remaining > .15;
+    });
+  });
+}
+
 function startLaunchSequence(phase) {
   clearLaunchActors();
   const count = Math.max(1, game.order.length);
   const localIndex = Math.max(0, game.order.indexOf(net.id));
+  const snapshots = new Map((phase?.crafts || []).filter(item => item?.id).map(item => [item.id, item]));
   game.order.forEach((id, index) => {
+    const snapshot = snapshots.get(id);
+    const model = window.paperFoldModel.replayFoldCommands(snapshot?.commands ?? '[]') || defaultPaperModel;
+    const tint = id === net.id ? new THREE.Color(0xfdfcf7) : idColor(id);
     const mascot = makeStandingPlaneMascot();
+    const { body: defaultBody } = mascot.userData;
+    mascot.remove(defaultBody);
+    disposeObject3D(defaultBody);
+    const body = makeFoldedCraftVisual(model, tint) || makePlaneMesh(tint);
+    body.name = 'launchFoldedBody';
+    body.rotation.x = Math.PI / 2;
+    mascot.add(body);
+    mascot.userData.body = body;
     mascot.scale.setScalar(.92);
     const start = launchSpawnPoint(index, count, 'start');
     const end = launchSpawnPoint(index, count, 'end');
@@ -1786,10 +1845,10 @@ function startLaunchSequence(phase) {
     mascot.position.copy(start).add(new THREE.Vector3(0, 3.05, 0));
     mascot.lookAt(mascot.position.clone().add(direction));
     world.add(mascot);
-    launchState.actors.push({ id, group: mascot, mascot, start, end, direction });
+    launchState.actors.push({ id, group: mascot, mascot, body, start, end, direction });
   });
   launchState.duration = Math.max(1, Number(phase?.duration) || 4400);
-  const elapsed = Math.max(0, launchState.duration - Math.max(0, Number(phase?.ends) - Date.now()));
+  const elapsed = Math.max(0, launchState.duration - Math.max(0, game.ends - Date.now()));
   launchState.startedAt = performance.now() - elapsed;
   launchState.active = true;
   game.phase = 'launch';
@@ -1804,6 +1863,7 @@ function startLaunchSequence(phase) {
 function updateLaunch(now) {
   if (!launchState.active) return;
   const progress = THREE.MathUtils.clamp((now - launchState.startedAt) / launchState.duration, 0, 1);
+  const pose = getLaunchPose(progress);
   const runProgress = THREE.MathUtils.smoothstep(progress, .08, .67);
   const jumpProgress = THREE.MathUtils.smoothstep(progress, .65, .92);
   const stride = Math.sin(progress * Math.PI * 20);
@@ -1823,25 +1883,25 @@ function updateLaunch(now) {
     const right = rightLeg.userData;
     const bounce = progress < .67 ? Math.abs(stride) * .18 : 0;
     actor.mascot.position.copy(position).add(new THREE.Vector3(0, 3.05 + bounce, 0));
-    body.rotation.x = progress > .67 ? -.22 * jumpProgress : .04 * stride;
+    body.rotation.x = pose.bodyPitch + (progress < .65 ? .04 * stride : 0);
     left.hip.rotation.x = stride * .58;
     right.hip.rotation.x = -stride * .58;
     left.knee.rotation.x = .18 + Math.max(0, -stride) * .65;
     right.knee.rotation.x = .18 + Math.max(0, stride) * .65;
     left.shoe.rotation.x = -.08 - Math.max(0, -stride) * .18;
     right.shoe.rotation.x = -.08 - Math.max(0, stride) * .18;
-    const fade = THREE.MathUtils.smoothstep(progress, .86, .96);
-    actor.mascot.scale.setScalar(.92 * (1 - fade * .7));
-    actor.mascot.visible = progress < .96;
+    setLaunchLegFade(leftLeg, pose.legFade);
+    setLaunchLegFade(rightLeg, pose.legFade);
+    actor.mascot.visible = !pose.showFlightCraft;
     if (index === localIndex) craft.position.copy(position);
   });
 
   if (progress < .18) showCenter(3, '준비', null);
   else if (progress < .39) showCenter(2, '달릴 준비', null);
   else if (progress < .66) showCenter(1, '달려!', null);
-  else if (progress < .92) showCenter(null, '점프!', '접은 종이비행기를 펼쳐 날아오릅니다');
+  else if (progress < .92) showCenter(null, '점프!', '다리를 접고 만든 종이 모양 그대로 날아오릅니다');
 
-  if (progress >= .88) craft.visible = true;
+  if (pose.showFlightCraft) craft.visible = true;
   if (progress >= 1) {
     launchState.active = false;
     launchState.actors.forEach(actor => { actor.mascot.visible = false; });
@@ -1928,7 +1988,7 @@ function applyPhase(m) {
     game.phase = 'countdown';
     net.leaderboard = [];
     game.seed = m.seed;
-    game.ends = m.ends;
+    game.ends = localDeadline(m.ends, m.serverNow, Date.now(), 4_000);
     game.order = m.order || [];
     hideResults();
 
@@ -1948,7 +2008,7 @@ function applyPhase(m) {
     game.frozen = true;
     net.leaderboard = [];
     game.seed = Number(m.seed) || 0;
-    game.ends = Number(m.ends) || Date.now() + 60000;
+    game.ends = localDeadline(m.ends, m.serverNow, Date.now(), 120_000);
     game.order = Array.isArray(m.order) ? m.order : [];
     $('results').classList.add('hide');
     (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
@@ -1984,13 +2044,12 @@ function applyPhase(m) {
   if (m.phase === 'launch') {
     window.paperFoldingStage?.leave();
     game.seed = Number(m.seed) || game.seed;
-    game.ends = Number(m.ends) || Date.now() + 4400;
+    game.ends = localDeadline(m.ends, m.serverNow, Date.now(), 4_400);
+    const needsWorld = m.t === 'room' && !world.children.length;
+    if (needsWorld) (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
     game.order = Array.isArray(m.order) ? m.order : game.order;
-    if (m.t === 'room' && !world.children.length) {
-      (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
-      buildLaunchTowers();
-      spawnSelf();
-    }
+    ensureLaunchTowers();
+    if (needsWorld) spawnSelf();
     applyCraftSnapshots(m.crafts);
     startLaunchSequence(m);
     return;
@@ -2001,7 +2060,12 @@ function applyPhase(m) {
     window.paperFoldingStage?.leave();
     game.seed = Number(m.seed) || game.seed;
     game.order = Array.isArray(m.order) ? m.order : game.order;
-    game.ends = m.ends;
+    game.ends = localDeadline(
+      m.ends,
+      m.serverNow,
+      Date.now(),
+      (game.mode === 'ARENA' ? 180 : 150) * 1000
+    );
     applyCraftSnapshots(m.crafts);
     game.frozen = false;
     const role = m.t === 'room'

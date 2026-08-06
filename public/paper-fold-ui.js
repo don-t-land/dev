@@ -210,7 +210,7 @@
 
   function enter(options) {
     if (!api) throw new Error('paperFoldModel is not loaded');
-    timed = Number.isFinite(Number(options?.ends));
+    timed = options?.ends !== null && options?.ends !== undefined && Number.isFinite(Number(options.ends));
     ends = timed ? Number(options.ends) : 0;
     const initial = typeof options?.initialCommands === 'string' && options.initialCommands !== '[]'
       ? api.replayFoldCommands(options.initialCommands)

@@ -15,6 +15,7 @@
   let completionSent = false;
   let roomProgress = null;
   let previousProfile = null;
+  let onModelChange = null;
 
   const $ = id => document.getElementById(id);
 
@@ -124,6 +125,10 @@
     ctx.restore();
   }
 
+  function emitModelChange(value) {
+    if (typeof onModelChange === 'function') onModelChange(value);
+  }
+
   function renderStats() {
     const host = $('fold-stats');
     const aero = root.PaperAeroProfile;
@@ -205,6 +210,7 @@
     $('fold-preset-btn').disabled = false;
     $('fold-complete-btn').textContent = '비행기 완성';
     updateStats();
+    emitModelChange(model);
     if (!frame) frame = requestAnimationFrame(render);
   }
 
@@ -214,6 +220,7 @@
     $('folding-screen')?.classList.add('hide');
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
+    emitModelChange(null);
   }
 
   function setDirection(next) {
@@ -248,6 +255,7 @@
       }
       model = next;
       updateStats();
+      emitModelChange(model);
     });
     canvas.addEventListener('pointercancel', () => { drag = null; });
     $('fold-dir-valley').addEventListener('click', () => setDirection(1));
@@ -262,11 +270,13 @@
       model = preset;
       drag = null;
       updateStats();
+      emitModelChange(model);
     });
     $('fold-undo-btn').addEventListener('click', () => {
       if (locked) return;
       model = api.undoFold(model);
       updateStats();
+      emitModelChange(model);
     });
     $('fold-complete-btn').addEventListener('click', () => lock('완성 · 다른 플레이어의 접기가 끝나기를 기다리는 중'));
     root.addEventListener('resize', fitCanvas);
@@ -287,6 +297,9 @@
         total: Math.max(0, Number(total) || 0)
       };
       if (model) updateStats();
+    },
+    setOnModelChange(fn) {
+      onModelChange = typeof fn === 'function' ? fn : null;
     }
   };
 })(window);

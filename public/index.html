@@ -2653,8 +2653,8 @@ function physics(dt) {
   /* 경계 */
   if (game.mode === 'DIST') {
     const half = distanceWidthNoise
-      ? DIST_HALF * window.mapGen.widthScaleAt(craft.position.z, distanceWidthNoise) - 6
-      : DIST_HALF - 6;
+      ? DIST_HALF * window.mapGen.widthScaleAt(craft.position.z, distanceWidthNoise) - 16
+      : DIST_HALF - 16;
     const over = Math.abs(craft.position.x) - half;
     if (over > 0) {
       craft.position.x = Math.sign(craft.position.x) * half;

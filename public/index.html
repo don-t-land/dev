@@ -1688,6 +1688,7 @@ scene.add(world);
 
 let spires = [], rocks = [], thermals = [], ringsArr = [], clouds = [];
 let spireMesh = null, rockMesh = null, wallMesh = null;
+let distanceWidthNoise = null;
 
 const thermalMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide,
@@ -1730,6 +1731,7 @@ function clearWorld() {
   world.clear();
   spires = []; rocks = []; thermals = []; ringsArr = []; clouds = [];
   spireMesh = rockMesh = wallMesh = null;
+  distanceWidthNoise = null;
   // 바이옴 팔레트 기본값 복원 — buildDistance/buildArena는 이 직후 자신의 팔레트를
   // 다시 적용하므로(동기 호출) 로비 경로(enterHome/enterLobby/enterRoomLobby)에서만
   // 이 기본값이 실제로 유지된다.
@@ -1782,6 +1784,7 @@ function buildDistance(seed) {
   const rng = mulberry32(seed);
   const { BIOMES: mgBiomes } = window.mapGen;
   const layout = window.mapGen.buildDistanceLayout(seed);
+  distanceWidthNoise = window.mapGen.makeNoise1d((seed ^ 0x2f6e1a3d) >>> 0);
   const tmpColor = new THREE.Color();
 
   // 진입 순간 팔레트를 즉시 기준 바이옴으로 맞춰 ARENA 테마가 한 프레임 잔존하는 것을 방지.
@@ -2649,9 +2652,12 @@ function physics(dt) {
 
   /* 경계 */
   if (game.mode === 'DIST') {
-    const over = Math.abs(craft.position.x) - (DIST_HALF - 6);
+    const half = distanceWidthNoise
+      ? DIST_HALF * window.mapGen.widthScaleAt(craft.position.z, distanceWidthNoise) - 6
+      : DIST_HALF - 6;
+    const over = Math.abs(craft.position.x) - half;
     if (over > 0) {
-      craft.position.x = Math.sign(craft.position.x) * (DIST_HALF - 6);
+      craft.position.x = Math.sign(craft.position.x) * half;
       me.speed *= Math.pow(0.55, dt);
       me.yaw += -Math.sign(craft.position.x) * 1.2 * dt;
       if (rapierFlight) {
@@ -2791,7 +2797,9 @@ renderer.setAnimationLoop(() => {
   if (game.mode === 'DIST') {
     ground.position.set(0, 0, followPos.z);
     grid.position.set(0, 0.05, Math.round(followPos.z / 40) * 40);
-    updateDistanceBiomeVisuals(craft.position.z);
+    if (game.phase === 'playing' || game.phase === 'launch' || game.phase === 'launch_done') {
+      updateDistanceBiomeVisuals(craft.position.z);
+    }
   } else {
     ground.position.set(0, 0, 0);
     grid.position.set(0, 0.05, 0);

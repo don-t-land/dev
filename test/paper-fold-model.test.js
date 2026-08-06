@@ -200,6 +200,12 @@ test('replayFoldCommands reconstructs the identical model and rejects tampered c
   }))), null);
 });
 
+test('replayFoldCommands rejects coordinates far outside the sheet', () => {
+  // Sheet coordinates live in [-1,1]; tolerate edge dragging but reject wildly
+  // out-of-range wire input (e.g. 1e300) before it reaches the geometry code.
+  assert.equal(replayFoldCommands([{ start: [1e300, 0], end: [1, 0], angle: Math.PI / 2 }]), null);
+});
+
 test('small drags, invalid angles, and sliver polygons are rejected atomically', () => {
   const model = createPaperModel();
 

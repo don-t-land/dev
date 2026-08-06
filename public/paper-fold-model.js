@@ -453,6 +453,10 @@
     for (const command of commands) {
       if (!command || !isPoint(command.start) || !isPoint(command.end)
           || !isValidAngle(command.angle)) return null;
+      // Sheet coordinates live in [-1,1]; tolerate edge dragging but reject
+      // wildly out-of-range wire input (e.g. 1e300) before it reaches applyFold.
+      if (Math.abs(command.start[0]) > 4 || Math.abs(command.start[1]) > 4
+          || Math.abs(command.end[0]) > 4 || Math.abs(command.end[1]) > 4) return null;
       const next = applyFold(model, command.start, command.end, command.angle);
       if (next === model) return null;
       model = next;

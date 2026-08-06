@@ -51,7 +51,7 @@ test('room entry stays translucent over the home scene', () => {
   assert.match(flowCss, /backdrop-filter:\s*blur\(5px\)/);
 });
 
-test('waiting room actors fit inside mobile slot cells and stay layered in front of slot boxes', () => {
+test('waiting room actors fit inside vertically stacked mobile slots and stay layered in front', () => {
   const waiting3d = fs.readFileSync(path.join(publicDir, 'waiting-room-3d.js'), 'utf8');
   assert.match(html, /data-slot-index=/);
   assert.match(waiting3d, /index < 4/);
@@ -64,6 +64,8 @@ test('waiting room actors fit inside mobile slot cells and stay layered in front
   assert.match(waiting3d, /Math\.min\(maxScale, widthScale, heightScale\)/);
   assert.match(waiting3d, /block\.bottom - PLAYER_INFO_CLEARANCE_PX/);
   assert.doesNotMatch(waiting3d, /block\.top - ACTOR_BLOCK_GAP_PX/);
+  assert.match(flowCss, /@media \(max-width:760px\)[\s\S]*?#room-player-list\s*\{[^}]*grid-template-columns:\s*1fr;[^}]*grid-template-rows:\s*repeat\(4,1fr\)/);
+  assert.doesNotMatch(flowCss, /@media \(max-width:760px\)[\s\S]*?#room-player-list\s*\{[^}]*grid-template-columns:\s*repeat\(2,1fr\)/);
   assert.match(flowCss, /#waiting-room-canvas\s*\{[^}]*z-index:\s*2/s);
   assert.match(flowCss, /#room-player-list\s*\{[^}]*z-index:\s*auto/s);
   assert.match(flowCss, /\.room-player-slot::before\s*\{[^}]*z-index:\s*1/s);

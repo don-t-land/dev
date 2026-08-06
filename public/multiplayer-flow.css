@@ -196,7 +196,7 @@
   .waiting-room-code { padding:8px 9px 8px 12px; }
   #room-code-display { font-size:15px !important; }
   #copy-code-btn { display:none; }
-  #room-player-list { grid-template-columns:1fr; grid-template-rows:repeat(4,1fr); inset:0; gap:8px; }
+  #room-player-list { grid-template-columns:repeat(4,1fr); grid-template-rows:1fr; inset:auto 0 8px; height:160px; gap:8px; }
   .room-player-slot { height:auto; }
   .waiting-room-bottom { grid-template-columns:1fr; }
   .waiting-room-actions { display:grid; grid-template-columns:1fr 1fr 1fr; }

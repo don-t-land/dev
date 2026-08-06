@@ -51,7 +51,7 @@ test('room entry stays translucent over the home scene', () => {
   assert.match(flowCss, /backdrop-filter:\s*blur\(5px\)/);
 });
 
-test('waiting room actors fit inside vertically stacked mobile slots and stay layered in front', () => {
+test('waiting room actors fit inside one horizontal row on mobile and stay layered in front', () => {
   const waiting3d = fs.readFileSync(path.join(publicDir, 'waiting-room-3d.js'), 'utf8');
   assert.match(html, /data-slot-index=/);
   assert.match(waiting3d, /index < 4/);
@@ -60,12 +60,14 @@ test('waiting room actors fit inside vertically stacked mobile slots and stay la
   assert.match(waiting3d, /new THREE\.Box3\(\)\.setFromObject\(mascot\)/);
   assert.match(waiting3d, /const SLOT_EDGE_PADDING_PX = 10/);
   assert.match(waiting3d, /const PLAYER_INFO_CLEARANCE_PX = 56/);
+  assert.match(waiting3d, /const MOBILE_PLAYER_INFO_CLEARANCE_PX = 72/);
   assert.match(waiting3d, /const MOBILE_MAX_ACTOR_SCALE = \.76/);
   assert.match(waiting3d, /Math\.min\(maxScale, widthScale, heightScale\)/);
-  assert.match(waiting3d, /block\.bottom - PLAYER_INFO_CLEARANCE_PX/);
+  assert.match(waiting3d, /const playerInfoClearance = mobile \? MOBILE_PLAYER_INFO_CLEARANCE_PX : PLAYER_INFO_CLEARANCE_PX/);
+  assert.match(waiting3d, /block\.bottom - playerInfoClearance/);
   assert.doesNotMatch(waiting3d, /block\.top - ACTOR_BLOCK_GAP_PX/);
-  assert.match(flowCss, /@media \(max-width:760px\)[\s\S]*?#room-player-list\s*\{[^}]*grid-template-columns:\s*1fr;[^}]*grid-template-rows:\s*repeat\(4,1fr\)/);
-  assert.doesNotMatch(flowCss, /@media \(max-width:760px\)[\s\S]*?#room-player-list\s*\{[^}]*grid-template-columns:\s*repeat\(2,1fr\)/);
+  assert.match(flowCss, /@media \(max-width:760px\)[\s\S]*?#room-player-list\s*\{[^}]*grid-template-columns:\s*repeat\(4,1fr\);[^}]*grid-template-rows:\s*1fr;[^}]*inset:\s*auto 0 8px;[^}]*height:\s*160px/);
+  assert.doesNotMatch(flowCss, /@media \(max-width:760px\)[\s\S]*?#room-player-list\s*\{[^}]*grid-template-columns:\s*(?:repeat\(2,1fr\)|1fr)/);
   assert.match(flowCss, /#waiting-room-canvas\s*\{[^}]*z-index:\s*2/s);
   assert.match(flowCss, /#room-player-list\s*\{[^}]*z-index:\s*auto/s);
   assert.match(flowCss, /\.room-player-slot::before\s*\{[^}]*z-index:\s*1/s);

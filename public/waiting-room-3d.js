@@ -3,6 +3,7 @@ import { makeStandingPlaneMascot } from './home-plane-3d.js';
 
 const SLOT_EDGE_PADDING_PX = 10;
 const PLAYER_INFO_CLEARANCE_PX = 56;
+const MOBILE_PLAYER_INFO_CLEARANCE_PX = 72;
 const MOBILE_MAX_ACTOR_SCALE = .76;
 const DESKTOP_MAX_ACTOR_SCALE = .94;
 const actors = [];
@@ -69,7 +70,8 @@ function alignActorsToSlots() {
     if (!actor) return;
     const block = slot.getBoundingClientRect();
     const centerX = block.left + block.width / 2;
-    const feetLineY = block.bottom - PLAYER_INFO_CLEARANCE_PX;
+    const playerInfoClearance = mobile ? MOBILE_PLAYER_INFO_CLEARANCE_PX : PLAYER_INFO_CLEARANCE_PX;
+    const feetLineY = block.bottom - playerInfoClearance;
     const fitTopY = mobile ? block.top + SLOT_EDGE_PADDING_PX : canvasBlock.top + SLOT_EDGE_PADDING_PX;
     const left = screenToWorldOnPlane(block.left + SLOT_EDGE_PADDING_PX, feetLineY);
     const right = screenToWorldOnPlane(block.right - SLOT_EDGE_PADDING_PX, feetLineY);

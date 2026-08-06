@@ -1450,16 +1450,21 @@ function syncRapierFromCraft() {
   });
 }
 
-void import('./flight-physics-rapier.mjs')
-  .then(async api => {
-    rapierApi = api;
-    rapierFlight = await api.createPaperFlightPhysics();
-    rapierFlight.configure(aeroProfile, api.makeColliderVertices(activePaperModel));
-    syncRapierMap();
-    syncRapierFromCraft();
-    updateAeroHud();
-  })
-  .catch(error => console.warn('Rapier 물리 초기화 실패 — 기존 물리로 전환합니다.', error));
+/* Rapier 물리는 조작 문제로 비활성화 — 기존 물리(updateAttitude 기반)를 사용합니다.
+   다시 켜려면 USE_RAPIER_PHYSICS를 true로 변경하세요. */
+const USE_RAPIER_PHYSICS = false;
+if (USE_RAPIER_PHYSICS) {
+  void import('./flight-physics-rapier.mjs')
+    .then(async api => {
+      rapierApi = api;
+      rapierFlight = await api.createPaperFlightPhysics();
+      rapierFlight.configure(aeroProfile, api.makeColliderVertices(activePaperModel));
+      syncRapierMap();
+      syncRapierFromCraft();
+      updateAeroHud();
+    })
+    .catch(error => console.warn('Rapier 물리 초기화 실패 — 기존 물리로 전환합니다.', error));
+}
 
 
 function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {

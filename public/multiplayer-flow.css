@@ -173,3 +173,10 @@
   #fold-status { order:-1; }
   .fold-controls > .fold-btn.finish { min-height:50px; }
 }
+
+#respawn-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(6,9,26,.62); backdrop-filter:blur(3px); z-index:60; pointer-events:auto; }
+#respawn-overlay.hide { display:none; }
+.respawn-card { background:rgba(13,19,48,.94); border:1px solid rgba(134,220,245,.28); border-radius:20px; padding:28px 34px; text-align:center; display:flex; flex-direction:column; gap:14px; min-width:300px; }
+.respawn-card h2 { font-size:clamp(24px,3vw,36px); letter-spacing:-.04em; }
+.respawn-card p { color:#cfe6f4; font-size:14px; }
+.respawn-card .button-row { display:flex; gap:10px; justify-content:center; }

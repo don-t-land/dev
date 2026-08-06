@@ -154,7 +154,9 @@
 
   function updateStats() {
     const count = model?.commands?.length || 0;
-    const peers = roomProgress ? ` · 완료 ${roomProgress.done}/${roomProgress.total}명` : '';
+    const peers = roomProgress
+      ? (timed ? ` · 완료 ${roomProgress.done}/${roomProgress.total}명` : ` · 방 인원 ${roomProgress.total}명 · 전투 진행 중`)
+      : '';
     $('fold-status').textContent = locked
       ? (timed
         ? `완성 · ${count}번 접음 · 다른 플레이어를 기다리는 중${peers}`

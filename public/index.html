@@ -548,6 +548,19 @@
       </div>
     </div>
 
+    <div id="respawn-overlay" class="hide" role="dialog" aria-labelledby="respawn-title">
+      <div class="respawn-card">
+        <div class="fold-kicker">SHOT DOWN</div>
+        <h2 id="respawn-title">격추되었습니다</h2>
+        <p id="respawn-detail"></p>
+        <div class="button-row">
+          <button id="respawn-now-btn" class="action-btn primary">바로 부활</button>
+          <button id="respawn-refold-btn" class="action-btn">다시 접기</button>
+        </div>
+        <div id="respawn-status" role="status"></div>
+      </div>
+    </div>
+
     <div id="results" class="hide" role="dialog" aria-modal="true" aria-labelledby="r-title">
       <div class="box">
         <h2 id="r-title" tabindex="-1">라운드 결과</h2>
@@ -794,6 +807,11 @@ function handle(m) {
         const alreadyInWorld = Number(m.seed) === Number(game.seed) &&
           (game.phase === 'playing' || game.phase === 'folding');
         if (!alreadyInWorld) enterLiveArena(m);
+        if (game.phase === 'folding') {
+          const totalPlayers = (m.players || []).length;
+          const aliveCount = (m.players || []).filter(player => player.alive).length;
+          window.paperFoldingStage?.setRoomProgress(aliveCount, totalPlayers);
+        }
         refreshBoard();
         break;
       }
@@ -853,6 +871,7 @@ function handle(m) {
     case 'spawned': {
       if (m.id === net.id) {
         window.paperFoldingStage?.leave();
+        $('respawn-overlay').classList.add('hide');
         enterGame();
         game.phase = 'playing';
         const angle = Number(m.angle) || 0;
@@ -862,7 +881,7 @@ function handle(m) {
         me.pitch = -0.05; me.roll = 0; me.speed = 22;
         freeLook = { yaw: 0, pitch: 0 };
         me.alive = true;
-        me.dist = 0; me.surv = 0;
+        me.dist = 0; me.surv = 0; me.lifeStartedAt = Date.now();
         me.ammo = 3; me.ammoT = 0;
         game.frozen = false;
         craft.visible = true;
@@ -900,7 +919,7 @@ function handle(m) {
       net.leaderboard = Array.isArray(m.rows) ? m.rows : [];
       for (const row of net.leaderboard) {
         const player = net.players.get(row.id);
-        if (player) { player.score = row.score; player.alive = row.alive; }
+        if (player) { player.score = row.score; player.alive = row.alive; player.kills = row.kills; }
       }
       refreshBoard();
       break;
@@ -929,8 +948,11 @@ function handle(m) {
 
     case 'crashed': {
       if (m.id === net.id) {
-        if (me.alive) dieLocal(false);
-        if (m.by) showKill(`${m.by} 님에게 격추되었습니다`);
+        if (me.alive) {
+          dieLocal(false);
+          if (net.room?.phase === 'live') showRespawnOverlay(m.by);
+        }
+        if (net.room?.phase !== 'live' && m.by) showKill(`${m.by} 님에게 격추되었습니다`);
       } else {
         const player = net.players.get(m.id);
         if (player) { player.alive = false; player.remote.group.visible = false; }
@@ -947,7 +969,12 @@ function handle(m) {
       break;
 
     case 'error':
-      showNetworkError(m.message || '요청을 처리할 수 없습니다');
+      if (m.code === 'RESPAWN_COOLDOWN' && !$('respawn-overlay').classList.contains('hide')) {
+        $('respawn-status').textContent = m.message || '잠시 후 다시 시도해 주세요';
+        setTimeout(() => { $('respawn-now-btn').disabled = false; }, 1000);
+      } else {
+        showNetworkError(m.message || '요청을 처리할 수 없습니다');
+      }
       break;
   }
 }
@@ -979,7 +1006,7 @@ const ROOM_ENTRY_COPY = Object.freeze({
   },
   ARENA: {
     title: '오래 날기',
-    description: '방을 만들거나 초대 코드로 친구들과 오래 날기에 도전하세요.'
+    description: '접기를 마치는 순간 바로 전장에 합류합니다. 언제든 드나들 수 있어요.'
   }
 });
 let entryMode = 'ARENA';
@@ -989,7 +1016,7 @@ function openRoomEntry(mode) {
   const copy = ROOM_ENTRY_COPY[entryMode];
   $('entry-title').textContent = copy.title;
   $('entry-description').textContent = copy.description;
-  $('entry-kicker').textContent = 'UP TO 4 PLAYERS';
+  $('entry-kicker').textContent = `UP TO ${entryMode === 'ARENA' ? 8 : 4} PLAYERS`;
   $('entry-name').value = localStorage.getItem('pp_name') || $('lob-name').value || '';
   $('entry-code').value = '';
   $('entry-status').textContent = '';
@@ -1111,11 +1138,15 @@ function renderRoomList(rooms) {
   }
   const modeName = mode => mode === 'ARENA' ? '오래 날기' : '멀리 날기';
   const phaseName = phase => ({ waiting: '대기 중', countdown: '시작 중', playing: '진행 중', results: '결과' })[phase] || phase;
+  const statusText = room => room.mode === 'ARENA'
+    ? `진행 중 · ${room.players}/${room.maxPlayers} · 바로 참여`
+    : `${phaseName(room.phase)} · ${room.players}/${room.maxPlayers}명 · ${room.code}`;
+  const joinLabel = room => room.mode === 'ARENA' ? '바로 참여' : (room.phase === 'playing' ? '관전 참가' : '참가');
   $('room-list').innerHTML = rooms.map(room =>
     `<div class="room-item"><div><b>${escapeHtml(room.hostName)}님의 ${modeName(room.mode)}</b>` +
-    `<span>${phaseName(room.phase)} · ${room.players}/${room.maxPlayers}명 · ${room.code}</span></div>` +
+    `<span>${statusText(room)}</span></div>` +
     `<button class="action-btn" data-join-code="${room.code}" ${room.joinable ? '' : 'disabled'}>` +
-    `${room.phase === 'playing' ? '관전 참가' : '참가'}</button></div>`).join('');
+    `${joinLabel(room)}</button></div>`).join('');
 }
 
 function joinByCode(code) {
@@ -1205,6 +1236,23 @@ $('results-ready-btn').addEventListener('click', event => {
   event.currentTarget.disabled = true;
   event.currentTarget.textContent = '다른 참가자 기다리는 중…';
   send({ t: 'results-ready' });
+});
+$('respawn-now-btn').addEventListener('click', () => {
+  $('respawn-now-btn').disabled = true;
+  $('respawn-status').textContent = '부활 요청 중…';
+  send({ t: 'spawn' });
+});
+$('respawn-refold-btn').addEventListener('click', () => {
+  $('respawn-overlay').classList.add('hide');
+  enterFolding();
+  window.paperFoldingStage?.enter({
+    ends: null,
+    initialCommands: net.lastFoldCommands || '[]',
+    onComplete: fold => {
+      net.lastFoldCommands = fold.commands;
+      send({ t: 'fold_done', commands: fold.commands });
+    }
+  });
 });
 $('leave-btn').addEventListener('click', () => send({ t: 'leave' }));
 $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(event.currentTarget.checked));
@@ -1554,7 +1602,7 @@ function applyCraftSnapshots(crafts) {
 }
 
 const GRAVITY = 21, DRAG = 0.0062, MAX_ALT = 420;
-const me = { yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false, dist: 0, surv: 0, ammo: 3, ammoT: 0 };
+const me = { yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false, dist: 0, surv: 0, ammo: 3, ammoT: 0, lifeStartedAt: 0 };
 
 /* ============================================================
    게임 상태 · 월드
@@ -2218,7 +2266,21 @@ function dieLocal(report = true) {
   if (!me.alive) return;
   me.alive = false;
   if (report) send({ t: 'crash' });
+  if (net.room?.phase === 'live') {
+    if (report) showRespawnOverlay(null);
+    return;
+  }
   showCenter(null, '추락', '관전 중 — 라운드 종료를 기다립니다');
+}
+
+function showRespawnOverlay(byName) {
+  $('respawn-detail').textContent = byName
+    ? `${byName} 님에게 격추 · 이번 생존 ${Math.floor(me.surv)}초`
+    : `추락 · 이번 생존 ${Math.floor(me.surv)}초`;
+  $('respawn-status').textContent = '';
+  $('respawn-overlay').classList.remove('hide');
+  $('respawn-now-btn').disabled = false;
+  $('respawn-now-btn').focus();
 }
 
 /* ---- 중앙 메시지 ---- */
@@ -2263,23 +2325,27 @@ function showResults(results) {
 }
 
 function refreshBoard() {
+  const isLive = net.room?.phase === 'live';
   let rows = net.leaderboard.map(row => ({
-    id: row.id, name: row.name, score: row.score, alive: row.alive
+    id: row.id, name: row.name, score: row.score, alive: row.alive, kills: row.kills ?? 0
   }));
   if (!rows.length) {
     rows = [{
       id: net.id, name: myName,
       score: game.mode === 'ARENA' ? Math.floor(me.surv) : Math.floor(me.dist),
-      alive: me.alive || game.phase !== 'playing'
+      alive: me.alive || game.phase !== 'playing',
+      kills: me.kills ?? 0
     }, ...[...net.players.entries()].map(([id, player]) => ({
-      id, name: player.name, score: player.score, alive: player.alive
-    }))].sort((a, b) => b.score - a.score);
+      id, name: player.name, score: player.score, alive: player.alive, kills: player.kills ?? 0
+    }))].sort((a, b) => (isLive ? (b.kills - a.kills || b.score - a.score) : b.score - a.score));
   }
   const unit = game.mode === 'ARENA' ? 's' : 'm';
   $('b-rows').innerHTML = rows.map((player, index) =>
     `<div class="row ${player.alive ? '' : 'dead'} ${player.id === net.id ? 'me' : ''}">` +
     `<span class="nm">${index + 1}. ${escapeHtml(player.name)}</span>` +
-    `<span class="sc">${player.score}${unit}</span></div>`).join('');
+    (isLive
+      ? `<span class="sc">${player.kills ?? 0}킬 · ${player.score}s</span></div>`
+      : `<span class="sc">${player.score}${unit}</span></div>`)).join('');
 }
 
 /* ============================================================
@@ -2596,7 +2662,9 @@ renderer.setAnimationLoop(() => {
   if (game.phase === 'launch') updateLaunch(performance.now());
 
   if (game.phase === 'playing') {
-    roundClock = Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
+    roundClock = net.room?.phase === 'live'
+      ? Math.max(0, (now - me.lifeStartedAt) / 1000)
+      : Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
     if (me.alive) physics(dt);
   }
 

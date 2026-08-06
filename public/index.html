@@ -593,16 +593,14 @@
   </header>
   <main class="fold-stage">
     <canvas id="fold-paper-canvas"></canvas>
-    <div class="fold-hint">접을 선을 그으세요 · 선을 그은 방향의 왼쪽 면이 접힙니다</div>
+    <div class="fold-hint">종이에 선을 긋고 위아래로 드래그해 접으세요 · 선을 그은 방향의 왼쪽 면이 접힙니다</div>
     <aside class="fold-side">
       <div id="fold-stats" class="fold-stats" aria-live="polite"></div>
-      <canvas id="fold-preview-canvas" class="fold-preview" aria-label="접은 비행기 미리보기"></canvas>
     </aside>
   </main>
   <footer class="fold-controls">
     <div class="fold-direction">
-      <button id="fold-dir-valley" class="fold-btn active" type="button">골접기 ↗</button>
-      <button id="fold-dir-mountain" class="fold-btn" type="button">산접기 ↙</button>
+      <div class="fold-help">돌리기: 빈 공간 드래그 · 접기: 종이에 선을 긋고 위아래로 드래그</div>
       <button id="fold-leave-btn" class="fold-btn" type="button">로비로 나가기</button>
     </div>
     <div id="fold-status" role="status">0/10번 접음</div>
@@ -636,6 +634,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
+import { createFoldEditor } from './fold-editor-3d.mjs';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
@@ -1525,90 +1524,13 @@ function setFoldedCraftVisual(owner, baseVisual, model, tint, commandKey = '[]')
   owner.userData.foldCommandKey = cacheKey;
 }
 
-/* ---- 접기 화면 3D 미리보기: 게임과 동일한 빌더로 접은 기체를 회전 표시 ---- */
-const foldPreview = (() => {
-  const previewCanvas = document.getElementById('fold-preview-canvas');
-  if (!previewCanvas) return null;
-  let previewRenderer = null;
-  let previewScene = null;
-  let previewCamera = null;
-  let previewGroup = null;
-  let previewFrame = 0;
-
-  function ensureRenderer() {
-    if (previewRenderer) return true;
-    try {
-      previewRenderer = new THREE.WebGLRenderer({ canvas: previewCanvas, antialias: true, alpha: true });
-    } catch {
-      previewCanvas.style.display = 'none';
-      return false;
-    }
-    previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    previewScene = new THREE.Scene();
-    previewCamera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
-    previewCamera.position.set(0, 2.4, 4.6);
-    previewCamera.lookAt(0, 0, 0);
-    previewScene.add(new THREE.AmbientLight(0xffffff, 0.8));
-    const previewSun = new THREE.DirectionalLight(0xffffff, 1.15);
-    previewSun.position.set(3, 5, 2);
-    previewScene.add(previewSun);
-    previewGroup = new THREE.Group();
-    previewScene.add(previewGroup);
-    return true;
-  }
-
-  function makeFlatPaperVisual() {
-    const flat = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.7, 2.7),
-      new THREE.MeshStandardMaterial({ color: 0xfdfcf7, roughness: 0.75, side: THREE.DoubleSide })
-    );
-    flat.rotation.x = -Math.PI / 2;
-    return flat;
-  }
-
-  function tick() {
-    if (!previewRenderer) { previewFrame = 0; return; }
-    const width = previewCanvas.clientWidth || 1;
-    const height = previewCanvas.clientHeight || 1;
-    const ratio = previewRenderer.getPixelRatio();
-    const targetWidth = Math.floor(width * ratio);
-    const targetHeight = Math.floor(height * ratio);
-    if (previewCanvas.width !== targetWidth || previewCanvas.height !== targetHeight) {
-      previewRenderer.setSize(width, height, false);
-      previewCamera.aspect = width / height;
-      previewCamera.updateProjectionMatrix();
-    }
-    previewGroup.rotation.y += 0.008;
-    previewRenderer.render(previewScene, previewCamera);
-    previewFrame = requestAnimationFrame(tick);
-  }
-
-  function setModel(foldModel) {
-    if (foldModel === null) {
-      if (previewFrame) cancelAnimationFrame(previewFrame);
-      previewFrame = 0;
-      if (previewGroup) {
-        while (previewGroup.children.length) {
-          const child = previewGroup.children[0];
-          previewGroup.remove(child);
-          disposeObject3D(child);
-        }
-      }
-      return;
-    }
-    if (!ensureRenderer()) return;
-    while (previewGroup.children.length) {
-      const child = previewGroup.children[0];
-      previewGroup.remove(child);
-      disposeObject3D(child);
-    }
-    previewGroup.add(makeFoldedCraftVisual(foldModel) || makeFlatPaperVisual());
-    if (!previewFrame) previewFrame = requestAnimationFrame(tick);
-  }
-
-  return { setModel };
-})();
-window.paperFoldingStage?.setOnModelChange(foldModel => foldPreview?.setModel(foldModel));
+/* ---- 접기 화면 3D 편집기: 종이에 직접 선을 긋고 각도를 정한다 ---- */
+const foldEditor = createFoldEditor({
+  canvas: document.getElementById('fold-paper-canvas'),
+  onCommitFold: (start, end, angle) => window.paperFoldingStage?.handleFoldCommit(start, end, angle),
+  onCancel: () => window.paperFoldingStage?.handleFoldCancel()
+});
+window.paperFoldingStage?.attachEditor(foldEditor);
 
 function setCraftFromFoldModel(model, authoritativeProfile = null, commandKey = '[]') {
   const sourceModel = Array.isArray(model?.faces) ? model : defaultPaperModel;

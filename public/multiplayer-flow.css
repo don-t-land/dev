@@ -151,7 +151,8 @@
 .fold-stats .fold-stat-row.good .fold-stat-bar i { background:#69e3b6; }
 .fold-stats .fold-stat-delta { text-align:center; color:#9fb4cc; }
 .fold-stats .fold-stat-value { text-align:right; font-variant-numeric:tabular-nums; }
-.fold-preview { width:100%; aspect-ratio:1/1; border-radius:14px; border:1px solid rgba(134,220,245,.22); background:radial-gradient(circle at 50% 42%,rgba(102,210,238,.14),rgba(9,14,38,.6) 70%); }
+.fold-help { display:flex; align-items:center; padding:0 4px; color:#9dafcc; font-size:11px; line-height:1.5; }
+.fold-angle-badge { position:absolute; left:50%; bottom:20px; transform:translateX(-50%); padding:9px 18px; border-radius:99px; border:1px solid rgba(134,220,245,.3); background:rgba(4,9,29,.72); color:#8ceaf4; font:900 22px/1 ui-monospace,monospace; letter-spacing:.02em; pointer-events:none; z-index:3; }
 @media (max-width:760px) { .fold-side { width:min(200px,44vw); } }
 
 @media (max-width:760px) {
@@ -169,7 +170,8 @@
   .waiting-room-actions { display:grid; grid-template-columns:1fr 1fr 1fr; }
   #ui #room-lobby .action-btn { padding:0 9px; }
   .fold-controls { grid-template-columns:1fr; gap:8px; }
-  .fold-direction { display:grid; grid-template-columns:1fr 1fr; }
+  .fold-direction { flex-direction:column; align-items:stretch; }
+  .fold-help { justify-content:center; text-align:center; }
   #fold-status { order:-1; }
   .fold-controls > .fold-btn.finish { min-height:50px; }
 }

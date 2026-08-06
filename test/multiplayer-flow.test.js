@@ -56,17 +56,24 @@ test('waiting room actors are larger and layered in front of slot boxes', () => 
   assert.match(flowCss, /\.room-player-info\s*\{[^}]*z-index:\s*3/s);
 });
 
-test('folding UI exposes direction, unfold, completion and synchronized progress', () => {
+test('folding UI exposes the 3d editor, unfold, completion and synchronized progress', () => {
   for (const id of [
-    'folding-screen', 'fold-timer', 'fold-paper-canvas', 'fold-dir-valley',
-    'fold-dir-mountain', 'fold-undo-btn', 'fold-complete-btn'
+    'folding-screen', 'fold-timer', 'fold-paper-canvas', 'fold-leave-btn',
+    'fold-undo-btn', 'fold-complete-btn'
   ]) assert.equal(hasId(id), true, `missing #${id}`);
-  assert.match(foldUi, /api\.applyFold\(model, completed\.start, completed\.end, direction\)/);
+  assert.match(html, /import \{ createFoldEditor \} from '\.\/fold-editor-3d\.mjs'/);
+  assert.match(html, /attachEditor\(foldEditor\)/);
+  assert.match(html, /class="fold-help">돌리기: 빈 공간 드래그/);
+  assert.doesNotMatch(html, /fold-dir-valley|fold-dir-mountain|fold-preview-canvas|foldPreview/);
+  assert.match(foldUi, /api\.applyFold\(model, start, end, angle\)/);
+  assert.match(foldUi, /attachEditor/);
+  assert.doesNotMatch(foldUi, /THREE|getContext\('2d'\)/);
   assert.match(html, /선을 그은 방향의 왼쪽 면/);
-  assert.doesNotMatch(foldUi, /const creasePoint = \[\(drag\.start/);
   assert.match(foldUi, /model = api\.undoFold\(model\)/);
   assert.match(foldUi, /setRoomProgress\(done, total\)/);
   assert.match(html, /onComplete: fold => send\(\{ t: 'fold_done', commands: fold\.commands \}\)/);
+  assert.match(flowCss, /\.fold-angle-badge/);
+  assert.doesNotMatch(flowCss, /\.fold-preview\s/);
 });
 
 test('active room snapshots are idempotent and launch is server-authoritative', () => {

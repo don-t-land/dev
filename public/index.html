@@ -250,6 +250,7 @@
   #results, .modal-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto; background: rgba(7,16,27,.68); backdrop-filter: blur(10px); }
   #results { overflow-y: auto; align-items: flex-start; padding-block: 18px; }
   .modal-layer { overflow-y: auto; align-items: flex-start; padding-block: 18px; }
+  #pause-menu { z-index: 70; }
   #results .box, .modal-card { width: min(440px, calc(100vw - 36px)); padding: 30px; border-radius: 22px; color: #ecf5ff; background: rgba(17,35,55,.95); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 25px 70px rgba(0,0,0,.3); }
   #results .box { min-width: 0; max-height: calc(100dvh - 36px); overflow: auto; }
   .modal-card { max-height: calc(100dvh - 36px); overflow-y: auto; flex-shrink: 0; }
@@ -380,8 +381,9 @@
       <label for="entry-name">닉네임</label>
       <input id="entry-name" maxlength="12" placeholder="닉네임을 입력하세요" autocomplete="off">
     </div>
+    <button id="entry-quick-btn" class="room-entry-action primary" type="button" style="width:100%">빠른 참가<small>바로 참여 가능한 방으로 이동합니다</small></button>
     <div class="room-entry-actions">
-      <button id="entry-create-btn" class="room-entry-action primary" type="button">방 만들기<small>내가 HOST가 됩니다</small></button>
+      <button id="entry-create-btn" class="room-entry-action" type="button">방 만들기<small>내가 HOST가 됩니다</small></button>
       <div class="room-entry-field" style="margin:0">
         <label for="entry-code">방 입장</label>
         <div class="room-entry-join">
@@ -389,6 +391,10 @@
           <button id="entry-join-btn" type="button">입장</button>
         </div>
       </div>
+    </div>
+    <div class="room-entry-field" style="margin-top:18px">
+      <label for="entry-room-list">빠른 참가</label>
+      <div id="entry-room-list" role="region" aria-label="참여 가능한 방 목록" aria-live="polite"><div class="room-empty">방 목록을 불러오는 중…</div></div>
     </div>
     <div id="entry-status" role="status"></div>
   </div>
@@ -597,6 +603,7 @@
     <div class="fold-direction">
       <button id="fold-dir-valley" class="fold-btn active" type="button">골접기 ↗</button>
       <button id="fold-dir-mountain" class="fold-btn" type="button">산접기 ↙</button>
+      <button id="fold-leave-btn" class="fold-btn" type="button">로비로 나가기</button>
     </div>
     <div id="fold-status" role="status">0/10번 접음</div>
     <div>
@@ -972,6 +979,11 @@ function handle(m) {
       if (m.code === 'RESPAWN_COOLDOWN' && !$('respawn-overlay').classList.contains('hide')) {
         $('respawn-status').textContent = m.message || '잠시 후 다시 시도해 주세요';
         setTimeout(() => { $('respawn-now-btn').disabled = false; }, 1000);
+      } else if (m.code === 'RESPAWN_COOLDOWN') {
+        // 접기 화면이 떠 있는 상태(빠른 재접기)에서 쿨다운에 걸린 경우: 안내만 하고
+        // 쿨다운이 끝난 뒤 자동으로 스폰을 재시도합니다.
+        $('fold-status').textContent = m.message || '잠시 후 다시 시도해 주세요';
+        setTimeout(() => send({ t: 'spawn' }), 1100);
       } else {
         showNetworkError(m.message || '요청을 처리할 수 없습니다');
       }
@@ -1021,6 +1033,9 @@ function openRoomEntry(mode) {
   $('entry-code').value = '';
   $('entry-status').textContent = '';
   $('room-entry').classList.remove('hide');
+  $('entry-room-list').innerHTML = roomListHtml(net.rooms.filter(room => room.mode === entryMode));
+  connect();
+  send({ t: 'list' });
   setTimeout(() => $('entry-name').focus(), 0);
 }
 
@@ -1131,22 +1146,26 @@ function showNetworkError(message) {
   else $('lob-status').textContent = message;
 }
 
-function renderRoomList(rooms) {
-  if (!rooms.length) {
-    $('room-list').innerHTML = '<div class="room-empty">현재 공개된 방이 없습니다<br>새 방을 만들어 보세요</div>';
-    return;
-  }
+function roomListHtml(rooms) {
+  if (!rooms.length) return '<div class="room-empty">현재 공개된 방이 없습니다<br>새 방을 만들어 보세요</div>';
   const modeName = mode => mode === 'ARENA' ? '오래 날기' : '멀리 날기';
   const phaseName = phase => ({ waiting: '대기 중', countdown: '시작 중', playing: '진행 중', results: '결과' })[phase] || phase;
   const statusText = room => room.mode === 'ARENA'
     ? `진행 중 · ${room.players}/${room.maxPlayers} · 바로 참여`
     : `${phaseName(room.phase)} · ${room.players}/${room.maxPlayers}명 · ${room.code}`;
   const joinLabel = room => room.mode === 'ARENA' ? '바로 참여' : (room.phase === 'playing' ? '관전 참가' : '참가');
-  $('room-list').innerHTML = rooms.map(room =>
+  return rooms.map(room =>
     `<div class="room-item"><div><b>${escapeHtml(room.hostName)}님의 ${modeName(room.mode)}</b>` +
     `<span>${statusText(room)}</span></div>` +
     `<button class="action-btn" data-join-code="${room.code}" ${room.joinable ? '' : 'disabled'}>` +
     `${joinLabel(room)}</button></div>`).join('');
+}
+
+function renderRoomList(rooms) {
+  $('room-list').innerHTML = roomListHtml(rooms);
+  if (!$('room-entry').classList.contains('hide')) {
+    $('entry-room-list').innerHTML = roomListHtml(rooms.filter(room => room.mode === entryMode));
+  }
 }
 
 function joinByCode(code) {
@@ -1187,11 +1206,19 @@ function joinFromEntry() {
   withEntrySession(() => send({ t: 'join', code }));
 }
 
+$('entry-quick-btn').addEventListener('click', () => withEntrySession(() => send({
+  t: 'join', mode: entryMode
+})));
 $('entry-create-btn').addEventListener('click', () => withEntrySession(() => send({
   t: 'create', mode: entryMode, visibility: 'private'
 })));
 $('entry-join-btn').addEventListener('click', joinFromEntry);
 $('entry-code').addEventListener('keydown', event => { if (event.key === 'Enter') joinFromEntry(); });
+$('entry-room-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-join-code]');
+  if (!button || button.disabled) return;
+  withEntrySession(() => send({ t: 'join', code: button.dataset.joinCode }));
+});
 $('entry-name').addEventListener('keydown', event => {
   if (event.key === 'Enter') $('entry-create-btn').click();
 });
@@ -1255,6 +1282,10 @@ $('respawn-refold-btn').addEventListener('click', () => {
   });
 });
 $('leave-btn').addEventListener('click', () => send({ t: 'leave' }));
+$('fold-leave-btn').addEventListener('click', () => {
+  window.paperFoldingStage?.leave();
+  send({ t: 'leave' });
+});
 $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(event.currentTarget.checked));
 $('copy-code-btn').addEventListener('click', async () => {
   const code = $('room-code-display').textContent;

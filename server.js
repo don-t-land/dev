@@ -574,6 +574,11 @@ wss.on('connection', (ws) => {
         me.disconnectTimer = null;
         me.ws = ws;
         me.name = s.name || me.name;
+        if (room.phase === 'live' && resumePlayer.alive) {
+          // 살아있는 채로 재접속하면 fold_done의 live 가드(!me.alive)를 통과하지 못해
+          // 영영 리스폰할 수 없으므로, 재접속 시점에 죽음 처리를 해서 접기→스폰 흐름을 되살립니다.
+          onCrash(room, resumePlayer, null);
+        }
         sendJson(ws, { t: 'hello', id: me.id, token, name: me.name, wins: me.wins, resumed: true });
         sendJson(ws, snapshot(room));
         bcast(room, snapshot(room), me.id);

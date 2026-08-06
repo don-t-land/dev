@@ -334,3 +334,46 @@ test('live 방에서는 전원이 죽어도 방이 끝나지 않는다', async (
     await Promise.all([host.close(), guest.close()]);
   }
 });
+
+test('생존 중 재접속하면 사망 처리되어 재접기 후 스폰할 수 있다', async () => {
+  const { host, guest, guestHello } = await createAndJoinLiveArena('방장', '손님');
+  try {
+    guest.send({ t: 'fold_done', commands: DART_COMMANDS });
+    await guest.next(message => message.t === 'fold_ok');
+    guest.send({ t: 'spawn' });
+    await guest.next(message => message.t === 'spawned');
+
+    // leave 없이 소켓만 끊고 같은 토큰으로 재접속합니다 (그레이스 구간 내).
+    await guest.close();
+
+    const resumed = await connectClient();
+    try {
+      resumed.send({ t: 'hello', token: guestHello.token, name: '손님' });
+      const hello = await resumed.next(message => message.t === 'hello');
+      assert.equal(hello.resumed, true);
+      assert.equal(hello.id, guestHello.id);
+
+      const resumeSnapshot = await resumed.next(message => message.t === 'room');
+      const selfRow = resumeSnapshot.players.find(player => player.id === guestHello.id);
+      assert.ok(selfRow, '재접속한 본인이 스냅샷에 있어야 한다');
+      assert.equal(selfRow.alive, false);
+
+      await host.next(message => message.t === 'crashed' && message.id === guestHello.id);
+
+      resumed.send({ t: 'fold_done', commands: DART_COMMANDS });
+      const foldOk = await resumed.next(message => message.t === 'fold_ok');
+      assert.equal(typeof foldOk.profile, 'object');
+
+      // 재접속 시점에 diedAt이 찍히므로 리스폰 쿨다운이 끝날 때까지 기다립니다.
+      await new Promise(resolve => setTimeout(resolve, 2_100));
+
+      resumed.send({ t: 'spawn' });
+      const spawned = await resumed.next(message => message.t === 'spawned');
+      assert.equal(spawned.id, guestHello.id);
+    } finally {
+      await resumed.close();
+    }
+  } finally {
+    await host.close();
+  }
+});

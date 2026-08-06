@@ -139,6 +139,17 @@
     opacity: 0; transition: opacity .3s; text-shadow: 0 0 14px rgba(255,200,97,.5);
   }
 
+  #biome-badge {
+    position: absolute; top: 16%; left: 50%; transform: translate(-50%, -8px);
+    font-size: 14px; letter-spacing: .16em; color: #eaf4ff; font-weight: 600;
+    padding: 7px 18px; border-radius: 999px;
+    background: rgba(12,18,28,.45); border: 1px solid rgba(255,255,255,.18);
+    opacity: 0; transition: opacity .4s, transform .4s;
+    text-shadow: 0 0 14px rgba(120,180,255,.4);
+    pointer-events: none;
+  }
+  #biome-badge.show { opacity: 1; transform: translate(-50%, 0); }
+
   #results {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(10,14,20,.72); backdrop-filter: blur(3px);
@@ -525,6 +536,7 @@
 
     <div id="thermal">상승기류</div>
     <div id="kill"></div>
+    <div id="biome-badge"></div>
 
     <div id="keys">
       <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 롤/선회</span><br>
@@ -628,6 +640,7 @@
 <script src="./fold-stats-view.js"></script>
 <script src="./paper-fold-ui.js"></script>
 <script src="./home-screen.js"></script>
+<script src="./map-gen.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./waiting-room-3d.js"></script>
 
@@ -1005,6 +1018,7 @@ function enterHome(msg) {
   window.paperFoldingStage?.leave();
   clearWorld();
   clearRemotePlayers();
+  resetBiomeDefaults();
   game.phase = 'lobby';
   game.frozen = true;
   if (msg) console.warn(msg);
@@ -1360,6 +1374,80 @@ grid.material.opacity = 0.35;
 scene.add(grid);
 
 /* ============================================================
+   바이옴 팔레트 — 안개/하늘/조명을 바이옴 색으로 lerp/적용
+   ============================================================ */
+const DEFAULT_BIOME = window.mapGen.BIOMES[0];
+let lastAppliedBiome = { a: 0, b: 0, t: -1 }; // -1 sentinel: 항상 첫 적용은 통과
+const biomeColorA = new THREE.Color();
+const biomeColorB = new THREE.Color();
+const biomeLerpColor = new THREE.Color();
+
+// 조명 색은 팔레트의 "하늘 mid" 색을 살짝 섞어 바이옴 분위기를 낸다.
+function biomeLightColor(biome, out) {
+  return out.setHex(0xfff0d8).lerp(biomeLerpColor.setHex(biome.sky.mid), 0.22);
+}
+
+function applyBiomePalette(biome) {
+  scene.fog.color.setHex(biome.fog);
+  sky.material.uniforms.uTop.value.setHex(biome.sky.top);
+  sky.material.uniforms.uMid.value.setHex(biome.sky.mid);
+  sky.material.uniforms.uBottom.value.setHex(biome.sky.bottom);
+  sun.color.copy(biomeLightColor(biome, biomeColorA));
+}
+
+function resetBiomeDefaults() {
+  scene.fog.color.setHex(DEFAULT_BIOME.fog);
+  sky.material.uniforms.uTop.value.setHex(DEFAULT_BIOME.sky.top);
+  sky.material.uniforms.uMid.value.setHex(DEFAULT_BIOME.sky.mid);
+  sky.material.uniforms.uBottom.value.setHex(DEFAULT_BIOME.sky.bottom);
+  sun.color.setHex(0xfff0d8);
+  lastAppliedBiome = { a: 0, b: 0, t: -1 };
+  lastBadgeBiome = -1;
+  clearTimeout(biomeBadgeT);
+  $('biome-badge')?.classList.remove('show');
+}
+
+function updateDistanceBiomeVisuals(z) {
+  const s = window.mapGen.sampleBiome(z);
+  const tQuant = Math.round(s.t * 100) / 100;
+  if (s.a === lastAppliedBiome.a && s.b === lastAppliedBiome.b && tQuant === lastAppliedBiome.t) return;
+  lastAppliedBiome = { a: s.a, b: s.b, t: tQuant };
+
+  const biomeA = window.mapGen.BIOMES[s.a];
+  const biomeB = window.mapGen.BIOMES[s.b];
+
+  biomeColorA.setHex(biomeA.fog).lerp(biomeColorB.setHex(biomeB.fog), tQuant);
+  scene.fog.color.copy(biomeColorA);
+
+  biomeColorA.setHex(biomeA.sky.top).lerp(biomeColorB.setHex(biomeB.sky.top), tQuant);
+  sky.material.uniforms.uTop.value.copy(biomeColorA);
+  biomeColorA.setHex(biomeA.sky.mid).lerp(biomeColorB.setHex(biomeB.sky.mid), tQuant);
+  sky.material.uniforms.uMid.value.copy(biomeColorA);
+  biomeColorA.setHex(biomeA.sky.bottom).lerp(biomeColorB.setHex(biomeB.sky.bottom), tQuant);
+  sky.material.uniforms.uBottom.value.copy(biomeColorA);
+
+  biomeLightColor(biomeA, biomeColorA);
+  biomeLightColor(biomeB, biomeColorB);
+  sun.color.copy(biomeColorA.lerp(biomeColorB, tQuant));
+
+  const dominant = tQuant < 0.5 ? s.a : s.b;
+  showBiomeBadge(dominant);
+}
+
+let lastBadgeBiome = -1;
+let biomeBadgeT = null;
+function showBiomeBadge(biomeIndex) {
+  if (biomeIndex === lastBadgeBiome) return;
+  lastBadgeBiome = biomeIndex;
+  const el = $('biome-badge');
+  if (!el) return;
+  el.textContent = `${window.mapGen.BIOMES[biomeIndex].name}에 진입했습니다`;
+  el.classList.add('show');
+  clearTimeout(biomeBadgeT);
+  biomeBadgeT = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+/* ============================================================
    종이비행기 팩토리 (본체 + 이름표)
    ============================================================ */
 function makePlaneMesh(color) {
@@ -1689,61 +1777,57 @@ function addClouds(rng, count, area) {
 function buildDistance(seed) {
   clearWorld();
   const rng = mulberry32(seed);
+  const { BIOMES: mgBiomes } = window.mapGen;
+  const layout = window.mapGen.buildDistanceLayout(seed);
+  const tmpColor = new THREE.Color();
+
+  // 진입 순간 팔레트를 즉시 기준 바이옴으로 맞춰 ARENA 테마가 한 프레임 잔존하는 것을 방지.
+  applyBiomePalette(mgBiomes[0]);
+  lastAppliedBiome = { a: -1, b: -1, t: -1 };
 
   // 협곡 벽
-  const step = 42, segs = Math.ceil(DIST_LEN / step);
-  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), segs * 2);
-  let wi = 0;
-  for (let side = -1; side <= 1; side += 2) {
-    for (let i = 0; i < segs; i++) {
-      dummy.position.set(side * (DIST_HALF + 10 + rng() * 16), 0, -i * step);
-      dummy.scale.set(26 + rng() * 22, 55 + rng() * 95, step * (0.9 + rng() * 0.35));
-      dummy.rotation.set(0, 0, 0);
-      dummy.updateMatrix();
-      wallMesh.setMatrixAt(wi++, dummy.matrix);
-    }
-  }
+  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), layout.walls.length);
+  layout.walls.forEach((wall, i) => {
+    dummy.position.set(wall.x, 0, wall.z);
+    dummy.scale.set(wall.w, wall.h, wall.d);
+    dummy.rotation.set(0, 0, 0);
+    dummy.updateMatrix();
+    wallMesh.setMatrixAt(i, dummy.matrix);
+    wallMesh.setColorAt(i, tmpColor.setHex(mgBiomes[wall.biome].terrain.wall));
+  });
   world.add(wallMesh);
 
   // 첨탑 — 렌더는 인스턴스 1콜, 충돌은 데이터 배열
-  const nSp = Math.floor(DIST_LEN / 1000 * 22);
-  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), nSp);
+  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), layout.spires.length);
   spireMesh.castShadow = true;
-  for (let i = 0; i < nSp; i++) {
-    const h = 45 + rng() * 125, r = 6 + rng() * 8;
-    const x = (rng() * 2 - 1) * (DIST_HALF - 20);
-    const z = -120 - rng() * (DIST_LEN - 200);
-    dummy.position.set(x, 0, z);
-    dummy.scale.set(r, h, r);
+  layout.spires.forEach((spire, i) => {
+    dummy.position.set(spire.x, 0, spire.z);
+    dummy.scale.set(spire.r, spire.h, spire.r);
+    dummy.rotation.set(0, 0, 0);
     dummy.updateMatrix();
     spireMesh.setMatrixAt(i, dummy.matrix);
-    spires.push({ x, z, h, r });
-  }
+    spireMesh.setColorAt(i, tmpColor.setHex(mgBiomes[spire.biome].terrain.spire));
+    spires.push({ x: spire.x, z: spire.z, h: spire.h, r: spire.r });
+  });
   world.add(spireMesh);
 
   // 공중 바위
-  const nRk = Math.floor(DIST_LEN / 1000 * 15);
-  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), nRk);
+  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), layout.rocks.length);
   rockMesh.castShadow = true;
-  for (let i = 0; i < nRk; i++) {
-    const r = 5 + rng() * 7;
-    const x = (rng() * 2 - 1) * (DIST_HALF - 20);
-    const y = 30 + rng() * 145;
-    const z = -160 - rng() * (DIST_LEN - 250);
-    dummy.position.set(x, y, z);
-    dummy.scale.setScalar(r);
+  layout.rocks.forEach((rock, i) => {
+    dummy.position.set(rock.x, rock.y, rock.z);
+    dummy.scale.setScalar(rock.r);
     dummy.rotation.set(rng() * 3, rng() * 3, 0);
     dummy.updateMatrix();
     rockMesh.setMatrixAt(i, dummy.matrix);
-    rocks.push({ p: new THREE.Vector3(x, y, z), r });
-  }
+    rockMesh.setColorAt(i, tmpColor.setHex(mgBiomes[rock.biome].terrain.rock));
+    rocks.push({ p: new THREE.Vector3(rock.x, rock.y, rock.z), r: rock.r });
+  });
   world.add(rockMesh);
 
   // 상승기류 · 부스트 링
-  for (let i = 0; i < Math.floor(DIST_LEN / 1000 * 5); i++)
-    addThermal((rng() * 2 - 1) * (DIST_HALF - 40), -200 - rng() * (DIST_LEN - 300));
-  for (let i = 0; i < Math.floor(DIST_LEN / 1000 * 7); i++)
-    addRing((rng() * 2 - 1) * (DIST_HALF - 35), 40 + rng() * 170, -180 - rng() * (DIST_LEN - 280), rng);
+  layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z));
+  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng));
 
   addClouds(rng, 24, (g, r2) => {
     g.position.x = (r2() * 2 - 1) * (DIST_HALF + 90);
@@ -1764,10 +1848,15 @@ function buildDistance(seed) {
 function buildArena(seed) {
   clearWorld();
   const rng = mulberry32(seed);
+  const theme = window.mapGen.arenaTheme(seed);
+  applyBiomePalette(theme);
+  // ARENA는 z 기반 전환 캐시를 쓰지 않음 — 다음 DIST 진입 시 sampleBiome 결과가
+  // 우연히 이전 캐시와 같아도 팔레트가 강제로 재적용되도록 무효화해 둔다.
+  lastAppliedBiome = { a: -1, b: -1, t: -1 };
 
   // 외벽 바위 링
   const nWall = 56;
-  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), nWall);
+  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(theme.terrain.wall), nWall);
   for (let i = 0; i < nWall; i++) {
     const a = (i / nWall) * Math.PI * 2;
     const rr = ARENA_R + 22 + rng() * 14;
@@ -1781,7 +1870,7 @@ function buildArena(seed) {
 
   // 내부 첨탑 — 엄폐물
   const nSp = 13;
-  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), nSp);
+  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(theme.terrain.spire), nSp);
   spireMesh.castShadow = true;
   for (let i = 0; i < nSp; i++) {
     const h = 60 + rng() * 130, r = 7 + rng() * 9;
@@ -1797,7 +1886,7 @@ function buildArena(seed) {
 
   // 공중 바위
   const nRk = 18;
-  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), nRk);
+  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(theme.terrain.rock), nRk);
   rockMesh.castShadow = true;
   for (let i = 0; i < nRk; i++) {
     const r = 5 + rng() * 7;
@@ -2696,6 +2785,7 @@ renderer.setAnimationLoop(() => {
   if (game.mode === 'DIST') {
     ground.position.set(0, 0, followPos.z);
     grid.position.set(0, 0.05, Math.round(followPos.z / 40) * 40);
+    updateDistanceBiomeVisuals(craft.position.z);
   } else {
     ground.position.set(0, 0, 0);
     grid.position.set(0, 0.05, 0);

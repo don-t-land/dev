@@ -1018,7 +1018,6 @@ function enterHome(msg) {
   window.paperFoldingStage?.leave();
   clearWorld();
   clearRemotePlayers();
-  resetBiomeDefaults();
   game.phase = 'lobby';
   game.frozen = true;
   if (msg) console.warn(msg);
@@ -1731,6 +1730,10 @@ function clearWorld() {
   world.clear();
   spires = []; rocks = []; thermals = []; ringsArr = []; clouds = [];
   spireMesh = rockMesh = wallMesh = null;
+  // 바이옴 팔레트 기본값 복원 — buildDistance/buildArena는 이 직후 자신의 팔레트를
+  // 다시 적용하므로(동기 호출) 로비 경로(enterHome/enterLobby/enterRoomLobby)에서만
+  // 이 기본값이 실제로 유지된다.
+  resetBiomeDefaults();
 }
 
 function addThermal(x, z) {
@@ -1795,6 +1798,7 @@ function buildDistance(seed) {
     wallMesh.setMatrixAt(i, dummy.matrix);
     wallMesh.setColorAt(i, tmpColor.setHex(mgBiomes[wall.biome].terrain.wall));
   });
+  wallMesh.instanceColor.needsUpdate = true;
   world.add(wallMesh);
 
   // 첨탑 — 렌더는 인스턴스 1콜, 충돌은 데이터 배열
@@ -1809,6 +1813,7 @@ function buildDistance(seed) {
     spireMesh.setColorAt(i, tmpColor.setHex(mgBiomes[spire.biome].terrain.spire));
     spires.push({ x: spire.x, z: spire.z, h: spire.h, r: spire.r });
   });
+  spireMesh.instanceColor.needsUpdate = true;
   world.add(spireMesh);
 
   // 공중 바위
@@ -1823,6 +1828,7 @@ function buildDistance(seed) {
     rockMesh.setColorAt(i, tmpColor.setHex(mgBiomes[rock.biome].terrain.rock));
     rocks.push({ p: new THREE.Vector3(rock.x, rock.y, rock.z), r: rock.r });
   });
+  rockMesh.instanceColor.needsUpdate = true;
   world.add(rockMesh);
 
   // 상승기류 · 부스트 링

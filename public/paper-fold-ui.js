@@ -160,6 +160,7 @@
     if (message) $('fold-status').textContent = message;
     $('fold-complete-btn').textContent = '완성됨';
     $('fold-complete-btn').disabled = true;
+    $('fold-preset-btn').disabled = true;
     if (!completionSent) {
       completionSent = true;
       onComplete?.({ commands: api.serializeFoldCommands(model) });
@@ -181,6 +182,7 @@
     $('fold-dir-valley').classList.add('active');
     $('fold-dir-mountain').classList.remove('active');
     $('fold-complete-btn').disabled = false;
+    $('fold-preset-btn').disabled = false;
     $('fold-complete-btn').textContent = '비행기 완성';
     updateStats();
     if (!frame) frame = requestAnimationFrame(render);
@@ -230,6 +232,17 @@
     canvas.addEventListener('pointercancel', () => { drag = null; });
     $('fold-dir-valley').addEventListener('click', () => setDirection(1));
     $('fold-dir-mountain').addEventListener('click', () => setDirection(-1));
+    $('fold-preset-btn').addEventListener('click', () => {
+      if (locked) return;
+      const preset = api.createPresetModel('dart');
+      if (!preset) {
+        $('fold-status').textContent = '기본 비행기 프리셋을 불러오지 못했습니다';
+        return;
+      }
+      model = preset;
+      drag = null;
+      updateStats();
+    });
     $('fold-undo-btn').addEventListener('click', () => {
       if (locked) return;
       model = api.undoFold(model);

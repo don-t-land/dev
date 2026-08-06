@@ -16,10 +16,15 @@
 
   function getLaunchPose(progress) {
     const value = clamp01(progress);
-    const transition = smoothstep(value, 0.65, 0.92);
+    const dropAt = 0.68;
+    const bodyTransition = smoothstep(value, 0.72, 0.94);
+    const poofProgress = value < dropAt ? 0 : smoothstep(value, dropAt, 0.86);
+    const poofOpacity = value < dropAt ? 0 : 1 - smoothstep(value, 0.78, 0.9);
     return {
-      bodyPitch: (1 - transition) * Math.PI / 2,
-      legFade: smoothstep(value, 0.65, 0.84),
+      bodyPitch: (1 - bodyTransition) * Math.PI / 2,
+      legsVisible: value < dropAt,
+      poofProgress,
+      poofOpacity,
       showFlightCraft: value >= 1
     };
   }

@@ -625,6 +625,7 @@
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
+<script src="./endurance-map.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./waiting-room-3d.js"></script>
 
@@ -636,6 +637,7 @@ const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
 const { getWaitingSlots, canStart, getLocalReady } = window.waitingRoomStatePolicy;
+const { createEnduranceMap } = window.EnduranceMap;
 
 /* ============================================================
    유틸
@@ -738,6 +740,7 @@ function disposeObject3D(object) {
   if (!object) return;
   object.removeFromParent();
   object.traverse(child => {
+    if (child.isInstancedMesh) child.dispose?.();
     child.geometry?.dispose?.();
     const materials = Array.isArray(child.material) ? child.material : child.material ? [child.material] : [];
     materials.forEach(material => {
@@ -1469,7 +1472,7 @@ const game = {
 
 /* 코스 상수 */
 const DIST_HALF = 155, DIST_LEN = 7500;
-const ARENA_R = 240;
+const ARENA_R = window.EnduranceMap.ARENA_RADIUS;
 const THERMAL_R = 26, THERMAL_LIFT = 15, RING_R = 8;
 
 /* 월드 컨테이너 — 라운드마다 비우고 다시 만듭니다 */
@@ -1481,24 +1484,28 @@ let spireMesh = null, rockMesh = null, wallMesh = null;
 
 const thermalMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide,
-  blending: THREE.AdditiveBlending, fog: false,
+  blending: THREE.NormalBlending, fog: true,
   uniforms: { uTime: { value: 0 } },
   vertexShader: `
+    #include <fog_pars_vertex>
     varying vec2 vUv; varying vec3 vN; varying vec3 vV;
     void main(){
       vUv=uv;
-      vec4 mv=modelViewMatrix*vec4(position,1.);
-      vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz);
-      gl_Position=projectionMatrix*mv;
+      vec4 mvPosition=modelViewMatrix*vec4(position,1.);
+      vN=normalize(normalMatrix*normal); vV=normalize(-mvPosition.xyz);
+      gl_Position=projectionMatrix*mvPosition;
+      #include <fog_vertex>
     }`,
   fragmentShader: `
+    #include <fog_pars_fragment>
     uniform float uTime; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
     void main(){
       float band=pow(sin(vUv.y*26.-uTime*2.6)*.5+.5,2.2);
       float edge=pow(1.-abs(dot(normalize(vN),normalize(vV))),1.6);
-      float fade=smoothstep(1.,.35,vUv.y)*smoothstep(0.,.08,vUv.y);
+      float fade=(1.-smoothstep(.58,1.,vUv.y))*smoothstep(0.,.1,vUv.y);
       vec3 col=mix(vec3(.25,.85,.62),vec3(1.,.94,.6),band);
-      gl_FragColor=vec4(col,(.09+band*.2)*edge*fade);
+      gl_FragColor=vec4(col,(.025+band*.07)*edge*fade);
+      #include <fog_fragment>
     }`
 });
 const thermalRingMat = new THREE.MeshBasicMaterial({ color: 0x4fd6a4, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
@@ -1506,9 +1513,22 @@ const ringMat = new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff
 const rockLikeMat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true });
 const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
 
+/* 백풍 우편협곡 전용 재질은 라운드 사이에 공유합니다. clearWorld는 지오메트리만 정리합니다. */
+const basinMat = new THREE.MeshStandardMaterial({ color: 0x657579, roughness: 1, flatShading: true });
+const sandstoneMat = new THREE.MeshStandardMaterial({ color: 0xc8b998, roughness: 0.94, flatShading: true });
+const sandstoneLightMat = new THREE.MeshStandardMaterial({ color: 0xddd1b5, roughness: 0.9, flatShading: true });
+const sandstoneShadowMat = new THREE.MeshStandardMaterial({ color: 0x817967, roughness: 1, flatShading: true });
+const plasterMat = new THREE.MeshStandardMaterial({ color: 0xe4e0d2, roughness: 0.86 });
+const metalMat = new THREE.MeshStandardMaterial({ color: 0x4d4940, roughness: 0.58, metalness: 0.3 });
+const grassMat = new THREE.MeshStandardMaterial({ color: 0xa49b61, roughness: 1, flatShading: true });
+const routeStoneMat = new THREE.MeshStandardMaterial({ color: 0xa95643, roughness: 0.9, flatShading: true });
+const routeRibbonMat = new THREE.MeshStandardMaterial({ color: 0xd28a69, roughness: 0.82, side: THREE.DoubleSide });
+const boundaryMat = new THREE.MeshBasicMaterial({ color: 0xd28a69, transparent: true, opacity: 0.34, side: THREE.DoubleSide });
+
 const unitBox = new THREE.BoxGeometry(1, 1, 1); unitBox.translate(0, 0.5, 0);
 const unitCone = new THREE.CylinderGeometry(0.35, 1, 1, 7, 1); unitCone.translate(0, 0.5, 0);
 const unitRock = new THREE.IcosahedronGeometry(1, 0);
+const unitGrass = new THREE.ConeGeometry(0.42, 1, 3); unitGrass.translate(0, 0.5, 0);
 const dummy = new THREE.Object3D();
 
 function clearWorld() {
@@ -1517,7 +1537,8 @@ function clearWorld() {
     clearLaunchTowers();
   }
   world.traverse(o => {
-    if (o.isMesh && o.geometry !== unitBox && o.geometry !== unitCone && o.geometry !== unitRock)
+    if (o.isInstancedMesh) o.dispose?.();
+    if (o.isMesh && o.geometry !== unitBox && o.geometry !== unitCone && o.geometry !== unitRock && o.geometry !== unitGrass)
       o.geometry.dispose?.();
   });
   world.clear();
@@ -1525,25 +1546,27 @@ function clearWorld() {
   spireMesh = rockMesh = wallMesh = null;
 }
 
-function addThermal(x, z) {
+function addThermal(x, z, parent = world) {
   const g = new THREE.Group();
-  const col = new THREE.Mesh(new THREE.CylinderGeometry(THERMAL_R, THERMAL_R * 0.55, 340, 22, 1, true), thermalMat);
-  col.position.y = 170;
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(THERMAL_R * 0.32, THERMAL_R, 220, 22, 1, true), thermalMat);
+  col.position.y = 110;
   g.add(col);
   const mark = new THREE.Mesh(new THREE.RingGeometry(THERMAL_R - 2.5, THERMAL_R, 36), thermalRingMat);
   mark.rotation.x = -Math.PI / 2; mark.position.y = 0.6;
   g.add(mark);
   g.position.set(x, 0, z);
-  world.add(g);
+  parent.add(g);
   thermals.push(g);
 }
 
-function addRing(x, y, z, rng) {
+function addRing(x, y, z, rngOrRotation, parent = world) {
   const m = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.65, 10, 36), ringMat);
   m.position.set(x, y, z);
-  m.rotation.y = (rng() - 0.5) * 0.6;
+  m.rotation.y = typeof rngOrRotation === 'function'
+    ? (rngOrRotation() - 0.5) * 0.6
+    : Number(rngOrRotation) || 0;
   m.userData.taken = false;
-  world.add(m);
+  parent.add(m);
   ringsArr.push(m);
 }
 
@@ -1640,82 +1663,366 @@ function buildDistance(seed) {
   world.add(line);
 }
 
-/* ---- 오래 날기: 원형 아레나 ---- */
-function buildArena(seed) {
-  clearWorld();
-  const rng = mulberry32(seed);
+/* ---- 오래 날기: authored 백풍 우편협곡 ---- */
+function makeArenaBeam(start, end, radius, material) {
+  const direction = end.clone().sub(start);
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, direction.length(), 8),
+    material
+  );
+  beam.position.copy(start).add(end).multiplyScalar(0.5);
+  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  beam.castShadow = true;
+  return beam;
+}
 
-  // 외벽 바위 링
-  const nWall = 56;
-  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), nWall);
-  for (let i = 0; i < nWall; i++) {
-    const a = (i / nWall) * Math.PI * 2;
-    const rr = ARENA_R + 22 + rng() * 14;
-    dummy.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
-    dummy.scale.set(30 + rng() * 18, 70 + rng() * 110, 30 + rng() * 18);
-    dummy.rotation.set(0, a, 0);
-    dummy.updateMatrix();
-    wallMesh.setMatrixAt(i, dummy.matrix);
-  }
-  world.add(wallMesh);
+function buildWhitewindGround(map) {
+  const root = new THREE.Group();
+  root.name = 'whitewind-ground';
 
-  // 내부 첨탑 — 엄폐물
-  const nSp = 13;
-  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), nSp);
-  spireMesh.castShadow = true;
-  for (let i = 0; i < nSp; i++) {
-    const h = 60 + rng() * 130, r = 7 + rng() * 9;
-    const a = rng() * Math.PI * 2, d = 40 + rng() * (ARENA_R - 80);
-    const x = Math.cos(a) * d, z = Math.sin(a) * d;
-    dummy.position.set(x, 0, z);
-    dummy.scale.set(r, h, r);
-    dummy.updateMatrix();
-    spireMesh.setMatrixAt(i, dummy.matrix);
-    spires.push({ x, z, h, r });
-  }
-  world.add(spireMesh);
-
-  // 공중 바위
-  const nRk = 18;
-  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), nRk);
-  rockMesh.castShadow = true;
-  for (let i = 0; i < nRk; i++) {
-    const r = 5 + rng() * 7;
-    const a = rng() * Math.PI * 2, d = rng() * (ARENA_R - 40);
-    const p = new THREE.Vector3(Math.cos(a) * d, 35 + rng() * 150, Math.sin(a) * d);
-    dummy.position.copy(p);
-    dummy.scale.setScalar(r);
-    dummy.rotation.set(rng() * 3, rng() * 3, 0);
-    dummy.updateMatrix();
-    rockMesh.setMatrixAt(i, dummy.matrix);
-    rocks.push({ p, r });
-  }
-  world.add(rockMesh);
-
-  // 상승기류 · 탄약 링
-  for (let i = 0; i < 8; i++) {
-    const a = rng() * Math.PI * 2, d = 50 + rng() * (ARENA_R - 90);
-    addThermal(Math.cos(a) * d, Math.sin(a) * d);
-  }
-  for (let i = 0; i < 6; i++) {
-    const a = rng() * Math.PI * 2, d = 40 + rng() * (ARENA_R - 70);
-    addRing(Math.cos(a) * d, 45 + rng() * 150, Math.sin(a) * d, rng);
-  }
-
-  addClouds(rng, 12, (g, r2) => {
-    const a = r2() * Math.PI * 2, d = r2() * (ARENA_R + 150);
-    g.position.x = Math.cos(a) * d;
-    g.position.z = Math.sin(a) * d;
+  // 낮게 가라앉은 동심 분지. 바깥 고리에서 중심으로 갈수록 차갑고 평평해집니다.
+  [
+    [map.radius, 6, -3, sandstoneShadowMat],
+    [164, 4.4, -2.1, sandstoneMat],
+    [92, 2.6, -1.25, basinMat],
+  ].forEach(([radius, height, y, material]) => {
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 64), material);
+    floor.position.y = y;
+    floor.receiveShadow = true;
+    root.add(floor);
   });
 
-  // 경계 표시 링
-  const bound = new THREE.Mesh(
-    new THREE.RingGeometry(ARENA_R - 2, ARENA_R, 80),
-    new THREE.MeshBasicMaterial({ color: 0xff8b7e, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+  // 남쪽의 다섯 우편 경작 단은 descriptor의 폭, 깊이, 방향을 그대로 씁니다.
+  for (const terrace of map.terraces) {
+    const step = new THREE.Mesh(unitBox, terrace.level % 2 ? sandstoneLightMat : sandstoneMat);
+    step.name = terrace.id;
+    step.position.set(terrace.x, terrace.level * 0.72, terrace.z);
+    step.scale.set(terrace.width, 1.8 + terrace.level * 0.36, terrace.depth);
+    step.rotation.y = terrace.rotation;
+    step.receiveShadow = true;
+    root.add(step);
+
+    const edgeOffset = terrace.depth * 0.5 - 0.9;
+    const edge = new THREE.Mesh(unitBox, sandstoneShadowMat);
+    edge.name = `${terrace.id}-retaining-edge`;
+    edge.position.set(
+      terrace.x + Math.sin(terrace.rotation) * edgeOffset,
+      terrace.level * 0.72 + step.scale.y - 0.72,
+      terrace.z + Math.cos(terrace.rotation) * edgeOffset
+    );
+    edge.scale.set(terrace.width, 0.72, 1.8);
+    edge.rotation.y = terrace.rotation;
+    edge.castShadow = edge.receiveShadow = true;
+    root.add(edge);
+  }
+
+  // 북쪽 아홉 능선은 하나의 인스턴스 드로콜로 거대한 외벽 실루엣을 만듭니다.
+  wallMesh = new THREE.InstancedMesh(unitBox, sandstoneShadowMat, map.ridge.length);
+  wallMesh.name = 'whitewind-north-ridge';
+  wallMesh.castShadow = true;
+  wallMesh.receiveShadow = true;
+  map.ridge.forEach((ridge, index) => {
+    dummy.position.set(ridge.x, 0, ridge.z);
+    dummy.scale.set(ridge.length, ridge.height, ridge.width);
+    dummy.rotation.set(0, ridge.rotation, 0);
+    dummy.updateMatrix();
+    wallMesh.setMatrixAt(index, dummy.matrix);
+  });
+  wallMesh.instanceMatrix.needsUpdate = true;
+  root.add(wallMesh);
+
+  const ridgeCrowns = new THREE.InstancedMesh(unitRock, sandstoneShadowMat, map.ridge.length);
+  ridgeCrowns.name = 'whitewind-ridge-crowns';
+  ridgeCrowns.castShadow = ridgeCrowns.receiveShadow = true;
+  map.ridge.forEach((ridge, index) => {
+    dummy.position.set(ridge.x, ridge.height * 0.88, ridge.z);
+    dummy.scale.set(ridge.length * 0.56, ridge.height * 0.26, ridge.width * 0.7);
+    dummy.rotation.set(0, ridge.rotation + index * 0.17, 0);
+    dummy.updateMatrix();
+    ridgeCrowns.setMatrixAt(index, dummy.matrix);
+  });
+  ridgeCrowns.instanceMatrix.needsUpdate = true;
+  root.add(ridgeCrowns);
+
+  const boundary = new THREE.Mesh(new THREE.RingGeometry(map.radius - 2, map.radius, 96), boundaryMat);
+  boundary.name = 'whitewind-boundary';
+  boundary.rotation.x = -Math.PI / 2;
+  boundary.position.y = 0.16;
+  root.add(boundary);
+  return root;
+}
+
+function buildWindGate(map) {
+  const landmark = map.landmarks.find(item => item.kind === 'wind-gate');
+  const root = new THREE.Group();
+  root.name = 'landmark-wind-gate';
+  root.position.set(landmark.x, 0, landmark.z);
+
+  // 두 석주 코어는 map.spires 인스턴스가 담당하고, 여기서는 끊어진 머릿돌만 덧댑니다.
+  const westLintel = new THREE.Mesh(unitBox, sandstoneLightMat);
+  westLintel.position.set(-14, 64, 0);
+  westLintel.scale.set(13, 4.5, 5.5);
+  westLintel.rotation.z = -0.12;
+  const eastLintel = new THREE.Mesh(unitBox, sandstoneMat);
+  eastLintel.position.set(3, 61, 0);
+  eastLintel.scale.set(11, 4, 5);
+  eastLintel.rotation.z = 0.16;
+  westLintel.castShadow = eastLintel.castShadow = true;
+  root.add(westLintel, eastLintel);
+
+  const windGateArch = new THREE.Mesh(
+    new THREE.TorusGeometry(15.5, 1.65, 8, 32, Math.PI),
+    plasterMat
   );
-  bound.rotation.x = -Math.PI / 2;
-  bound.position.y = 0.15;
-  world.add(bound);
+  windGateArch.name = 'wind-gate-arch';
+  windGateArch.position.set(0, 54, 0);
+  windGateArch.castShadow = true;
+  root.add(windGateArch);
+
+  const cablePath = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-14, 72, 0),
+    new THREE.Vector3(-6, 66, -1.5),
+    new THREE.Vector3(3, 63, -2),
+    new THREE.Vector3(14, 66, 0),
+  ]);
+  const cable = new THREE.Mesh(new THREE.TubeGeometry(cablePath, 24, 0.32, 6, false), metalMat);
+  cable.name = 'wind-gate-cable';
+  root.add(cable);
+
+  [[-13, 69, -0.08], [13, 64, 0.1]].forEach(([x, y, tilt], index) => {
+    const ribbon = new THREE.Mesh(new THREE.PlaneGeometry(index ? 4.5 : 6, index ? 12 : 15, 1, 3), routeRibbonMat);
+    ribbon.name = `wind-gate-cloth-${index + 1}`;
+    ribbon.position.set(x, y, 1.2);
+    ribbon.rotation.set(0, tilt, index ? 0.13 : -0.1);
+    root.add(ribbon);
+  });
+  return root;
+}
+
+function buildPostOffice(map) {
+  const landmark = map.landmarks.find(item => item.kind === 'post-office');
+  const root = new THREE.Group();
+  root.name = 'landmark-post-office';
+  root.position.set(landmark.x, 0, landmark.z);
+  root.rotation.y = landmark.rotation;
+
+  const body = new THREE.Mesh(unitBox, plasterMat);
+  body.position.set(0, 0, 0);
+  body.scale.set(48, 11, 19);
+  body.castShadow = body.receiveShadow = true;
+  root.add(body);
+
+  // 긴 건물 위에 서로 접힌 두 장의 얕은 지붕을 올립니다.
+  [[-5.2, -0.24], [5.2, 0.24]].forEach(([z, pitch], index) => {
+    const roof = new THREE.Mesh(unitBox, routeStoneMat);
+    roof.position.set(0, 11, z);
+    roof.scale.set(51, 1.2, 11.5);
+    roof.rotation.x = pitch;
+    roof.castShadow = true;
+    root.add(roof);
+  });
+
+  const chimney = new THREE.Mesh(unitBox, routeStoneMat);
+  chimney.position.set(-17, 11.5, -2);
+  chimney.scale.set(4.5, 8.5, 4.5);
+  chimney.castShadow = true;
+  root.add(chimney);
+
+  const deck = new THREE.Mesh(unitBox, sandstoneShadowMat);
+  deck.position.set(0, 0.25, 9.5);
+  deck.scale.set(54, 1.1, 10);
+  deck.receiveShadow = true;
+  root.add(deck);
+
+  const door = new THREE.Mesh(unitBox, routeStoneMat);
+  door.position.set(-11, 1, 9.7);
+  door.scale.set(7, 7.5, 0.8);
+  root.add(door);
+  [-1, 12].forEach(x => {
+    const slot = new THREE.Mesh(unitBox, metalMat);
+    slot.position.set(x, 5.2, 9.8);
+    slot.scale.set(7, 2.2, 0.65);
+    root.add(slot);
+  });
+
+  const sign = new THREE.Group();
+  sign.name = 'post-office-envelope-sign';
+  sign.position.set(5.5, 2.8, 10.2);
+  const signBoard = new THREE.Mesh(unitBox, plasterMat);
+  signBoard.scale.set(13, 6.2, 0.65);
+  signBoard.castShadow = true;
+  sign.add(signBoard);
+  for (const direction of [-1, 1]) {
+    const fold = new THREE.Mesh(unitBox, routeStoneMat);
+    fold.position.set(direction * 2.8, 3.3, 0.48);
+    fold.scale.set(7, 0.65, 0.3);
+    fold.rotation.z = direction * -0.44;
+    sign.add(fold);
+  }
+  root.add(sign);
+
+  const pole = makeArenaBeam(new THREE.Vector3(16, 11, 0), new THREE.Vector3(16, 24, 0), 0.35, metalMat);
+  const vane = new THREE.Mesh(unitCone, routeRibbonMat);
+  vane.position.set(16, 22.5, 0);
+  vane.scale.set(2.5, 7, 2.5);
+  vane.rotation.z = -Math.PI / 2;
+  root.add(pole, vane);
+  return root;
+}
+
+function buildWhiteNeedle(map) {
+  const landmark = map.landmarks.find(item => item.kind === 'white-needle');
+  const root = new THREE.Group();
+  root.name = 'landmark-white-needle';
+  root.position.set(landmark.x, 0, landmark.z);
+
+  // 흰 첨탑 코어는 map.spires가 렌더하고, 관측 고리와 네 지지대만 이 landmark에 둡니다.
+  const deck = new THREE.Mesh(new THREE.CylinderGeometry(14, 11, 2.2, 20), plasterMat);
+  deck.position.y = 43;
+  deck.castShadow = deck.receiveShadow = true;
+  root.add(deck);
+  const observationRing = new THREE.Mesh(new THREE.TorusGeometry(14, 1.25, 8, 36), metalMat);
+  observationRing.name = 'white-needle-observation-ring';
+  observationRing.position.y = 45;
+  observationRing.rotation.x = Math.PI / 2;
+  root.add(observationRing);
+
+  for (let index = 0; index < 4; index += 1) {
+    const angle = index * Math.PI / 2 + Math.PI / 4;
+    const lower = new THREE.Vector3(Math.cos(angle) * 7, 24, Math.sin(angle) * 7);
+    const upper = new THREE.Vector3(Math.cos(angle) * 12, 42, Math.sin(angle) * 12);
+    root.add(makeArenaBeam(lower, upper, 0.65, plasterMat));
+  }
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(3.2, 12, 8), plasterMat);
+  cap.position.y = landmark.height + 5;
+  cap.castShadow = true;
+  root.add(cap);
+  return root;
+}
+
+function buildRouteDressing(map) {
+  const root = new THREE.Group();
+  root.name = 'whitewind-route-dressing';
+
+  const routeMarkers = new THREE.InstancedMesh(unitBox, routeStoneMat, map.dressing.routeMarkers.length);
+  routeMarkers.name = 'postal-route-stones';
+  routeMarkers.castShadow = true;
+  map.dressing.routeMarkers.forEach((marker, index) => {
+    dummy.position.set(marker.x, 0, marker.z);
+    dummy.scale.set(marker.cluster === 'double' ? 2.2 : 1.55, marker.height, 1.5);
+    dummy.rotation.set(0, marker.rotation, 0);
+    dummy.updateMatrix();
+    routeMarkers.setMatrixAt(index, dummy.matrix);
+  });
+  routeMarkers.instanceMatrix.needsUpdate = true;
+  root.add(routeMarkers);
+
+  const grassPatches = new THREE.InstancedMesh(unitGrass, grassMat, map.dressing.grassPatches.length);
+  grassPatches.name = 'terrace-grass';
+  map.dressing.grassPatches.forEach((patch, index) => {
+    dummy.position.set(patch.x, 0.15, patch.z);
+    dummy.scale.set(patch.scale * 1.4, patch.scale * 3.3, patch.scale);
+    dummy.rotation.set(0, patch.rotation, 0);
+    dummy.updateMatrix();
+    grassPatches.setMatrixAt(index, dummy.matrix);
+  });
+  grassPatches.instanceMatrix.needsUpdate = true;
+  root.add(grassPatches);
+
+  const groundRocks = new THREE.InstancedMesh(unitRock, sandstoneShadowMat, map.dressing.groundRocks.length);
+  groundRocks.name = 'basin-ground-rocks';
+  groundRocks.castShadow = groundRocks.receiveShadow = true;
+  map.dressing.groundRocks.forEach((rock, index) => {
+    dummy.position.set(rock.x, rock.y, rock.z);
+    dummy.scale.set(rock.scale * 1.35, rock.scale * 0.7, rock.scale);
+    dummy.rotation.set(rock.rotation * 0.35, rock.rotation, 0);
+    dummy.updateMatrix();
+    groundRocks.setMatrixAt(index, dummy.matrix);
+  });
+  groundRocks.instanceMatrix.needsUpdate = true;
+  root.add(groundRocks);
+
+  // 네 개의 이중 표식에만 천 리본을 달아 작은 개별 mesh 수를 유지합니다.
+  map.dressing.routeMarkers.filter(marker => marker.cluster === 'double').forEach((marker, index) => {
+    const ribbon = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 1.4), routeRibbonMat);
+    ribbon.name = `postal-route-ribbon-${index + 1}`;
+    ribbon.position.set(marker.x, marker.height - 1.2, marker.z);
+    ribbon.rotation.y = marker.rotation;
+    root.add(ribbon);
+  });
+  return root;
+}
+
+function buildArena(seed) {
+  clearWorld();
+  const map = createEnduranceMap(seed);
+  const arenaRoot = new THREE.Group();
+  arenaRoot.name = `endurance-map-${map.id}`;
+  arenaRoot.userData.mapName = map.name;
+  arenaRoot.userData.mapId = map.id;
+  arenaRoot.userData.seed = map.seed;
+  world.add(arenaRoot);
+
+  arenaRoot.add(buildWhitewindGround(map));
+  arenaRoot.add(buildWindGate(map));
+  arenaRoot.add(buildPostOffice(map));
+  arenaRoot.add(buildWhiteNeedle(map));
+  arenaRoot.add(buildRouteDressing(map));
+
+  // 첨탑 instance는 시각 코어인 동시에 기존 원기둥 충돌 계약을 채웁니다.
+  spireMesh = new THREE.InstancedMesh(unitCone, sandstoneMat, map.spires.length);
+  spireMesh.name = 'whitewind-collidable-spires';
+  spireMesh.castShadow = true;
+  let spireIndex = 0;
+  for (const descriptor of map.spires) {
+    dummy.position.set(descriptor.x, 0, descriptor.z);
+    dummy.scale.set(descriptor.r, descriptor.h, descriptor.r);
+    dummy.rotation.set(0, 0, 0);
+    dummy.updateMatrix();
+    spireMesh.setMatrixAt(spireIndex++, dummy.matrix);
+    spires.push({ x: descriptor.x, z: descriptor.z, h: descriptor.h, r: descriptor.r });
+  }
+  spireMesh.instanceMatrix.needsUpdate = true;
+  arenaRoot.add(spireMesh);
+
+  rockMesh = new THREE.InstancedMesh(unitRock, sandstoneShadowMat, map.rocks.length);
+  rockMesh.name = 'whitewind-collidable-rocks';
+  rockMesh.castShadow = true;
+  let rockIndex = 0;
+  for (const descriptor of map.rocks) {
+    const p = new THREE.Vector3(descriptor.x, descriptor.y, descriptor.z);
+    dummy.position.copy(p);
+    dummy.scale.setScalar(descriptor.r);
+    dummy.rotation.set(descriptor.x * 0.013, descriptor.z * 0.017, descriptor.y * 0.009);
+    dummy.updateMatrix();
+    rockMesh.setMatrixAt(rockIndex++, dummy.matrix);
+    rocks.push({ p, r: descriptor.r });
+  }
+  rockMesh.instanceMatrix.needsUpdate = true;
+  arenaRoot.add(rockMesh);
+
+  for (const descriptor of map.thermals) {
+    addThermal(descriptor.x, descriptor.z, arenaRoot);
+  }
+  for (const descriptor of map.rings) {
+    addRing(descriptor.x, descriptor.y, descriptor.z, descriptor.rotationY, arenaRoot);
+  }
+
+  // 구름도 descriptor 위치/높이/크기를 그대로 사용하며 공용 unitRock으로 구성합니다.
+  for (const descriptor of map.clouds) {
+    const cloud = new THREE.Group();
+    cloud.name = descriptor.id;
+    cloud.position.set(descriptor.x, descriptor.y, descriptor.z);
+    cloud.scale.setScalar(descriptor.scale);
+    [[-12, 0, 0, 14], [4, 3, -2, 18], [18, -1, 3, 11]].forEach(([x, y, z, size]) => {
+      const puff = new THREE.Mesh(unitRock, cloudMat);
+      puff.position.set(x, y, z);
+      puff.scale.set(size, size * 0.55, size * 0.8);
+      cloud.add(puff);
+    });
+    arenaRoot.add(cloud);
+    clouds.push(cloud);
+  }
 }
 
 /* ---- 공통 출발 연출: 모드별 스폰 지점의 옥상에서 달려 점프 ---- */
@@ -1806,18 +2113,49 @@ function clearLaunchActors() {
   launchState.active = false;
 }
 
-function setLaunchLegFade(leg, fade) {
-  const remaining = Math.max(0, 1 - fade);
-  leg.scale.setScalar(Math.max(.001, remaining));
-  leg.visible = remaining > .01;
-  leg.traverse(part => {
-    const materials = Array.isArray(part.material) ? part.material : [part.material];
-    materials.filter(Boolean).forEach(material => {
-      material.transparent = fade > 0;
-      material.opacity = remaining;
-      material.depthWrite = remaining > .15;
-    });
+const LAUNCH_POOF_OFFSETS = [
+  [-1.05, .08, -.12, 1.05], [-.72, .42, .16, .9], [-.62, -.38, .08, .82],
+  [-.22, .16, -.28, 1.12], [0, -.24, .22, .94], [.28, .48, .04, .78],
+  [.52, -.34, -.18, .88], [.7, .2, .25, 1], [1.04, -.02, -.08, .92],
+  [-.34, -.62, .3, .7], [.35, -.58, .26, .72], [0, .68, -.1, .74]
+];
+
+function makeLaunchLegPoof() {
+  const geometry = new THREE.SphereGeometry(.62, 12, 8);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    vertexColors: true
   });
+  const poof = new THREE.InstancedMesh(geometry, material, LAUNCH_POOF_OFFSETS.length);
+  poof.name = 'launchLegPoof';
+  poof.position.set(0, -1.86, .36);
+  poof.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  poof.frustumCulled = false;
+  poof.visible = false;
+  const colors = [0xfffdf4, 0xeafcff, 0xcceff4];
+  LAUNCH_POOF_OFFSETS.forEach((_, index) => poof.setColorAt(index, new THREE.Color(colors[index % colors.length])));
+  if (poof.instanceColor) poof.instanceColor.needsUpdate = true;
+  return poof;
+}
+
+function updateLaunchLegPoof(poof, pose) {
+  if (!poof) return;
+  poof.visible = pose.poofOpacity > .01;
+  poof.material.opacity = pose.poofOpacity * .92;
+  if (!poof.visible) return;
+  const spread = .14 + pose.poofProgress * 1.35;
+  const baseScale = .5 + pose.poofProgress * .82;
+  LAUNCH_POOF_OFFSETS.forEach((offset, index) => {
+    dummy.position.set(offset[0] * spread, offset[1] * spread, offset[2] * spread);
+    dummy.rotation.set(index * .31, pose.poofProgress * (index % 2 ? 1.2 : -.9), index * .17);
+    dummy.scale.setScalar(baseScale * offset[3]);
+    dummy.updateMatrix();
+    poof.setMatrixAt(index, dummy.matrix);
+  });
+  poof.instanceMatrix.needsUpdate = true;
 }
 
 function startLaunchSequence(phase) {
@@ -1838,6 +2176,8 @@ function startLaunchSequence(phase) {
     body.rotation.x = Math.PI / 2;
     mascot.add(body);
     mascot.userData.body = body;
+    const poof = makeLaunchLegPoof();
+    mascot.add(poof);
     mascot.scale.setScalar(.92);
     const start = launchSpawnPoint(index, count, 'start');
     const end = launchSpawnPoint(index, count, 'end');
@@ -1845,7 +2185,7 @@ function startLaunchSequence(phase) {
     mascot.position.copy(start).add(new THREE.Vector3(0, 3.05, 0));
     mascot.lookAt(mascot.position.clone().add(direction));
     world.add(mascot);
-    launchState.actors.push({ id, group: mascot, mascot, body, start, end, direction });
+    launchState.actors.push({ id, group: mascot, mascot, body, poof, start, end, direction });
   });
   launchState.duration = Math.max(1, Number(phase?.duration) || 4400);
   const elapsed = Math.max(0, launchState.duration - Math.max(0, game.ends - Date.now()));
@@ -1890,8 +2230,9 @@ function updateLaunch(now) {
     right.knee.rotation.x = .18 + Math.max(0, stride) * .65;
     left.shoe.rotation.x = -.08 - Math.max(0, -stride) * .18;
     right.shoe.rotation.x = -.08 - Math.max(0, stride) * .18;
-    setLaunchLegFade(leftLeg, pose.legFade);
-    setLaunchLegFade(rightLeg, pose.legFade);
+    leftLeg.visible = pose.legsVisible;
+    rightLeg.visible = pose.legsVisible;
+    updateLaunchLegPoof(actor.poof, pose);
     actor.mascot.visible = !pose.showFlightCraft;
     if (index === localIndex) craft.position.copy(position);
   });
@@ -1899,7 +2240,8 @@ function updateLaunch(now) {
   if (progress < .18) showCenter(3, '준비', null);
   else if (progress < .39) showCenter(2, '달릴 준비', null);
   else if (progress < .66) showCenter(1, '달려!', null);
-  else if (progress < .92) showCenter(null, '점프!', '다리를 접고 만든 종이 모양 그대로 날아오릅니다');
+  else if (progress < .68) showCenter(null, '점프!', '옥상 끝에서 뛰어내립니다');
+  else if (progress < .92) showCenter(null, '펑!', '다리는 구름 속으로 사라집니다');
 
   if (pose.showFlightCraft) craft.visible = true;
   if (progress >= 1) {
@@ -2085,6 +2427,7 @@ function applyPhase(m) {
       showCenter('비행 종료', '관전 중', '다음 라운드를 기다리세요');
     } else if (wasLaunch) {
       clearLaunchActors();
+      clearLaunchTowers();
       game.phase = 'playing';
       me.alive = true;
       craft.visible = true;
@@ -2574,19 +2917,24 @@ renderer.setAnimationLoop(() => {
   );
   camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
   camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
-  lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
-  lookAt.y += 1.2;
-  camera.lookAt(lookAt);
+    lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
+    const cameraLookHeight = game.phase === 'launch'
+      ? 1.2
+      : game.mode === 'ARENA' ? -5.5 : 1.2;
+    lookAt.y += cameraLookHeight;
+    camera.lookAt(lookAt);
 
-  /* ---- 배경 추적 ---- */
-  sky.position.copy(camera.position);
-  if (game.mode === 'DIST') {
-    ground.position.set(0, 0, followPos.z);
-    grid.position.set(0, 0.05, Math.round(followPos.z / 40) * 40);
-  } else {
-    ground.position.set(0, 0, 0);
-    grid.position.set(0, 0.05, 0);
-  }
+    /* ---- 배경 추적 ---- */
+    sky.position.copy(camera.position);
+    grid.visible = game.mode === 'DIST';
+    ground.material.color.setHex(game.mode === 'ARENA' ? 0x455957 : 0x5f7a4e);
+    if (game.mode === 'DIST') {
+      ground.position.set(0, 0, followPos.z);
+      grid.position.set(0, 0.05, Math.round(followPos.z / 40) * 40);
+    } else {
+      ground.position.set(0, game.mode === 'ARENA' ? -6 : 0, 0);
+      grid.position.set(0, 0.05, 0);
+    }
   sun.position.set(followPos.x + 70, 110, followPos.z + 50);
   sun.target.position.copy(followPos);
 

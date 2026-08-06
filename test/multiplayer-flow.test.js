@@ -145,10 +145,12 @@ test('active room snapshots are idempotent and launch is server-authoritative', 
   assert.doesNotMatch(html, /setCraftFromFoldModel\(foldedModel\);\s*startLaunchSequence\(\)/s);
 });
 
-test('remote and launch Three.js resources are explicitly disposed', () => {
+test('remote, launch, and authored-map Three.js resources are explicitly disposed', () => {
   assert.match(html, /function disposeObject3D\(object\)/);
+  assert.match(html, /if \(child\.isInstancedMesh\) child\.dispose\?\.\(\)/);
   assert.match(html, /disposeObject3D\(actor\.group \|\| actor\.mascot\)/);
   assert.match(html, /disposeObject3D\(player\.remote\.group\)/);
+  assert.match(html, /function clearWorld\(\)[\s\S]*if \(o\.isInstancedMesh\) o\.dispose\?\.\(\)/);
 });
 
 test('DIST and ARENA share READY and folding flow while retaining mode-specific play maps', () => {
@@ -196,7 +198,7 @@ test('folded craft and server-timed rooftop launch sequence are connected to are
   assert.match(html, /game\.order = Array\.isArray\(m\.order\)[^;]+;\s*ensureLaunchTowers\(\)/s);
 });
 
-test('rooftop launch uses each player folded model from the first frame and removes only the legs during jump', () => {
+test('rooftop launch poofs away full-size legs at the drop without folding them', () => {
   assert.match(html, /<script src="\.\/launch-transition\.js"><\/script>/);
   assert.match(html, /const snapshots = new Map\(\(phase\?\.crafts/);
   assert.match(html, /replayFoldCommands\(snapshot\?\.commands/);
@@ -205,8 +207,15 @@ test('rooftop launch uses each player folded model from the first frame and remo
   assert.match(html, /mascot\.add\(body\)/);
   assert.match(html, /getLaunchPose\(progress\)/);
   assert.match(html, /body\.rotation\.x = pose\.bodyPitch/);
-  assert.match(html, /setLaunchLegFade\(leftLeg, pose\.legFade\)/);
-  assert.match(html, /setLaunchLegFade\(rightLeg, pose\.legFade\)/);
+  assert.match(html, /function makeLaunchLegPoof\(\)/);
+  assert.match(html, /new THREE\.SphereGeometry\(\.62, 12, 8\)/);
+  assert.doesNotMatch(html, /function makeLaunchLegPoof\(\)[\s\S]{0,200}IcosahedronGeometry/);
+  assert.match(html, /new THREE\.InstancedMesh\([^,]+,[^,]+,\s*LAUNCH_POOF_OFFSETS\.length\)/);
+  assert.match(html, /updateLaunchLegPoof\(actor\.poof, pose\)/);
+  assert.match(html, /leftLeg\.visible = pose\.legsVisible/);
+  assert.match(html, /rightLeg\.visible = pose\.legsVisible/);
+  assert.doesNotMatch(html, /setLaunchLegFade|pose\.legFade|다리를 접고/);
+  assert.match(html, /showCenter\(null, '펑!', '다리는 구름/);
   assert.doesNotMatch(html, /if \(progress >= \.88\) craft\.visible = true/);
 });
 

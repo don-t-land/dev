@@ -7,24 +7,27 @@ const {
   shouldReuseFoldedVisual,
   getLaunchLayoutKey
 } = require('../public/launch-transition.js');
-
-test('launch starts with an upright folded body and fully visible legs', () => {
-  const pose = getLaunchPose(0.5);
-  assert.equal(pose.legFade, 0);
+test('launch keeps full-size legs visible until the rooftop drop', () => {
+  const pose = getLaunchPose(0.66);
+  assert.equal(pose.legsVisible, true);
+  assert.equal(pose.poofProgress, 0);
+  assert.equal(pose.poofOpacity, 0);
   assert.equal(pose.bodyPitch, Math.PI / 2);
   assert.equal(pose.showFlightCraft, false);
 });
 
-test('jump naturally folds the body into flight while fading the legs', () => {
-  const pose = getLaunchPose(0.75);
-  assert.ok(pose.legFade > 0 && pose.legFade < 1);
-  assert.ok(pose.bodyPitch > 0 && pose.bodyPitch < Math.PI / 2);
+test('the rooftop drop hides both legs at once and triggers a short poof', () => {
+  const pose = getLaunchPose(0.72);
+  assert.equal(pose.legsVisible, false);
+  assert.ok(pose.poofProgress > 0 && pose.poofProgress < 1);
+  assert.ok(pose.poofOpacity > 0 && pose.poofOpacity <= 1);
   assert.equal(pose.showFlightCraft, false);
 });
 
 test('only the completed launch swaps to the actual flight craft', () => {
   const pose = getLaunchPose(1);
-  assert.equal(pose.legFade, 1);
+  assert.equal(pose.legsVisible, false);
+  assert.equal(pose.poofOpacity, 0);
   assert.equal(pose.bodyPitch, 0);
   assert.equal(pose.showFlightCraft, true);
 });

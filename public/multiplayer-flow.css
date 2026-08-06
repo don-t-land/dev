@@ -149,6 +149,7 @@
 .fold-workspace { width:min(1240px,100%); height:100%; min-height:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(270px, 330px); gap:14px; }
 .fold-stage { position:relative; min-width:0; min-height:0; border:1px solid rgba(134,220,245,.2); border-radius:22px; overflow:hidden; background:radial-gradient(circle at 50% 50%,rgba(102,210,238,.12),transparent 52%); box-shadow:inset 0 0 80px rgba(5,8,29,.72),0 18px 50px rgba(2,5,25,.25); }
 #fold-paper-canvas { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; outline:none; }
+#fold-paper-canvas.orbiting { cursor:grabbing; }
 #fold-paper-canvas:focus-visible { box-shadow:inset 0 0 0 3px #71e4ed; }
 #fold-paper-canvas[aria-disabled="true"] { cursor:not-allowed; }
 .fold-hint { position:absolute; z-index:3; left:50%; top:14px; max-width:calc(100% - 24px); transform:translateX(-50%); padding:8px 13px; border:1px solid rgba(142,213,240,.14); border-radius:99px; color:#b9c9e3; background:rgba(4,9,29,.72); font-size:11px; text-align:center; white-space:nowrap; pointer-events:none; }

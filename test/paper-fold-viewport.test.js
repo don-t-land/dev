@@ -27,10 +27,43 @@ function closePoint(actual, expected, epsilon = 1e-8) {
 
 test('UMD viewport exposes deterministic orthographic projection and hit-test math', () => {
   assert.deepEqual(Object.keys(viewport).sort(), [
-    'DEFAULT_CAMERA', 'faceNormal', 'hitTestFaces', 'materialToScreen',
+    'DEFAULT_CAMERA', 'DEFAULT_ORBIT', 'cameraBasisFromOrbit', 'faceNormal', 'hitTestFaces', 'materialToScreen',
     'pointInPolygon', 'polygonArea', 'projectFace', 'projectPoint',
     'screenToMaterial'
   ]);
+});
+
+test('orbit camera basis stays orthonormal and keeps the paper center fixed', () => {
+  const basis = viewport.cameraBasisFromOrbit(
+    viewport.DEFAULT_ORBIT.azimuth + 0.73,
+    viewport.DEFAULT_ORBIT.elevation - 0.21
+  );
+  const dot = (left, right) => left.reduce((sum, value, index) => sum + value * right[index], 0);
+
+  for (const axis of [basis.right, basis.up, basis.view]) {
+    assert.ok(axis.every(Number.isFinite));
+    assert.ok(Math.abs(Math.hypot(...axis) - 1) < 1e-9);
+  }
+  assert.ok(Math.abs(dot(basis.right, basis.up)) < 1e-9);
+  assert.ok(Math.abs(dot(basis.right, basis.view)) < 1e-9);
+  assert.ok(Math.abs(dot(basis.up, basis.view)) < 1e-9);
+
+  const camera = { ...basis, scale: 120, cx: 321, cy: 234 };
+  closePoint(viewport.projectPoint([0, 0, 0], camera).point, [321, 234]);
+  const material = [0.23, -0.41];
+  const screen = viewport.materialToScreen(flatFace, material, camera);
+  closePoint(viewport.screenToMaterial(flatFace, screen, camera), material, 1e-7);
+});
+
+test('the default orbit reproduces the existing default camera basis', () => {
+  const basis = viewport.cameraBasisFromOrbit(
+    viewport.DEFAULT_ORBIT.azimuth,
+    viewport.DEFAULT_ORBIT.elevation
+  );
+
+  closePoint(basis.right, viewport.DEFAULT_CAMERA.right);
+  closePoint(basis.up, viewport.DEFAULT_CAMERA.up);
+  closePoint(basis.view, viewport.DEFAULT_CAMERA.view);
 });
 
 test('flat and ninety-degree panels both have nonzero projected visible area', () => {

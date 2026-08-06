@@ -14,7 +14,8 @@
   const MAX_FACES = 64;
   const MAX_COMMAND_JSON = 4096;
   const MAX_COORDINATE = 1000;
-  const COMMAND_VERSION = 2;
+  const LEGACY_COMMAND_VERSION = 2;
+  const COMMAND_VERSION = 3;
 
   function cleanNumber(value) {
     const rounded = Math.round(value * 1e12) / 1e12;
@@ -108,16 +109,18 @@
   }
 
   function cloneCommand(command, index = 0, fallbackId) {
+    const version = command?.version === LEGACY_COMMAND_VERSION
+      ? LEGACY_COMMAND_VERSION : COMMAND_VERSION;
     if (command?.type === 'flip') {
       return {
-        type: 'flip', version: COMMAND_VERSION,
+        type: 'flip', version,
         id: isActionId(command.id, 'flip') ? command.id : (fallbackId || `flip-${index + 1}`)
       };
     }
     const legacy = command?.type == null;
     const cloned = {
       type: 'fold',
-      version: COMMAND_VERSION,
+      version,
       id: isActionId(command?.id, 'fold') ? command.id : (fallbackId || `fold-${index + 1}`),
       start: clonePoint(command.start),
       end: clonePoint(command.end),
@@ -403,7 +406,7 @@
     return cleanNumber(Math.round(angle * 1000) / 1000);
   }
 
-  function normalizedTargets(model, options) {
+  function normalizedTargets(model, options, connectedFlap) {
     if (options.targetFaceIds != null && options.seedFaceId != null) return null;
     let ids = null;
     let seedFaceId = null;
@@ -418,14 +421,25 @@
     }
     if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_FACES
         || !ids.every(isId) || new Set(ids).size !== ids.length) return null;
-    // Selective commands intentionally model one physical panel. Moving an
-    // arbitrary disconnected set would imply several independent hinges and
-    // cannot later be unfolded as one rigid command.
+    // In v3 a selected face identifies which visible layer the user grabbed.
+    // The actual motion still includes every sheet facet on the directed
+    // crease's moving side; v2 replay keeps its historical single-face motion.
     if (ids.length !== 1) return null;
     const available = new Set(model.faces.map(face => face.id));
-    if (!ids.every(id => available.has(id))) return null;
+    const seedExists = available.has(ids[0]) || connectedFlap && model.history.some(snapshot => (
+      snapshot.faces.some(face => face.id === ids[0])
+    ));
+    if (!seedExists) return null;
+    const candidates = model.faces.filter(face => face.id === ids[0]
+      || connectedFlap && face.id.startsWith(`${ids[0]}:`));
+    if (!candidates.length) return null;
     const canonical = model.faces.map(face => face.id).filter(id => ids.includes(id));
-    return { ids: canonical, seedFaceId, selected: new Set(canonical) };
+    return {
+      ids: connectedFlap ? ids.slice() : canonical,
+      seedFaceId,
+      hingeFaceIds: new Set(candidates.map(face => face.id)),
+      selected: new Set((connectedFlap ? model.faces : candidates).map(face => face.id))
+    };
   }
 
   function nextActionId(model, type) {
@@ -442,7 +456,7 @@
     return id;
   }
 
-  function applyPanelFoldInternal(original, options, requiredId) {
+  function applyPanelFoldInternal(original, options, requiredId, commandVersion = COMMAND_VERSION) {
     const model = upgradeModel(original);
     if (!model || !options || typeof options !== 'object'
         || !isPoint(options.start) || !isPoint(options.end)
@@ -457,7 +471,8 @@
     if (requiredId != null && options.id != null && options.id !== requiredId) return original;
     const id = chooseActionId(model, 'fold', suppliedId);
     if (!id) return original;
-    const targets = normalizedTargets(model, options);
+    const connectedFlap = commandVersion === COMMAND_VERSION;
+    const targets = normalizedTargets(model, options, connectedFlap);
     if (!targets) return original;
 
     const deltaX = options.end[0] - options.start[0];
@@ -491,28 +506,38 @@
         : splitFace(face, options.start, projectedNormal, face.poly);
       if ((split.moved && !isLargeEnough(split.moved))
           || (split.stationary && !isLargeEnough(split.stationary))) return original;
-      if (split.moved) {
+      // Only a face cut into two physical pieces contributes a real hinge.
+      // A face wholly on the moving side follows the connected flap but must
+      // not manufacture an extrapolated axis outside the sheet.
+      if (split.moved && (!connectedFlap || split.stationary)) {
         const axisStart = materialPoint3d(face, materialStart);
         const axisEnd = materialPoint3d(face, materialEnd);
         if (!axisStart || !axisEnd || !normalized3d(vector3d(axisStart, axisEnd))) return original;
-        hinges.push([axisStart, axisEnd]);
-        anyMoved = true;
+        hinges.push({ axis: [axisStart, axisEnd], faceId: face.id });
       }
+      if (split.moved) anyMoved = true;
       pieces.push({
         face, selected: true, moved: split.moved, stationary: split.stationary,
         creasePoint, creaseDirection
       });
     }
 
-    if (!anyMoved || !hinges.every(hinge => sameHinge(hinges[0], hinge))) return original;
+    if (!anyMoved || !hinges.length
+        || !hinges.every(hinge => sameHinge(hinges[0].axis, hinge.axis))) return original;
+    let physicalHinge = hinges[0].axis;
+    if (connectedFlap && targets.ids) {
+      const seedHinges = hinges.filter(hinge => targets.hingeFaceIds.has(hinge.faceId));
+      if (seedHinges.length !== 1) return original;
+      physicalHinge = seedHinges[0].axis;
+    }
     const resultingFaceCount = pieces.reduce((count, piece) => {
       if (!piece.selected || !piece.moved) return count + 1;
       return count + 1 + (piece.stationary ? 1 : 0);
     }, 0);
     if (resultingFaceCount > MAX_FACES) return original;
 
-    const axisPoint = hinges[0][0];
-    const axisEnd = hinges[0][1];
+    const axisPoint = physicalHinge[0];
+    const axisEnd = physicalHinge[1];
     const axisDirection = normalized3d(vector3d(axisPoint, axisEnd));
     const radians = options.direction * targetAngle * Math.PI / 180;
     const movedLayers = pieces.filter(piece => piece.moved).map(piece => piece.face.layer);
@@ -555,7 +580,7 @@
     }
 
     const command = {
-      type: 'fold', version: COMMAND_VERSION, id,
+      type: 'fold', version: commandVersion, id,
       start: [cleanNumber(options.start[0]), cleanNumber(options.start[1])],
       end: [cleanNumber(options.end[0]), cleanNumber(options.end[1])],
       direction: options.direction,
@@ -580,7 +605,8 @@
     if (JSON.stringify(nextCommands).length > MAX_COMMAND_JSON) return original;
 
     return {
-      faces: targets.ids ? faces : normalizeLayers(faces),
+      faces: commandVersion === LEGACY_COMMAND_VERSION && targets.ids
+        ? faces : normalizeLayers(faces),
       folds: model.folds.map((item, index) => cloneFold(item, index)).concat(fold),
       history: model.history.map(cloneSnapshot).concat(snapshotOf(model)),
       commands: nextCommands,
@@ -591,9 +617,10 @@
   /**
    * Apply an absolute-angle panel fold. `coordinateSpace: 'material'` cuts in
    * canonical sheet coordinates and is the stable API for sequential seed-face
-   * editing. A selective command moves exactly one seed/target face as one
-   * rigid rotation. Unsupported multi-panel hinges and every other failure are
-   * rejected atomically by returning the original model.
+   * editing. A selected face is a grab seed; every connected facet on the
+   * directed line's left side moves through one rigid hinge transform so old
+   * seams remain joined. Unsupported multi-hinge motion and every other failure
+   * are rejected atomically by returning the original model.
    */
   function applyPanelFold(model, options) {
     return applyPanelFoldInternal(model, options, options && options.id);
@@ -604,7 +631,7 @@
     return applyPanelFold(model, { start, end, direction, targetAngle: 180 });
   }
 
-  function flipPaperInternal(original, requiredId) {
+  function flipPaperInternal(original, requiredId, commandVersion = COMMAND_VERSION) {
     const model = upgradeModel(original);
     if (!model || model.commands.length >= MAX_ACTIONS) return original;
     const id = chooseActionId(model, 'flip', requiredId);
@@ -631,7 +658,7 @@
       d: [fold.d[0], cleanNumber(-fold.d[1])],
       axis3d: fold.axis3d.map(point => [point[0], cleanNumber(-point[1]), cleanNumber(-point[2])])
     }));
-    const command = { type: 'flip', version: COMMAND_VERSION, id };
+    const command = { type: 'flip', version: commandVersion, id };
     const nextCommands = model.commands.map((item, index) => cloneCommand(item, index)).concat(command);
     if (JSON.stringify(nextCommands).length > MAX_COMMAND_JSON) return original;
     return {
@@ -703,7 +730,7 @@
         model = next;
         continue;
       }
-      if (!rawCommand || rawCommand.version !== COMMAND_VERSION) return null;
+      if (!rawCommand || ![LEGACY_COMMAND_VERSION, COMMAND_VERSION].includes(rawCommand.version)) return null;
       if (rawCommand.type === 'fold') {
         const allowed = [
           'type', 'version', 'id', 'start', 'end', 'direction', 'targetAngle',
@@ -726,13 +753,13 @@
         if ('coordinateSpace' in rawCommand) options.coordinateSpace = rawCommand.coordinateSpace;
         if ('targetFaceIds' in rawCommand) options.targetFaceIds = rawCommand.targetFaceIds;
         if ('seedFaceId' in rawCommand) options.seedFaceId = rawCommand.seedFaceId;
-        const next = applyPanelFoldInternal(model, options, rawCommand.id);
+        const next = applyPanelFoldInternal(model, options, rawCommand.id, rawCommand.version);
         if (next === model) return null;
         model = next;
       } else if (rawCommand.type === 'flip') {
         if (!isActionId(rawCommand.id, 'flip')
             || Object.keys(rawCommand).some(key => !['type', 'version', 'id'].includes(key))) return null;
-        const next = flipPaperInternal(model, rawCommand.id);
+        const next = flipPaperInternal(model, rawCommand.id, rawCommand.version);
         if (next === model) return null;
         model = next;
       } else {

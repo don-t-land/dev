@@ -9,6 +9,7 @@
   ];
   const ANIMATION_MS = 300;
   const CLICK_DISTANCE = 8;
+  const ORBIT_SENSITIVITY = 0.008;
 
   let canvas;
   let ctx;
@@ -22,6 +23,8 @@
   let direction = 1;
   let targetAngle = 90;
   let drag = null;
+  let orbitDrag = null;
+  let cameraOrbit = null;
   let selectedFaceId = null;
   let selectionMaterial = null;
   let frame = 0;
@@ -56,8 +59,11 @@
   function view() {
     const rect = canvas.getBoundingClientRect();
     const scale = Math.max(1, Math.min(rect.width / 3.25, rect.height / 3.2));
+    const orbit = cameraOrbit || viewport.DEFAULT_ORBIT;
+    const basis = viewport.cameraBasisFromOrbit(orbit.azimuth, orbit.elevation);
     return {
       ...viewport.DEFAULT_CAMERA,
+      ...basis,
       width: rect.width,
       height: rect.height,
       scale,
@@ -414,6 +420,8 @@
     animationToken += 1;
     previewModel = null;
     drag = null;
+    orbitDrag = null;
+    canvas?.classList.remove('orbiting');
     $('fold-complete-btn').textContent = '완성됨';
     $('fold-complete-btn').disabled = true;
     setStatus(message || '완성 · 다른 플레이어를 기다리는 중');
@@ -432,6 +440,8 @@
     direction = 1;
     targetAngle = 90;
     drag = null;
+    orbitDrag = null;
+    cameraOrbit = { ...viewport.DEFAULT_ORBIT };
     selectedFaceId = null;
     selectionMaterial = null;
     locked = false;
@@ -457,6 +467,8 @@
     animationToken += 1;
     previewModel = null;
     drag = null;
+    orbitDrag = null;
+    canvas?.classList.remove('orbiting');
     $('folding-screen')?.classList.add('hide');
     if (frame) root.cancelAnimationFrame(frame);
     frame = 0;
@@ -578,6 +590,23 @@
 
     canvas.addEventListener('pointerdown', event => {
       if (!active || locked || animating) return;
+      const button = Number.isInteger(event.button) ? event.button : 0;
+      if (button === 1) {
+        event.preventDefault();
+        const screen = localPoint(event);
+        const orbit = cameraOrbit || viewport.DEFAULT_ORBIT;
+        orbitDrag = {
+          pointerId: event.pointerId,
+          startScreen: screen,
+          azimuth: orbit.azimuth,
+          elevation: orbit.elevation
+        };
+        drag = null;
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add('orbiting');
+        return;
+      }
+      if (button !== 0) return;
       const screen = localPoint(event);
       const hit = viewport.hitTestFaces(model.faces, screen, view());
       if (!hit) {
@@ -588,6 +617,7 @@
       selectedFaceId = hit.face.id;
       selectionMaterial = hit.material.slice();
       drag = {
+        pointerId: event.pointerId,
         faceId: hit.face.id,
         start: hit.material.slice(),
         end: hit.material.slice(),
@@ -599,7 +629,18 @@
     });
 
     canvas.addEventListener('pointermove', event => {
-      if (!drag || locked || animating) return;
+      if (orbitDrag) {
+        if (event.pointerId !== orbitDrag.pointerId || locked || animating) return;
+        event.preventDefault();
+        const screen = localPoint(event);
+        const basis = viewport.cameraBasisFromOrbit(
+          orbitDrag.azimuth + (screen[0] - orbitDrag.startScreen[0]) * ORBIT_SENSITIVITY,
+          orbitDrag.elevation - (screen[1] - orbitDrag.startScreen[1]) * ORBIT_SENSITIVITY
+        );
+        cameraOrbit = { azimuth: basis.azimuth, elevation: basis.elevation };
+        return;
+      }
+      if (!drag || event.pointerId !== drag.pointerId || locked || animating) return;
       const face = faceById(drag.faceId);
       if (!face) return;
       const screen = localPoint(event);
@@ -611,7 +652,15 @@
     });
 
     canvas.addEventListener('pointerup', event => {
-      if (!drag || locked || animating) return;
+      if (orbitDrag) {
+        if (event.pointerId !== orbitDrag.pointerId) return;
+        event.preventDefault();
+        orbitDrag = null;
+        canvas.classList.remove('orbiting');
+        setStatus('종이 중심 시점을 조절했습니다');
+        return;
+      }
+      if (!drag || event.pointerId !== drag.pointerId || locked || animating) return;
       const face = faceById(drag.faceId);
       const screen = localPoint(event);
       const material = face && viewport.screenToMaterial(face, screen, view());
@@ -628,7 +677,18 @@
       applyCompletedDrag(completed);
     });
 
-    canvas.addEventListener('pointercancel', () => { drag = null; });
+    function cancelPointerInteraction(event) {
+      if (orbitDrag && event.pointerId === orbitDrag.pointerId) {
+        orbitDrag = null;
+        canvas.classList.remove('orbiting');
+      }
+      if (drag && event.pointerId === drag.pointerId) drag = null;
+    }
+    canvas.addEventListener('pointercancel', cancelPointerInteraction);
+    canvas.addEventListener('lostpointercapture', cancelPointerInteraction);
+    canvas.addEventListener('auxclick', event => {
+      if (event.button === 1) event.preventDefault();
+    });
     $('fold-dir-valley').addEventListener('click', () => setDirection(1));
     $('fold-dir-mountain').addEventListener('click', () => setDirection(-1));
     $('fold-angle-90').addEventListener('click', () => setTargetAngle(90));
@@ -687,6 +747,10 @@
     leave,
     getModel: () => model,
     getCommands: () => model ? api.serializeFoldCommands(model) : '[]',
+    getViewState: () => {
+      const orbit = cameraOrbit || viewport.DEFAULT_ORBIT;
+      return { azimuth: orbit.azimuth, elevation: orbit.elevation };
+    },
     isLocked: () => locked,
     setRoomProgress(done, total) {
       roomProgress = {

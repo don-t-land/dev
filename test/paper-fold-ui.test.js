@@ -69,6 +69,17 @@ function makeHarness() {
   const raf = [];
   const viewport = {
     DEFAULT_CAMERA: {},
+    DEFAULT_ORBIT: { azimuth: -0.8, elevation: 0.55 },
+    cameraBasisFromOrbit(azimuth, elevation) {
+      const safeElevation = Math.max(0.08, Math.min(1.45, elevation));
+      return {
+        right: [Math.cos(azimuth), Math.sin(azimuth), 0],
+        up: [0, 0, 1],
+        view: [-Math.sin(azimuth), Math.cos(azimuth), safeElevation],
+        azimuth,
+        elevation: safeElevation
+      };
+    },
     faceNormal: () => [0, 0, 1],
     pointInPolygon: () => true,
     hitTestFaces: faces => ({ face: faces[0], material: [-1, 0] }),
@@ -92,7 +103,7 @@ function makeHarness() {
   vm.createContext(context);
   const source = fs.readFileSync(path.join(__dirname, '../public/paper-fold-ui.js'), 'utf8');
   vm.runInContext(source, context, { filename: 'paper-fold-ui.js' });
-  return { elements, stage: window.paperFoldingStage, raf };
+  return { elements, stage: window.paperFoldingStage, raf, viewport };
 }
 
 test('completing during fold animation serializes the selected final angle, never preview zero', () => {
@@ -132,4 +143,50 @@ test('canvas keyboard selection and H/V/D/Enter creases create folds without poi
     assert.equal(stage.getModel().commands[0].targetAngle, 90);
     assert.match(elements['fold-status'].textContent, /90°/);
   }
+});
+
+test('middle-button drag orbits around the paper without creating a fold', () => {
+  const { elements, stage } = makeHarness();
+  const canvas = elements['fold-paper-canvas'];
+  stage.enter({ ends: Date.now() + 60_000 });
+  const initial = stage.getViewState();
+
+  const down = canvas.dispatch('pointerdown', {
+    button: 1, buttons: 4, clientX: 290, clientY: 290, pointerId: 7
+  });
+  canvas.dispatch('pointermove', {
+    button: 1, buttons: 4, clientX: 230, clientY: 250, pointerId: 99
+  });
+  assert.deepEqual(stage.getViewState(), initial, 'another pointer must not move the camera');
+  canvas.dispatch('pointermove', {
+    button: 1, buttons: 4, clientX: 230, clientY: 250, pointerId: 7
+  });
+  canvas.dispatch('pointerup', {
+    button: 1, buttons: 0, clientX: 230, clientY: 250, pointerId: 7
+  });
+
+  assert.equal(down.defaultPrevented, true);
+  assert.notDeepEqual(stage.getViewState(), initial);
+  assert.equal(stage.getModel().commands.length, 0);
+
+  canvas.dispatch('pointerdown', { button: 0, clientX: 10, clientY: 10, pointerId: 8 });
+  canvas.dispatch('pointerup', { button: 0, clientX: 100, clientY: 10, pointerId: 8 });
+  assert.equal(stage.getModel().commands.filter(command => command.type === 'fold').length, 1);
+});
+
+test('cancelling a middle-button orbit stops later pointer movement', () => {
+  const { elements, stage } = makeHarness();
+  const canvas = elements['fold-paper-canvas'];
+  stage.enter({ ends: Date.now() + 60_000 });
+  canvas.dispatch('pointerdown', {
+    button: 1, buttons: 4, clientX: 160, clientY: 160, pointerId: 12
+  });
+  canvas.dispatch('pointercancel', { pointerId: 12 });
+  const cancelled = stage.getViewState();
+  canvas.dispatch('pointermove', {
+    button: 1, buttons: 4, clientX: 20, clientY: 20, pointerId: 12
+  });
+
+  assert.deepEqual(stage.getViewState(), cancelled);
+  assert.equal(stage.getModel().commands.length, 0);
 });

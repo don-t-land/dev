@@ -97,7 +97,7 @@ test('partial 3D folds preserve physical area while horizontal planform and lift
   assert.ok(first.stallSpeed >= 8 && first.stallSpeed <= 42);
 });
 
-test('a supported sequential fold on a tilted seed keeps all material area in aero metrics', () => {
+test('a tilted-face crease that needs multiple physical hinges is rejected without changing aero metrics', () => {
   const first = applyPanelFold(createPaperModel(), {
     start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
     direction: 1, targetAngle: 90
@@ -107,12 +107,10 @@ test('a supported sequential fold on a tilted seed keeps all material area in ae
     start: [0, 0], end: [0, 1], coordinateSpace: 'material',
     direction: 1, targetAngle: 90, seedFaceId: seed.id
   });
-  const profile = deriveAerodynamicProfile(second);
 
-  assert.equal(second.faces.length, 3);
-  approx(profile.physicalArea, 4);
-  assert.ok(profile.planformArea > 0);
-  assert.ok(profile.areaRatio >= .02 && profile.areaRatio <= 1);
+  assert.strictEqual(second, first);
+  assert.deepEqual(deriveAerodynamicProfile(second), deriveAerodynamicProfile(first));
+  approx(deriveAerodynamicProfile(second).physicalArea, 4);
 });
 
 test('flips are not aerodynamic folds and a double flip restores the entire profile', () => {

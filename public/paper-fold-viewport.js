@@ -9,6 +9,10 @@
   const VIEW = normalize([0.55, -0.65, 0.52]);
   const RIGHT = normalize([0.65, 0.55, 0]);
   const UP = normalize(cross(VIEW, RIGHT));
+  const DEFAULT_ORBIT = Object.freeze({
+    azimuth: Math.atan2(VIEW[1], VIEW[0]),
+    elevation: Math.asin(VIEW[2])
+  });
   const DEFAULT_CAMERA = Object.freeze({
     right: Object.freeze(RIGHT),
     up: Object.freeze(UP),
@@ -37,6 +41,27 @@
   function normalize(vector) {
     const length = Math.hypot(...vector);
     return length > EPSILON ? vector.map(value => value / length) : [0, 0, 0];
+  }
+
+  function cameraBasisFromOrbit(azimuth, elevation) {
+    const safeAzimuth = Number.isFinite(azimuth) ? azimuth : DEFAULT_ORBIT.azimuth;
+    const requestedElevation = Number.isFinite(elevation) ? elevation : DEFAULT_ORBIT.elevation;
+    const safeElevation = Math.max(0.08, Math.min(1.45, requestedElevation));
+    const horizontal = Math.cos(safeElevation);
+    const view = normalize([
+      horizontal * Math.cos(safeAzimuth),
+      horizontal * Math.sin(safeAzimuth),
+      Math.sin(safeElevation)
+    ]);
+    const right = normalize([-Math.sin(safeAzimuth), Math.cos(safeAzimuth), 0]);
+    const up = normalize(cross(view, right));
+    return {
+      right,
+      up,
+      view,
+      azimuth: safeAzimuth,
+      elevation: safeElevation
+    };
   }
 
   function cameraValue(camera, key) {
@@ -203,6 +228,8 @@
 
   return {
     DEFAULT_CAMERA,
+    DEFAULT_ORBIT,
+    cameraBasisFromOrbit,
     faceNormal,
     hitTestFaces,
     materialToScreen,

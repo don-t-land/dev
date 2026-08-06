@@ -243,7 +243,8 @@ test('an arena room requires every player to be ready before its host starts fol
     assert.ok(hostPhase.ends - requestedAt >= 90);
 
     const halfFold = JSON.stringify([{
-      start: [-1, 0], end: [1, 0], direction: 1
+      type: 'fold', version: 2, id: 'fold-1',
+      start: [-1, 0], end: [1, 0], direction: 1, targetAngle: 180
     }]);
     host.send({ t: 'fold_done', commands: halfFold });
     const oneDone = await guest.next(message => message.t === 'fold_status' && message.doneIds.length === 1);
@@ -258,11 +259,17 @@ test('an arena room requires every player to be ready before its host starts fol
     const invalidFold = await guest.next(message => message.t === 'error');
     assert.equal(invalidFold.code, 'INVALID_FOLD');
 
-    guest.send({ t: 'fold_done', commands: '[]' });
+    guest.send({
+      t: 'fold_done',
+      commands: JSON.stringify([{
+        type: 'fold', version: 3, id: 'fold-1',
+        start: [-1, 0], end: [1, 0], direction: -1, targetAngle: 180
+      }])
+    });
     const allDoneStatus = await host.next(message => message.t === 'fold_status' && message.doneIds.length === 2);
     assert.deepEqual(new Set(allDoneStatus.doneIds), new Set([hostHello.id, guestHello.id]));
     assert.equal(allDoneStatus.total, 2);
-    assert.equal(allDoneStatus.profiles[guestHello.id].planformArea, 4);
+    assert.equal(allDoneStatus.profiles[guestHello.id].planformArea, 2);
 
     const launch = await host.next(message => message.t === 'phase' && message.phase === 'launch');
     assert.equal(launch.order.length, 2);

@@ -161,11 +161,11 @@ test('serializeFoldCommands returns deterministic JSON without exposing mutable 
 
   assert.equal(serialized, JSON.stringify([
     {
-      type: 'fold', version: 2, id: 'fold-1', start: [-1, 0], end: [1, 0],
+      type: 'fold', version: 3, id: 'fold-1', start: [-1, 0], end: [1, 0],
       direction: 1, targetAngle: 180
     },
     {
-      type: 'fold', version: 2, id: 'fold-2', start: [0, -1], end: [0, 1],
+      type: 'fold', version: 3, id: 'fold-2', start: [0, -1], end: [0, 1],
       direction: -1, targetAngle: 180
     }
   ]));
@@ -201,13 +201,20 @@ test('small drags, invalid values, and sliver polygons are rejected atomically',
 
 test('at most ten folds and sixty-four faces are accepted', () => {
   let model = createPaperModel();
-  for (let i = 0; i < 10; i += 1) {
-    const start = i % 2 ? [1, 0] : [-1, 0];
-    const end = i % 2 ? [-1, 0] : [1, 0];
-    model = applyFold(model, start, end, i % 2 ? -1 : 1);
+  for (let index = 0; index < 10; index += 1) {
+    const x = -0.9 + index * 0.18;
+    const next = applyPanelFold(model, {
+      start: [x, -1], end: [x, 1], coordinateSpace: 'material',
+      direction: 1, targetAngle: 0
+    });
+    assert.notStrictEqual(next, model, `pre-crease ${index + 1} should be accepted`);
+    model = next;
   }
   assert.equal(model.folds.length, 10);
-  assert.strictEqual(applyFold(model, [-1, 0], [1, 0], 1), model);
+  assert.strictEqual(applyPanelFold(model, {
+    start: [0.9, -1], end: [0.9, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 0
+  }), model);
 
   const tooManyFaces = createPaperModel();
   tooManyFaces.faces = Array.from({ length: 64 }, (_, layer) => ({
@@ -247,7 +254,7 @@ test('a versioned 90 degree panel fold rotates real 3D geometry and preserves ph
 
   assert.notEqual(folded, null);
   assert.equal(folded.commands[0].type, 'fold');
-  assert.equal(folded.commands[0].version, 2);
+  assert.equal(folded.commands[0].version, 3);
   assert.equal(folded.commands[0].id, 'fold-1');
   assert.equal(folded.commands[0].targetAngle, 90);
   assert.equal(folded.faces.length, 2);
@@ -259,25 +266,26 @@ test('a versioned 90 degree panel fold rotates real 3D geometry and preserves ph
   assert.ok(totalArea(folded.faces) < 4);
 });
 
-test('targetFaceIds and seedFaceId move only the selected face or layer', () => {
+test('targetFaceIds and seedFaceId identify a grabbed layer but move the connected flap', () => {
   const stacked = applyPanelFold(createPaperModel(), {
     start: [-1, 0], end: [1, 0], direction: 1, targetAngle: 180
   });
-  const untouched = stacked.faces.find(face => !face.folds.length);
   const selected = stacked.faces.find(face => face.folds.length);
-  const before = JSON.parse(JSON.stringify(untouched));
   const selective = applyPanelFold(stacked, {
-    start: [0, -1], end: [0, 1], direction: 1, targetAngle: 90,
-    targetFaceIds: [selected.id]
+    start: [0, -1], end: [0, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, targetFaceIds: [selected.id]
+  });
+  const seeded = applyPanelFold(stacked, {
+    start: [0, -1], end: [0, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, seedFaceId: selected.id
   });
 
-  assert.deepEqual(selective.faces.find(face => face.id === untouched.id), before);
-  assert.ok(selective.faces.filter(face => face.id.includes('fold-2')).length > 0);
-  const seeded = applyPanelFold(stacked, {
-    start: [0, -1], end: [0, 1], direction: -1, targetAngle: 90,
-    seedFaceId: selected.id
-  });
-  assert.deepEqual(seeded.faces.find(face => face.id === untouched.id), before);
+  assert.notStrictEqual(selective, stacked);
+  assert.notStrictEqual(seeded, stacked);
+  assert.equal(selective.faces.length, 4);
+  assert.equal(selective.faces.filter(face => face.folds.includes('fold-2')).length, 2);
+  assertMaterialVertexJoined(selective, [-1, 0]);
+  assert.deepEqual(seeded.faces, selective.faces);
   assert.strictEqual(applyPanelFold(stacked, {
     start: [0, -1], end: [0, 1], direction: 1, targetAngle: 90,
     targetFaceIds: ['missing-face']
@@ -358,26 +366,19 @@ test('two consecutive user flips compact away and exactly restore the prior mode
 
 test('interleaved flips do not consume the ten-fold allowance', () => {
   let model = createPaperModel();
-  const candidates = [
-    [[-1, 0], [1, 0], 1],
-    [[1, 0], [-1, 0], -1],
-    [[-1, 0], [1, 0], -1],
-    [[1, 0], [-1, 0], 1]
-  ];
-  const applyNextFold = current => {
-    for (const [start, end, foldDirection] of candidates) {
-      const next = applyFold(current, start, end, foldDirection);
-      if (next !== current) return next;
-    }
-    return current;
-  };
-
   for (let index = 0; index < 9; index += 1) {
-    const folded = applyNextFold(model);
+    const x = -0.9 + index * 0.18;
+    const folded = applyPanelFold(model, {
+      start: [x, -1], end: [x, 1], coordinateSpace: 'material',
+      direction: 1, targetAngle: 0
+    });
     assert.notStrictEqual(folded, model, `fold ${index + 1} should be accepted`);
     model = flipPaper(folded);
   }
-  const tenth = applyNextFold(model);
+  const tenth = applyPanelFold(model, {
+    start: [0.72, -1], end: [0.72, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 0
+  });
 
   assert.notStrictEqual(tenth, model);
   assert.equal(tenth.folds.length, 10);
@@ -389,11 +390,11 @@ test('interleaved flips do not consume the ten-fold allowance', () => {
 test('replay retains required ids even when its wire payload contains consecutive flips', () => {
   const commands = [
     {
-      type: 'fold', version: 2, id: 'fold-1', start: [-1, 0], end: [1, 0],
+      type: 'fold', version: 3, id: 'fold-1', start: [-1, 0], end: [1, 0],
       direction: 1, targetAngle: 90
     },
-    { type: 'flip', version: 2, id: 'flip-2' },
-    { type: 'flip', version: 2, id: 'flip-3' }
+    { type: 'flip', version: 3, id: 'flip-2' },
+    { type: 'flip', version: 3, id: 'flip-3' }
   ];
 
   const replayed = replayFoldCommands(commands);
@@ -405,7 +406,7 @@ test('replay retains required ids even when its wire payload contains consecutiv
 
 test('versioned replay rejects malformed, oversized, non-finite, and dangling identifiers', () => {
   const valid = {
-    type: 'fold', version: 2, id: 'fold-1', start: [-1, 0], end: [1, 0],
+    type: 'fold', version: 3, id: 'fold-1', start: [-1, 0], end: [1, 0],
     direction: 1, targetAngle: 90
   };
   assert.equal(replayFoldCommands([{ ...valid, targetAngle: NaN }]), null);
@@ -414,14 +415,39 @@ test('versioned replay rejects malformed, oversized, non-finite, and dangling id
   assert.equal(replayFoldCommands([valid, { ...valid, start: [0, -1], end: [0, 1] }]), null);
   assert.equal(replayFoldCommands(JSON.stringify([valid]) + ' '.repeat(4097)), null);
   assert.equal(replayFoldCommands(Array.from({ length: 21 }, (_, index) => ({
-    type: 'flip', version: 2, id: `flip-${index + 1}`
+    type: 'flip', version: 3, id: `flip-${index + 1}`
   }))), null);
-  assert.equal(replayFoldCommands([{ type: 'flip', version: 2, id: 'fold-9' }]), null);
+  assert.equal(replayFoldCommands([{ type: 'flip', version: 3, id: 'fold-9' }]), null);
+  assert.equal(replayFoldCommands([{ ...valid, version: 1 }]), null);
+  assert.equal(replayFoldCommands([{ ...valid, version: 4 }]), null);
 
   const legacy = replayFoldCommands([{ start: [-1, 0], end: [1, 0], direction: 1 }]);
   assert.ok(legacy);
   assert.equal(legacy.commands[0].type, 'fold');
   assert.equal(legacy.commands[0].targetAngle, 180);
+});
+
+test('v2 selective payloads retain single-face replay while new commands serialize as v3', () => {
+  const commands = [
+    {
+      type: 'fold', version: 2, id: 'fold-1', start: [-1, 0], end: [1, 0],
+      direction: 1, targetAngle: 180, coordinateSpace: 'material'
+    },
+    {
+      type: 'fold', version: 2, id: 'fold-2', start: [0, -1], end: [0, 1],
+      direction: 1, targetAngle: 90, coordinateSpace: 'material',
+      seedFaceId: 'face-0:fold-1:m'
+    }
+  ];
+
+  const replayed = replayFoldCommands(commands);
+
+  assert.ok(replayed);
+  assert.equal(replayed.faces.length, 3);
+  assert.equal(replayed.faces.filter(face => face.folds.includes('fold-2')).length, 1);
+  assert.equal(serializeFoldCommands(replayed), JSON.stringify(commands));
+  const fresh = applyFold(createPaperModel(), [-1, 0], [1, 0], 1);
+  assert.equal(JSON.parse(serializeFoldCommands(fresh))[0].version, 3);
 });
 
 function approxPoint3d(actual, expected, tolerance = 1e-8) {
@@ -432,7 +458,107 @@ function approxPoint3d(actual, expected, tolerance = 1e-8) {
   });
 }
 
-test('a sequential material-space fold on an edge-on panel preserves every face and physical area', () => {
+function materialVertexOccurrences(model, materialPoint, tolerance = 1e-8) {
+  return model.faces.flatMap(face => face.materialPoly.flatMap((point, index) => (
+    Math.abs(point[0] - materialPoint[0]) <= tolerance
+      && Math.abs(point[1] - materialPoint[1]) <= tolerance
+      ? [face.vertices3d[index]] : []
+  )));
+}
+
+function assertMaterialVertexJoined(model, materialPoint, tolerance = 1e-8) {
+  const occurrences = materialVertexOccurrences(model, materialPoint, tolerance);
+  assert.ok(occurrences.length >= 2, `expected a shared material vertex at ${materialPoint}`);
+  for (const occurrence of occurrences.slice(1)) {
+    approxPoint3d(occurrence, occurrences[0], tolerance);
+  }
+}
+
+test('a selected seed folds the whole connected flap without tearing an existing seam', () => {
+  const first = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
+    direction: 1, targetAngle: 180
+  });
+  const seed = first.faces.find(face => face.folds.includes('fold-1'));
+  const second = applyPanelFold(first, {
+    start: [0, -1], end: [0, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, seedFaceId: seed.id
+  });
+
+  assert.notStrictEqual(second, first);
+  assert.equal(second.faces.length, 4);
+  assert.equal(second.faces.filter(face => face.folds.includes('fold-2')).length, 2);
+  assertMaterialVertexJoined(second, [-1, 0]);
+  assertMaterialVertexJoined(second, [0, 0]);
+  assert.ok(Math.abs(physicalArea3d(second.faces) - 4) < 1e-8);
+});
+
+test('editing a connected flap angle keeps every prior seam joined around the selected crease', () => {
+  const first = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
+    direction: 1, targetAngle: 180
+  });
+  const seed = first.faces.find(face => face.folds.includes('fold-1'));
+  const folded = applyPanelFold(first, {
+    start: [0, -1], end: [0, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, seedFaceId: seed.id
+  });
+
+  for (const angle of [0, 45, 90, 180]) {
+    const adjusted = updateFoldAngle(folded, 'fold-2', angle);
+    assert.equal(adjusted.commands[1].targetAngle, angle);
+    assertMaterialVertexJoined(adjusted, [-1, 0]);
+    assertMaterialVertexJoined(adjusted, [0, 0]);
+    assert.deepEqual(replayFoldCommands(serializeFoldCommands(adjusted)), adjusted);
+  }
+});
+
+test('a crease that does not intersect the paper is rejected instead of orbiting the sheet', () => {
+  const model = createPaperModel();
+  const result = applyPanelFold(model, {
+    start: [1, 2], end: [-1, 2], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, seedFaceId: 'face-0'
+  });
+
+  assert.strictEqual(result, model);
+});
+
+test('a seed outside the moving side cannot authorize another face to fold', () => {
+  const first = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
+    direction: 1, targetAngle: 180
+  });
+  const seed = first.faces.find(face => face.folds.includes('fold-1'));
+  const result = applyPanelFold(first, {
+    start: [1, -0.5], end: [-1, -0.5], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90, seedFaceId: seed.id
+  });
+
+  assert.strictEqual(result, first);
+});
+
+test('v3 seeds reject nonexistent intermediate face-id prefixes', () => {
+  const first = applyPanelFold(createPaperModel(), {
+    start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
+    direction: 1, targetAngle: 180
+  });
+  const fold = {
+    start: [-1, 0.5], end: [1, 0.5], coordinateSpace: 'material',
+    direction: 1, targetAngle: 90
+  };
+
+  assert.strictEqual(applyPanelFold(first, {
+    ...fold, seedFaceId: 'face-0:fold-1:s'
+  }), first);
+  assert.strictEqual(applyPanelFold(first, {
+    ...fold, seedFaceId: 'face-0:fold-1'
+  }), first);
+  assert.notStrictEqual(applyPanelFold(first, {
+    ...fold, seedFaceId: 'face-0'
+  }), first);
+});
+
+test('a material crease requiring different physical hinges is rejected atomically', () => {
   const first = applyPanelFold(createPaperModel(), {
     start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
     direction: 1, targetAngle: 90
@@ -442,90 +568,72 @@ test('a sequential material-space fold on an edge-on panel preserves every face 
     start: [0, 0], end: [0, 1], coordinateSpace: 'material',
     direction: 1, targetAngle: 90, seedFaceId: tilted.id
   });
-
-  assert.notStrictEqual(second, first);
-  assert.equal(first.faces.length, 2);
-  assert.equal(second.faces.length, 3);
-  assert.ok(Math.abs(physicalArea3d(second.faces) - 4) < 1e-8);
-  assert.ok(second.faces.every(face => face.materialPoly.length === face.vertices3d.length));
-
-  // One material crease on non-coplanar panels has no single physical hinge.
-  // Reject the whole command rather than silently dropping an edge-on face.
-  const unsupported = applyPanelFold(first, {
+  const acrossBothPanels = applyPanelFold(first, {
     start: [0, -1], end: [0, 1], coordinateSpace: 'material',
     direction: 1, targetAngle: 90
   });
-  assert.strictEqual(unsupported, first);
+
+  assert.strictEqual(second, first);
+  assert.strictEqual(acrossBothPanels, first);
   assert.ok(Math.abs(physicalArea3d(first.faces) - 4) < 1e-8);
 });
 
-test('a crease on a tilted selected panel uses its material seam as the actual 3D hinge', () => {
+test('a selected stacked flap derives hinge orientation and rotation sign from its seed face', () => {
   const first = applyPanelFold(createPaperModel(), {
     start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
-    direction: 1, targetAngle: 60
+    direction: 1, targetAngle: 180
   });
-  const tilted = first.faces.find(face => face.folds.includes('fold-1'));
+  const seed = first.faces.find(face => face.folds.includes('fold-1'));
   const second = applyPanelFold(first, {
-    start: [0, 0], end: [0, 1], coordinateSpace: 'material',
-    direction: -1, targetAngle: 90, seedFaceId: tilted.id
+    start: [0, -1], end: [0, 1], coordinateSpace: 'material',
+    direction: -1, targetAngle: 90, seedFaceId: seed.id
   });
-  const fold = second.folds.find(item => item.id === second.commands[1].id);
+  const fold = second.folds.find(item => item.id === 'fold-2');
 
-  approxPoint3d(fold.axis3d[0], [0, 0, 0]);
-  approxPoint3d(fold.axis3d[1], [0, .5, Math.sqrt(3) / 2]);
-  assert.ok(fold.axis3d[1][2] > .8, 'the second hinge must not be forced onto z=0');
-
-  const children = second.faces.filter(face => face.id.startsWith(`${tilted.id}:${fold.id}:`));
-  assert.equal(children.length, 2);
-  const seamVertices = children.map(face => face.materialPoly
-    .map((point, index) => ({ material: point, spatial: face.vertices3d[index] }))
-    .filter(vertex => Math.abs(vertex.material[0]) < 1e-9)
-    .map(vertex => vertex.spatial));
-  assert.ok(seamVertices.every(vertices => vertices.length >= 2));
-  for (const expected of seamVertices[0]) {
-    assert.ok(seamVertices[1].some(actual => actual.every((value, axis) =>
-      Math.abs(value - expected[axis]) < 1e-8)));
-  }
+  approxPoint3d(fold.axis3d[0], [0, 1, 0]);
+  approxPoint3d(fold.axis3d[1], [0, -1, 0]);
+  assert.equal(second.faces.filter(face => face.folds.includes('fold-2')).length, 2);
+  const movedSeed = second.faces.find(face => face.id.startsWith(`${seed.id}:fold-2:m`));
+  assert.ok(movedSeed.vertices3d.some(point => point[2] > 0.9));
+  assertMaterialVertexJoined(second, [-1, 0]);
+  assertMaterialVertexJoined(second, [0, 0]);
 });
 
-test('editing an earlier angle replays two dependent seed folds with stable topology and geometry', () => {
+test('v3 connected flap folds normalize sparse layer indices', () => {
   const first = applyPanelFold(createPaperModel(), {
     start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
-    direction: 1, targetAngle: 90
+    direction: 1, targetAngle: 180
   });
-  const firstMoved = first.faces.find(face => face.folds.includes('fold-1'));
+  const seed = first.faces.find(face => face.folds.includes('fold-1'));
   const second = applyPanelFold(first, {
-    start: [0, 0], end: [0, 1], coordinateSpace: 'material',
-    direction: 1, targetAngle: 70, seedFaceId: firstMoved.id
-  });
-  const secondMoved = second.faces.find(face => face.folds.includes('fold-2'));
-  const third = applyPanelFold(second, {
-    start: [0, .5], end: [-1, .5], coordinateSpace: 'material',
-    direction: -1, targetAngle: 35, seedFaceId: secondMoved.id
+    start: [1, 1], end: [-1, 0], coordinateSpace: 'material',
+    direction: -1, targetAngle: 90, seedFaceId: seed.id
   });
 
-  const edited = updateFoldAngle(third, 'fold-1', 45);
-  const expectedFirst = applyPanelFold(createPaperModel(), {
+  assert.notStrictEqual(second, first);
+  assert.deepEqual([...new Set(second.faces.map(face => face.layer))].sort((a, b) => a - b), [0, 1, 2]);
+  assert.deepEqual(replayFoldCommands(serializeFoldCommands(second)), second);
+});
+
+test('editing an earlier angle rejects a later crease that would require multiple hinges', () => {
+  const first = applyPanelFold(createPaperModel(), {
     start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
-    direction: 1, targetAngle: 45, id: 'fold-1'
+    direction: 1, targetAngle: 0
   });
-  const expectedSecond = applyPanelFold(expectedFirst, {
-    start: [0, 0], end: [0, 1], coordinateSpace: 'material',
-    direction: 1, targetAngle: 70, seedFaceId: firstMoved.id, id: 'fold-2'
-  });
-  const expected = applyPanelFold(expectedSecond, {
-    start: [0, .5], end: [-1, .5], coordinateSpace: 'material',
-    direction: -1, targetAngle: 35, seedFaceId: secondMoved.id, id: 'fold-3'
+  const seed = first.faces.find(face => face.folds.includes('fold-1'));
+  const second = applyPanelFold(first, {
+    start: [0, -1], end: [0, 1], coordinateSpace: 'material',
+    direction: 1, targetAngle: 70, seedFaceId: seed.id
   });
 
-  assert.notStrictEqual(edited, third);
-  assert.notStrictEqual(expected, expectedSecond);
-  assert.deepEqual(edited, expected);
-  assert.deepEqual(replayFoldCommands(serializeFoldCommands(edited)), edited);
-  assert.equal(edited.commands.length, 3);
-  assert.equal(edited.faces.length, third.faces.length);
-  assert.deepEqual(edited.faces.map(face => face.id), third.faces.map(face => face.id));
-  assert.ok(Math.abs(physicalArea3d(edited.faces) - 4) < 1e-8);
+  const rejected = updateFoldAngle(second, 'fold-1', 45);
+  const adjustedSecond = updateFoldAngle(second, 'fold-2', 35);
+
+  assert.strictEqual(rejected, second);
+  assert.notStrictEqual(adjustedSecond, second);
+  assert.equal(adjustedSecond.commands[1].targetAngle, 35);
+  assert.deepEqual(replayFoldCommands(serializeFoldCommands(adjustedSecond)), adjustedSecond);
+  assert.ok(Math.abs(physicalArea3d(adjustedSecond.faces) - 4) < 1e-8);
 });
 
 test('removing an earlier general fold keeps later command ids and only rejects true dangling seeds', () => {
@@ -574,15 +682,14 @@ test('legacy in-memory models without 3D, face ids, or extended fold fields neve
   assert.ok(folded && flipped);
 });
 
-test('seedFaceId metadata defines selective unfold and preserves every other physical face', () => {
+test('seedFaceId metadata keeps connected unfold replayable without tearing other layers', () => {
   const base = applyPanelFold(createPaperModel(), {
     start: [-1, 0], end: [1, 0], coordinateSpace: 'material',
     direction: 1, targetAngle: 180
   });
   const seed = base.faces.find(face => face.folds.includes('fold-1'));
-  const other = base.faces.find(face => face.id !== seed.id);
   const selective = applyPanelFold(base, {
-    start: [0, 0], end: [0, 1], coordinateSpace: 'material',
+    start: [0, -1], end: [0, 1], coordinateSpace: 'material',
     direction: 1, targetAngle: 180, seedFaceId: seed.id
   });
 
@@ -591,8 +698,9 @@ test('seedFaceId metadata defines selective unfold and preserves every other phy
   for (const angle of [90, 0, 180]) {
     const adjusted = updateFoldAngle(selective, 'fold-2', angle);
     assert.equal(adjusted.commands[1].targetAngle, angle);
-    assert.deepEqual(adjusted.faces.find(face => face.id === other.id), other);
-    assert.ok(adjusted.faces.some(face => face.folds.includes('fold-2')));
+    assert.equal(adjusted.faces.filter(face => face.folds.includes('fold-2')).length, 2);
+    assertMaterialVertexJoined(adjusted, [-1, 0]);
+    assertMaterialVertexJoined(adjusted, [0, 0]);
     assert.ok(Math.abs(physicalArea3d(adjusted.faces) - 4) < 1e-8);
   }
 });

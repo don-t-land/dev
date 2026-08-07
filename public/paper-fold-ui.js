@@ -18,6 +18,7 @@
   let onModelChange = null;
   let editor = null;
   let editorFailed = false;
+  let selectedPreset = null;
 
   const $ = id => document.getElementById(id);
 
@@ -26,6 +27,68 @@
   }
 
   const DISPLAYED_STAT_FIELDS = ['liftScale', 'dragScale', 'stability', 'stallSpeed', 'rollBias'];
+
+  /* 프리셋 목록(접기 화면 좌측) — WebGL 편집기가 죽어도 동작해야 하므로
+     순수 DOM으로만 그린다. 프리셋 프로필은 정적이라 한 번만 계산해 둔다. */
+  const presetStatsCache = {};
+
+  function presetStatsLine(name) {
+    if (name in presetStatsCache) return presetStatsCache[name];
+    const aero = root.PaperAeroProfile;
+    const preset = aero ? api.createPresetModel(name) : null;
+    const profile = preset ? aero.deriveAerodynamicProfile(preset) : null;
+    presetStatsCache[name] = profile
+      ? `양력 ${Math.round(profile.liftScale * 100)}% · 실속 ${Math.round(profile.stallSpeed)}m/s`
+      : '';
+    return presetStatsCache[name];
+  }
+
+  function refreshPresetList() {
+    const host = $('fold-preset-list');
+    if (!host) return;
+    host.querySelectorAll('.fold-preset-card').forEach(card => {
+      card.classList.toggle('active', card.dataset.preset === selectedPreset);
+      card.disabled = locked;
+    });
+  }
+
+  function renderPresetList() {
+    const host = $('fold-preset-list');
+    if (!host) return;
+    const info = api.PRESET_INFO || {};
+    host.innerHTML = api.presetNames.map(name => {
+      const meta = info[name] || { label: name, tagline: '' };
+      const stats = presetStatsLine(name);
+      return `<button type="button" class="fold-preset-card" data-preset="${name}">
+        <span class="fold-preset-label">${meta.label}</span>
+        <span class="fold-preset-tagline">${meta.tagline}</span>
+        ${stats ? `<span class="fold-preset-stats">${stats}</span>` : ''}
+      </button>`;
+    }).join('');
+    refreshPresetList();
+  }
+
+  function applyPreset(name) {
+    if (!active || locked) return;
+    const preset = api.createPresetModel(name);
+    if (!preset) {
+      $('fold-status').textContent = '비행기 프리셋을 불러오지 못했습니다';
+      return;
+    }
+    model = preset;
+    selectedPreset = name;
+    refreshPresetList();
+    updateStats();
+    editor?.setModel(model);
+    emitModelChange(model);
+  }
+
+  /* 손으로 접거나 펴면 더는 프리셋 그대로가 아니므로 하이라이트를 지운다. */
+  function clearPresetSelection() {
+    if (selectedPreset === null) return;
+    selectedPreset = null;
+    refreshPresetList();
+  }
 
   function renderStats() {
     const host = $('fold-stats');
@@ -57,7 +120,7 @@
         ? `완성 · ${count}번 접음 · 다른 플레이어를 기다리는 중${peers}`
         : `완성 · ${count}번 접음 · 활공을 시작합니다${peers}`)
       : editorFailed
-        ? `3D 편집기를 열 수 없어요 — 기본 비행기 프리셋을 사용해 주세요${peers}`
+        ? `3D 편집기를 열 수 없어요 — 왼쪽 목록에서 비행기 프리셋을 골라 주세요${peers}`
         : (timed
           ? `${count}/10번 접음 · 선을 긋고 접을 쪽을 잡아 당기세요${peers}`
           : `${count}/10번 접음 · 완성 버튼을 누르면 바로 출격합니다${peers}`);
@@ -92,7 +155,7 @@
     $('fold-status').textContent = finalMessage;
     $('fold-complete-btn').textContent = '완성됨';
     $('fold-complete-btn').disabled = true;
-    $('fold-preset-btn').disabled = true;
+    refreshPresetList();
     if (!completionSent) {
       completionSent = true;
       onComplete?.({ commands: api.serializeFoldCommands(model) });
@@ -116,8 +179,9 @@
     active = true;
     $('folding-screen').classList.remove('hide');
     $('fold-complete-btn').disabled = false;
-    $('fold-preset-btn').disabled = false;
     $('fold-complete-btn').textContent = '비행기 완성';
+    selectedPreset = null;
+    renderPresetList();
     editorFailed = false;
     if (editor) {
       editor.setModel(model);
@@ -151,6 +215,7 @@
       return;
     }
     model = next;
+    clearPresetSelection();
     updateStats();
     editor?.setModel(model);
     emitModelChange(model);
@@ -165,6 +230,7 @@
       return;
     }
     model = next;
+    clearPresetSelection();
     updateStats();
     editor?.setModel(model);
     emitModelChange(model);
@@ -178,21 +244,14 @@
 
   function init() {
     if (!api) return;
-    $('fold-preset-btn').addEventListener('click', () => {
-      if (locked) return;
-      const preset = api.createPresetModel('dart');
-      if (!preset) {
-        $('fold-status').textContent = '기본 비행기 프리셋을 불러오지 못했습니다';
-        return;
-      }
-      model = preset;
-      updateStats();
-      editor?.setModel(model);
-      emitModelChange(model);
+    $('fold-preset-list').addEventListener('click', event => {
+      const card = event.target.closest('.fold-preset-card');
+      if (card && !card.disabled) applyPreset(card.dataset.preset);
     });
     $('fold-undo-btn').addEventListener('click', () => {
       if (locked) return;
       model = api.undoFold(model);
+      clearPresetSelection();
       updateStats();
       editor?.setModel(model);
       emitModelChange(model);

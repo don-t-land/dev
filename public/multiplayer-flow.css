@@ -146,6 +146,16 @@
 .fold-btn.finish { color:#111536; border-color:transparent; background:#f4cd6c; }
 #fold-status { text-align:center; color:#9dafcc; font-size:12px; }
 .fold-side { position:absolute; top:14px; right:14px; width:min(236px,36vw); display:flex; flex-direction:column; gap:10px; z-index:2; }
+.fold-presets { position:absolute; top:14px; left:14px; width:min(210px,30vw); display:flex; flex-direction:column; gap:8px; z-index:2; }
+.fold-preset-card { display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; padding:10px 12px; border:1px solid rgba(134,220,245,.22); border-radius:14px; color:#dfeafa; background:rgba(9,14,38,.74); backdrop-filter:blur(4px); cursor:pointer; transition:border-color .15s,background .15s,box-shadow .15s; }
+.fold-preset-card:hover:not(:disabled) { border-color:rgba(118,229,239,.5); background:rgba(14,22,54,.8); }
+.fold-preset-card.active { border-color:#76e5ef; background:rgba(118,229,239,.14); box-shadow:0 0 16px rgba(118,229,239,.28); }
+.fold-preset-card:disabled { opacity:.55; cursor:default; }
+.fold-preset-label { font:800 12px sans-serif; color:#eaf6ff; }
+.fold-preset-card.active .fold-preset-label { color:#8ceaf4; }
+.fold-preset-tagline { font-size:10px; color:#9dafcc; }
+.fold-preset-stats { font-size:10px; color:#8ceaf4; font-variant-numeric:tabular-nums; }
+@media (min-width:761px) { .fold-hint { max-width:calc(100% - 480px); overflow:hidden; text-overflow:ellipsis; } }
 .fold-stats { background:rgba(9,14,38,.74); border:1px solid rgba(134,220,245,.22); border-radius:14px; padding:10px 12px; backdrop-filter:blur(4px); }
 .fold-stats .fold-stat-row { display:grid; grid-template-columns:56px 1fr 58px 14px; align-items:center; gap:7px; margin:5px 0; font-size:11px; color:#cfe6f4; }
 .fold-stats .fold-stat-bar { height:6px; border-radius:3px; background:rgba(255,255,255,.12); overflow:hidden; }
@@ -155,7 +165,13 @@
 .fold-stats .fold-stat-value { text-align:right; font-variant-numeric:tabular-nums; }
 .fold-help { display:flex; align-items:center; padding:0 4px; color:#9dafcc; font-size:11px; line-height:1.5; }
 .fold-angle-badge { position:absolute; left:50%; bottom:20px; transform:translateX(-50%); padding:9px 18px; border-radius:99px; border:1px solid rgba(134,220,245,.3); background:rgba(4,9,29,.72); color:#8ceaf4; font:900 22px/1 ui-monospace,monospace; letter-spacing:.02em; pointer-events:none; z-index:3; }
-@media (max-width:760px) { .fold-side { width:min(200px,44vw); } }
+@media (max-width:760px) {
+  .fold-side { width:min(200px,44vw); }
+  .fold-presets { top:44px; width:min(150px,42vw); gap:6px; }
+  .fold-preset-card { padding:7px 9px; border-radius:11px; gap:2px; }
+  .fold-preset-tagline { display:none; }
+  .fold-preset-stats { font-size:9px; }
+}
 
 @media (max-width:760px) {
   .room-entry-card { padding:27px 20px 20px; }

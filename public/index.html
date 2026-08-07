@@ -606,6 +606,7 @@
   <main class="fold-stage">
     <canvas id="fold-paper-canvas"></canvas>
     <div class="fold-hint">종이에 선을 그어 힌지를 만들고 · 접을 쪽을 잡아 당겨 접으세요 · 금색 힌지는 언제든 다시 조절</div>
+    <aside class="fold-presets" id="fold-preset-list" aria-label="비행기 프리셋"></aside>
     <aside class="fold-side">
       <div id="fold-stats" class="fold-stats" aria-live="polite"></div>
     </aside>
@@ -617,7 +618,6 @@
     </div>
     <div id="fold-status" role="status">0/10번 접음</div>
     <div>
-      <button id="fold-preset-btn" class="fold-btn" type="button">기본 비행기</button>
       <button id="fold-undo-btn" class="fold-btn" type="button">한 번 펴기</button>
       <button id="fold-complete-btn" class="fold-btn finish" type="button">비행기 완성</button>
     </div>

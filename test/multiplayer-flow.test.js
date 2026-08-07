@@ -68,8 +68,14 @@ test('waiting room actors fit inside one horizontal row on mobile and stay layer
 test('folding UI exposes the 3d editor, unfold, completion and synchronized progress', () => {
   for (const id of [
     'folding-screen', 'fold-timer', 'fold-paper-canvas', 'fold-leave-btn',
-    'fold-undo-btn', 'fold-complete-btn'
+    'fold-undo-btn', 'fold-complete-btn', 'fold-preset-list'
   ]) assert.equal(hasId(id), true, `missing #${id}`);
+  // 프리셋은 좌측 목록으로 고른다 — 단일 프리셋 버튼은 사라졌다.
+  assert.doesNotMatch(html, /fold-preset-btn/);
+  assert.match(html, /<aside class="fold-presets" id="fold-preset-list" aria-label="비행기 프리셋">/);
+  assert.match(foldUi, /api\.presetNames\.map\(/);
+  assert.match(foldUi, /api\.createPresetModel\(name\)/);
+  assert.match(flowCss, /\.fold-presets \{ position:absolute; top:14px; left:14px;/);
   assert.match(html, /import \{ createFoldEditor \} from '\.\/fold-editor-3d\.mjs'/);
   assert.match(html, /attachEditor\(foldEditor\)/);
   assert.match(html, /class="fold-help">돌리기: 빈 공간 드래그/);

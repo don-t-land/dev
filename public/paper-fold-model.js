@@ -512,17 +512,39 @@
     return model;
   }
 
-  // 좌우 대칭 dart: 날개를 먼저 상반각으로 세우고, 기수 쪽 코너를 각 날개
+  // 좌우 대칭 프리셋들: 날개를 먼저 상반각으로 세우고, 기수 쪽 코너를 각 날개
   // 위로 접어 넣는다. 날개 접기 이후의 코너 접기는 해당 날개 컴포넌트 안에서만
-  // 일어나므로 어떤 힌지도 찢거나 가로지르지 않는다.
+  // 일어나므로 어떤 힌지도 찢거나 가로지르지 않는다. 세 프리셋은 날개 접는
+  // 위치·각도만 다르며, deriveAerodynamicProfile 실측으로 성격을 확정했다:
+  //   dart  lift≈.72 drag≈1.19 stall≈14.2 — 균형형 기준점
+  //   wide  lift≈.91 drag≈1.26 stall≈12.6 — 넓은 스팬·얕은 상반각 활공형
+  //   sleek lift≈.35 drag≈1.11 stall≈20.2 — 좁은 평면형·가파른 몸통 접기 속도형
   const PRESETS = {
     dart: [
       { start: [0.5, 1], end: [0.5, -1], angle: 0.9 },     // 오른 날개 상반각 (바깥쪽이 왼편)
       { start: [-0.5, -1], end: [-0.5, 1], angle: 0.9 },   // 왼 날개 상반각
       { start: [0.6, 1], end: [1, 0.5], angle: Math.PI },  // 우상단(기수) 코너를 오른 날개 위로
       { start: [-1, 0.5], end: [-0.6, 1], angle: Math.PI } // 좌상단(기수) 코너를 왼 날개 위로
+    ],
+    wide: [
+      { start: [0.55, 1], end: [0.55, -1], angle: 0.5 },   // 오른 날개 — 바깥쪽·얕은 상반각
+      { start: [-0.55, -1], end: [-0.55, 1], angle: 0.5 }, // 왼 날개
+      { start: [0.65, 1], end: [1, 0.65], angle: Math.PI },  // 우상단 코너 살짝 말아 넣기
+      { start: [-1, 0.65], end: [-0.65, 1], angle: Math.PI } // 좌상단 코너
+    ],
+    sleek: [
+      { start: [0.5, 1], end: [0.5, -1], angle: 2.6 },     // 오른 날개 — 몸통 위로 가파르게
+      { start: [-0.5, -1], end: [-0.5, 1], angle: 2.6 },   // 왼 날개
+      { start: [0.6, 1], end: [1, 0.6], angle: Math.PI },  // 우상단(기수) 코너
+      { start: [-1, 0.6], end: [-0.6, 1], angle: Math.PI } // 좌상단(기수) 코너
     ]
   };
+
+  const PRESET_INFO = Object.freeze({
+    dart: Object.freeze({ label: '기본 종이비행기', tagline: '균형 잡힌 만능형' }),
+    wide: Object.freeze({ label: '넓적 종이비행기', tagline: '높은 양력 · 느긋한 활공' }),
+    sleek: Object.freeze({ label: '날렵 비행기', tagline: '낮은 항력 · 빠른 돌파' })
+  });
 
   function getPresetCommands(name) {
     const commands = PRESETS[name];
@@ -544,6 +566,7 @@
     getPresetCommands,
     createPresetModel,
     computeFoldedGeometry,
-    presetNames: Object.keys(PRESETS)
+    presetNames: Object.keys(PRESETS),
+    PRESET_INFO
   };
 });

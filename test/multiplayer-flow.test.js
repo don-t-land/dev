@@ -45,12 +45,16 @@ test('Fold N Fly style plane selection is integrated into the folding screen', (
   assert.match(html, /data-home-action="costume"/);
   assert.match(html, /function selectedPlaneCommands\(\)/);
   assert.match(html, /initialPreset:\s*selectedPlaneName\(\)/);
+  assert.match(foldUi, /selectedPreset = requestedPreset \|\| \(!initial \? api\.presetNames\[0\] : null\)/);
   assert.match(html, /setSelectedPlaneCommands\(fold\.commands, fold\.preset \|\| 'custom'\)/);
   assert.match(flowCss, /\.fold-preset-list\s*\{[\s\S]*flex-direction:\s*column/);
   assert.match(flowCss, /\.fold-preset-card\.active/);
   assert.match(flowCss, /\.fold-platform/);
   assert.match(foldUi, /presetThumbnail\(name, meta\.label\)/);
+  assert.match(foldUi, /presetMeta\.reference\.folds/);
   assert.match(foldUi, /editor\?\.setAutoRotate\(true\)/);
+  const foldEditor = fs.readFileSync(path.join(publicDir, 'fold-editor-3d.mjs'), 'utf8');
+  assert.match(foldEditor, /orbit\.distance \* Math\.max\(1, 1 \/ camera\.aspect\)/);
 });
 
 test('room entry stays translucent over the home scene', () => {

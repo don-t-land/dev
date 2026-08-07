@@ -1453,6 +1453,7 @@ $('respawn-refold-btn').addEventListener('click', () => {
   window.paperFoldingStage?.enter({
     ends: null,
     initialCommands: net.lastFoldCommands || '[]',
+    initialPreset: selectedPlaneName(),
     onComplete: fold => {
       net.lastFoldCommands = fold.commands;
       send({ t: 'fold_done', commands: fold.commands });

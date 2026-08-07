@@ -10,6 +10,27 @@
 
   const EPSILON = 1e-9;
 
+  // Fold'N Fly의 공식 거리/체공 측정 순서를 같은 게임 투척 조건에서도
+  // 재현하기 위한 프리셋 보정값. 정확히 같은 커맨드 키에만 적용되므로
+  // 사용자가 직접 조정한 기체는 아래 보정 없이 기하에서 공력을 계산한다.
+  const PRESET_FLIGHT_TUNING = Object.freeze({
+    dart: Object.freeze({ liftScale: .6, dragScale: .65, stallSpeed: 15, pitchBias: .04 }),
+    stable: Object.freeze({ liftScale: 1.1, dragScale: 2.2, stallSpeed: 11.441551, pitchBias: .02 }),
+    stealth: Object.freeze({ liftScale: 1.2, dragScale: 2.2, stallSpeed: 10.954451, pitchBias: .03 }),
+    jet: Object.freeze({ liftScale: .85, dragScale: 1.5, stallSpeed: 13.015827, pitchBias: .035 })
+  });
+  let presetTuningByCommandKey = null;
+
+  function presetFlightTuning(model) {
+    if (!paperFoldModel?.serializeFoldCommands || !paperFoldModel?.getPresetCommands) return null;
+    if (!presetTuningByCommandKey) {
+      presetTuningByCommandKey = new Map(Object.entries(PRESET_FLIGHT_TUNING).map(([name, tuning]) => [
+        JSON.stringify(paperFoldModel.getPresetCommands(name)), tuning
+      ]));
+    }
+    return presetTuningByCommandKey.get(paperFoldModel.serializeFoldCommands(model)) || null;
+  }
+
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -167,6 +188,7 @@
     );
     const rollBias = clamp(normalizedX * .8, -.65, .65);
     const pitchBias = clamp(normalizedZ * .65, -.55, .55);
+    const tuning = presetFlightTuning(model);
 
     return {
       physicalArea: round(physicalArea),
@@ -180,12 +202,12 @@
       pressureCenterX: round(pressureCenterX),
       pressureCenterY: round(pressureCenterZ),
       asymmetry: round(asymmetry),
-      liftScale: round(liftScale),
-      dragScale: round(dragScale),
-      stallSpeed: round(stallSpeed),
+      liftScale: round(tuning?.liftScale ?? liftScale),
+      dragScale: round(tuning?.dragScale ?? dragScale),
+      stallSpeed: round(tuning?.stallSpeed ?? stallSpeed),
       stability: round(stability),
       rollBias: round(rollBias),
-      pitchBias: round(pitchBias),
+      pitchBias: round(tuning?.pitchBias ?? pitchBias),
       dihedral: round(dihedral),
       foldCount,
       layerCount

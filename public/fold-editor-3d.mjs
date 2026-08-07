@@ -1271,10 +1271,13 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     }
-    const horizontal = Math.cos(orbit.pitch) * orbit.distance;
+    // 세로형 모바일 캔버스는 수평 시야가 좁으므로 같은 줌 값에서도
+    // 날개 전체가 보이도록 렌더 거리만 종횡비에 맞춰 보정한다.
+    const framedDistance = orbit.distance * Math.max(1, 1 / camera.aspect);
+    const horizontal = Math.cos(orbit.pitch) * framedDistance;
     camera.position.set(
       orbitTarget.x + Math.sin(orbit.yaw) * horizontal,
-      orbitTarget.y + Math.sin(orbit.pitch) * orbit.distance,
+      orbitTarget.y + Math.sin(orbit.pitch) * framedDistance,
       orbitTarget.z + Math.cos(orbit.yaw) * horizontal
     );
     camera.lookAt(orbitTarget);

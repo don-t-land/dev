@@ -153,18 +153,22 @@
 
   function updateStats() {
     const count = model?.commands?.length || 0;
+    const presetMeta = api.PRESET_INFO?.[selectedPreset];
+    const progress = presetMeta?.reference
+      ? `${presetMeta.label} · 공식 ${presetMeta.reference.folds}단계`
+      : `${count}/10번 접음`;
     const peers = roomProgress
       ? (timed ? ` · 완료 ${roomProgress.done}/${roomProgress.total}명` : ` · 방 인원 ${roomProgress.total}명 · 전투 진행 중`)
       : '';
     $('fold-status').textContent = locked
       ? (timed
-        ? `완성 · ${count}번 접음 · 다른 플레이어를 기다리는 중${peers}`
-        : `완성 · ${count}번 접음 · 활공을 시작합니다${peers}`)
+        ? `완성 · ${progress} · 다른 플레이어를 기다리는 중${peers}`
+        : `완성 · ${progress} · 활공을 시작합니다${peers}`)
       : editorFailed
         ? `3D 편집기를 열 수 없어요 — 왼쪽 목록에서 비행기 프리셋을 골라 주세요${peers}`
         : (timed
-          ? `${count}/10번 접음 · 선을 긋고 접을 쪽을 잡아 당기세요${peers}`
-          : `${count}/10번 접음 · 완성 버튼을 누르면 바로 출격합니다${peers}`);
+          ? `${progress} · 선을 긋고 접을 쪽을 잡아 당기세요${peers}`
+          : `${progress} · 완성 버튼을 누르면 바로 출격합니다${peers}`);
     $('fold-undo-btn').disabled = locked || !count;
     renderStats();
   }
@@ -207,10 +211,14 @@
     if (!api) throw new Error('paperFoldModel is not loaded');
     timed = options?.ends !== null && options?.ends !== undefined && Number.isFinite(Number(options.ends));
     ends = timed ? Number(options.ends) : 0;
+    const requestedPreset = api.presetNames.includes(options?.initialPreset)
+      ? options.initialPreset
+      : null;
     const initial = typeof options?.initialCommands === 'string' && options.initialCommands !== '[]'
       ? api.replayFoldCommands(options.initialCommands)
       : null;
-    model = initial || api.createPaperModel();
+    selectedPreset = requestedPreset || (!initial ? api.presetNames[0] : null);
+    model = initial || (selectedPreset ? api.createPresetModel(selectedPreset) : api.createPaperModel());
     $('fold-timer').classList.toggle('hide', !timed);
     locked = false;
     completionSent = false;
@@ -221,7 +229,6 @@
     $('folding-screen').classList.remove('hide');
     $('fold-complete-btn').disabled = false;
     $('fold-complete-btn').textContent = '비행기 완성';
-    selectedPreset = api.presetNames.includes(options?.initialPreset) ? options.initialPreset : null;
     renderPresetList();
     editorFailed = false;
     if (editor) {

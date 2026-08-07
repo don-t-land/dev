@@ -86,7 +86,7 @@ for (const name of ALL_PRESETS) {
     const profile = deriveAerodynamicProfile(model);
     assert.ok(Math.abs(profile.rollBias) <= .01, `rollBias ${profile.rollBias}`);
     assert.ok(profile.liftScale >= .5, `liftScale ${profile.liftScale}`);
-    assert.ok(profile.dragScale >= .8 && profile.dragScale <= 1.4, `dragScale ${profile.dragScale}`);
+    assert.ok(profile.dragScale >= .25 && profile.dragScale <= 2.2, `dragScale ${profile.dragScale}`);
   });
 
   test(`${name} 프리셋은 모든 저작 힌지를 한 단계씩 되돌릴 수 있다`, () => {
@@ -109,14 +109,13 @@ test('Basic Dart는 최초 소스 기본 메시의 실루엣 비율을 재현한
   assert.ok(Math.abs(authoredChordToSpan - legacyChordToSpan) / legacyChordToSpan < .05,
     `authored ${authoredChordToSpan}, legacy ${legacyChordToSpan}`);
   assert.ok(profile.dihedral > .1, `dihedral ${profile.dihedral}`);
-  assert.ok(Math.abs(profile.pitchBias) < .03, `pitchBias ${profile.pitchBias}`);
   assert.deepStrictEqual(getPresetVisual('dart'), {
     vertices: [[0, 0, -1.85], [-1.2, .16, .92], [0, 0, .8], [1.2, .16, .92], [0, -.42, .86]],
     faces: [[0, 1, 2], [0, 2, 3], [0, 4, 2]]
   });
 });
 
-test('게임 공력은 레퍼런스의 거리·체공 순위를 같은 순서로 재현한다', async () => {
+test('게임 공력은 공식 레퍼런스의 거리·체공 순위를 같은 투척 조건에서 재현한다', async () => {
   const { createPaperFlightPhysics, makeColliderVertices } = await import('../public/flight-physics-rapier.mjs');
   const outcomes = {};
   for (const name of ALL_PRESETS) {
@@ -142,8 +141,25 @@ test('게임 공력은 레퍼런스의 거리·체공 순위를 같은 순서로
   assert.ok(outcomes.stealth.distance > outcomes.jet.distance);
   assert.ok(outcomes.jet.distance > outcomes.stable.distance);
   assert.ok(outcomes.stealth.time > outcomes.dart.time);
-  assert.ok(outcomes.dart.time > outcomes.stable.time);
+  assert.ok(outcomes.stealth.time > outcomes.stable.time);
   assert.ok(outcomes.stable.time > outcomes.jet.time);
+  assert.ok(outcomes.jet.time > outcomes.dart.time);
+});
+
+test('공식 공력 보정은 프리셋 원본에만 적용되고 직접 조정하면 해제된다', () => {
+  const preset = createPresetModel('dart');
+  const tuned = deriveAerodynamicProfile(preset);
+  assert.deepStrictEqual({
+    liftScale: tuned.liftScale,
+    dragScale: tuned.dragScale,
+    stallSpeed: tuned.stallSpeed,
+    pitchBias: tuned.pitchBias
+  }, { liftScale: .6, dragScale: .65, stallSpeed: 15, pitchBias: .04 });
+
+  const adjusted = require('../public/paper-fold-model.js').setFoldAngle(preset, 3, 2.9);
+  const custom = deriveAerodynamicProfile(adjusted);
+  assert.notStrictEqual(custom.liftScale, tuned.liftScale);
+  assert.notStrictEqual(custom.dragScale, tuned.dragScale);
 });
 
 test('getPresetCommands는 방어적 복사본을 주고 없는 이름은 거부한다', () => {

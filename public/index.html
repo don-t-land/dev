@@ -144,6 +144,33 @@
   #keys { position: absolute; bottom: 26px; right: 22px; text-align: right; font-size: 11px; line-height: 1.9; color: #8496ad; }
   #keys kbd { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); border-radius: 3px; padding: 1px 6px; color: #dce5f0; font: inherit; }
 
+  #touch-controls {
+    position: absolute; z-index: 45; left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
+    display: none; align-items: flex-end; justify-content: space-between;
+    pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .touch-pad { pointer-events: none; }
+  .touch-dpad { display: grid; grid-template: repeat(3, 54px) / repeat(3, 54px); gap: 4px; }
+  .touch-control {
+    display: grid; place-items: center; min-width: 54px; min-height: 54px; padding: 5px;
+    border: 1px solid rgba(220,239,255,.42); border-radius: 17px; color: #f5fbff;
+    background: rgba(8,24,42,.68); box-shadow: inset 0 1px rgba(255,255,255,.14), 0 5px 20px rgba(0,0,0,.24);
+    backdrop-filter: blur(10px); font: 800 20px/1 ui-monospace, monospace;
+    pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  .touch-control small { display: block; margin-top: 2px; color: #bcd0e1; font-size: 8px; letter-spacing: .06em; }
+  .touch-control.is-pressed { color: #102538; background: rgba(143,227,196,.94); border-color: #d8fff1; transform: scale(.94); }
+  .touch-up { grid-area: 1 / 2; }
+  .touch-left { grid-area: 2 / 1; }
+  .touch-down { grid-area: 3 / 2; }
+  .touch-right { grid-area: 2 / 3; }
+  .touch-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .touch-action { width: 72px; min-height: 58px; border-radius: 21px; font-size: 13px; }
+  .touch-dash { color: #ffe5a6; border-color: rgba(255,211,120,.56); }
+  .touch-fire { color: #ffd0c9; border-color: rgba(255,135,119,.62); }
+  .touch-menu { width: 48px; min-width: 48px; min-height: 42px; border-radius: 15px; font-size: 18px; }
+
   #center {
     position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%);
     text-align: center; text-shadow: 0 2px 14px rgba(0,0,0,.7);
@@ -344,6 +371,30 @@
     #gauge { left: 8px; right: 8px; bottom: 8px; padding: 8px 10px; }
     #energy { left: 8px; right: 8px; bottom: 65px; width: auto; padding: 8px 10px; }
     #keys { display: none; }
+  }
+  @media (hover: none) and (pointer: coarse) {
+    #touch-controls { display: flex; }
+    #keys, #game-leave-btn { display: none !important; }
+    #gauge { left: 12px; right: 12px; bottom: calc(190px + env(safe-area-inset-bottom)); width: auto; padding: 8px 10px; }
+    #energy { left: 12px; right: 12px; bottom: calc(245px + env(safe-area-inset-bottom)); width: auto; padding: 8px 10px; }
+  }
+  @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    #stats { top: 12px; left: 12px; transform: scale(.66); transform-origin: top left; }
+    #timer { top: 12px; left: auto; right: 12px; transform: none; font-size: 18px; }
+    #board { top: 140px; left: 12px; right: 12px; width: auto; max-height: min(180px, 28vh); overflow-y: auto; }
+  }
+  @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+    #touch-controls { left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); }
+    .touch-dpad { grid-template: repeat(3, 46px) / repeat(3, 46px); gap: 3px; }
+    .touch-control { min-width: 46px; min-height: 46px; border-radius: 15px; }
+    .touch-action { width: 66px; min-height: 48px; }
+    .touch-menu { width: 44px; min-width: 44px; min-height: 36px; }
+    #gauge { left: 32%; right: 32%; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; padding: 7px 9px; }
+    #energy { left: 32%; right: 32%; bottom: calc(57px + env(safe-area-inset-bottom)); width: auto; padding: 7px 9px; }
+    #stats { top: 8px; left: max(8px, env(safe-area-inset-left)); transform: scale(.68); transform-origin: top left; }
+    #board { top: 8px; left: auto; right: max(8px, env(safe-area-inset-right)); width: min(260px, 31vw); max-height: 104px; overflow-y: auto; padding: 6px 8px; }
+    #board .state { display: none; }
+    #timer { top: 8px; left: 50%; right: auto; transform: translateX(-50%); font-size: 17px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .lobby-plane, .cloud { animation: none; }
@@ -649,6 +700,20 @@
       <span id="keys-fire" class="hide"><kbd>Space</kbd> 다트 발사</span>
     </div>
 
+    <div id="touch-controls" aria-label="모바일 비행 조작">
+      <div class="touch-pad touch-dpad" role="group" aria-label="비행 방향">
+        <button type="button" class="touch-control touch-up" data-flight-key="KeyW" aria-label="기수 내리기" aria-pressed="false"><span aria-hidden="true">▲<small>하강</small></span></button>
+        <button type="button" class="touch-control touch-left" data-flight-key="KeyA" aria-label="왼쪽으로 기울이기" aria-pressed="false"><span aria-hidden="true">◀<small>좌회전</small></span></button>
+        <button type="button" class="touch-control touch-down" data-flight-key="KeyS" aria-label="기수 올리기" aria-pressed="false"><span aria-hidden="true">▼<small>상승</small></span></button>
+        <button type="button" class="touch-control touch-right" data-flight-key="KeyD" aria-label="오른쪽으로 기울이기" aria-pressed="false"><span aria-hidden="true">▶<small>우회전</small></span></button>
+      </div>
+      <div class="touch-pad touch-actions" role="group" aria-label="비행 액션">
+        <button type="button" class="touch-control touch-menu" id="touch-menu" aria-label="비행 설정">⚙</button>
+        <button type="button" class="touch-control touch-action touch-dash" data-flight-key="ShiftLeft" aria-label="대시" aria-pressed="false">DASH</button>
+        <button type="button" class="touch-control touch-action touch-fire" id="touch-fire" data-flight-key="Space" aria-label="다트 발사" aria-pressed="false">FIRE</button>
+      </div>
+    </div>
+
     <div id="center" class="hide">
       <div class="cd hide" id="c-cd"></div>
       <div class="msg hide" id="c-msg"></div>
@@ -830,6 +895,7 @@
 }
 </script>
 <script src="./input-policy.js"></script>
+<script src="./mobile-controls.js"></script>
 <script src="./room-state.js"></script>
 <script src="./flight-controls.js"></script>
 <script src="./costume-state.js"></script>
@@ -870,6 +936,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
+const { createCombinedKeyState, createTouchKeyState } = window.mobileControls;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
   updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage,
@@ -1465,6 +1532,7 @@ function enterGame() {
   $('s-cap').textContent = arena ? '생존 시간' : '직선 거리';
   $('s-unit').textContent = arena ? 's' : 'm';
   $('keys-fire').classList.toggle('hide', !arena);
+  $('touch-fire').classList.toggle('hide', !arena);
   $('b-title').textContent = arena ? 'ARENA 랭킹' : '실시간 랭킹';
 }
 
@@ -3165,6 +3233,7 @@ function escapeHtml(value) {
 }
 
 function showResults(results) {
+  clearFlightKeys();
   const unit = game.mode === 'ARENA' ? 's' : 'm';
   const readyButton = $('results-ready-btn');
   readyButton.disabled = false;
@@ -3209,14 +3278,18 @@ function refreshBoard() {
 /* ============================================================
    입력 · 자유 시점 · ESC 설정
    ============================================================ */
-const keys = {};
+const keyboardKeys = {};
+const touchKeys = {};
+const keys = createCombinedKeyState(keyboardKeys, touchKeys);
+let touchFlightKeys = null;
 let freeLook = { yaw: 0, pitch: 0 };
 let mouseInvertY = mouseInvertYFromStorage(localStorage.getItem('pp_mouse_invert_y'));
 let pauseReturnFocus = null;
 let resultsReturnFocus = null;
 
 function clearFlightKeys() {
-  for (const code of Object.keys(keys)) keys[code] = false;
+  for (const code of Object.keys(keyboardKeys)) keyboardKeys[code] = false;
+  touchFlightKeys?.clear();
 }
 
 function isPauseMenuOpen() {
@@ -3321,6 +3394,53 @@ function resumeFlight() {
   if (game.phase === 'playing' || game.phase === 'countdown') requestFlightPointerLock();
 }
 
+touchFlightKeys = createTouchKeyState(touchKeys, {
+  onChange: (code, active) => {
+    const button = document.querySelector(`[data-flight-key="${code}"]`);
+    button?.classList.toggle('is-pressed', active);
+    button?.setAttribute('aria-pressed', String(active));
+  },
+  onPress: code => {
+    if (code === 'Space' && game.mode === 'ARENA' &&
+        (game.phase === 'playing' || game.phase === 'countdown') &&
+        isPauseMenuOpen() === false && $('results').classList.contains('hide')) shoot();
+  }
+});
+
+for (const button of document.querySelectorAll('#touch-controls [data-flight-key]')) {
+  button.addEventListener('pointerdown', event => {
+    if ((game.phase !== 'playing' && game.phase !== 'countdown') || isPauseMenuOpen() ||
+        !$('respawn-overlay').classList.contains('hide') || !$('results').classList.contains('hide')) return;
+    event.preventDefault();
+    button.setPointerCapture(event.pointerId);
+    touchFlightKeys.press(event.pointerId, button.dataset.flightKey);
+  });
+  const releaseTouchPointer = event => {
+    event.preventDefault();
+    touchFlightKeys.release(event.pointerId);
+  };
+  button.addEventListener('pointerup', releaseTouchPointer);
+  button.addEventListener('pointercancel', releaseTouchPointer);
+  button.addEventListener('lostpointercapture', releaseTouchPointer);
+  button.addEventListener('click', event => {
+    if (event.detail !== 0 || (game.phase !== 'playing' && game.phase !== 'countdown') ||
+        isPauseMenuOpen() || !$('respawn-overlay').classList.contains('hide') ||
+        !$('results').classList.contains('hide')) return;
+    event.preventDefault();
+    const code = button.dataset.flightKey;
+    const activationId = `assistive:${code}`;
+    if (code === 'Space') {
+      touchFlightKeys.press(activationId, code);
+      touchFlightKeys.release(activationId);
+    } else if (touchFlightKeys.isPointerActive(activationId)) {
+      touchFlightKeys.release(activationId);
+    } else {
+      touchFlightKeys.press(activationId, code);
+    }
+  });
+}
+$('touch-menu').addEventListener('click', openPauseMenu);
+
 setKeyGuideVisible(keyGuideVisibleFromStorage(localStorage.getItem('pp_key_guide')));
 $('mouse-invert-y-toggle').checked = mouseInvertY;
 
@@ -3357,13 +3477,14 @@ addEventListener('keydown', e => {
   if (pauseOpen) return;
   if (!$('results').classList.contains('hide')) return;
   if (game.phase !== 'playing' && game.phase !== 'countdown') return;
+  if (e.target instanceof Element && e.target.closest('#touch-controls')) return;
   if (!shouldCaptureGameKey(e)) return;
-  keys[e.code] = true;
+  keyboardKeys[e.code] = true;
   e.preventDefault();
   if (e.code === 'Space' && !e.repeat) shoot();
 });
 addEventListener('keyup', e => {
-  if (e.code in keys) keys[e.code] = false;
+  if (e.code in keyboardKeys) keyboardKeys[e.code] = false;
 });
 addEventListener('blur', clearFlightKeys);
 document.addEventListener('visibilitychange', () => {

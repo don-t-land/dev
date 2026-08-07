@@ -42,6 +42,58 @@ test('dash and darts share one energy HUD instead of rechargeable ammo pips', ()
   assert.doesNotMatch(html, /id="ammo"|me\.ammo|me\.ammoT/);
 });
 
+test('coarse-pointer gameplay exposes a complete accessible touch keypad overlay', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /<script\s+src=['"]\.\/mobile-controls\.js['"]><\/script>/);
+  assert.match(html, /id="touch-controls"[^>]*aria-label="모바일 비행 조작"/);
+  for (const [code, label] of [
+    ['KeyW', '기수 내리기'],
+    ['KeyS', '기수 올리기'],
+    ['KeyA', '왼쪽으로 기울이기'],
+    ['KeyD', '오른쪽으로 기울이기'],
+    ['ShiftLeft', '대시'],
+    ['Space', '다트 발사']
+  ]) {
+    assert.match(html, new RegExp(`<button[^>]*data-flight-key="${code}"[^>]*aria-label="${label}"`));
+    assert.match(html, new RegExp(`<button[^>]*data-flight-key="${code}"[^>]*aria-pressed="false"`));
+  }
+  assert.match(html, /#touch-controls\s*\{[^}]*touch-action:\s*none/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#touch-controls\s*\{[^}]*display:\s*flex/s);
+});
+
+test('portrait touch HUD separates stats, timer, leaderboard, meters, and controls', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#stats\s*\{[^}]*transform:\s*scale\(\.66\)/s);
+  assert.match(html, /orientation:\s*portrait\)[\s\S]*#timer\s*\{[^}]*right:\s*12px[^}]*transform:\s*none/s);
+  assert.match(html, /orientation:\s*portrait\)[\s\S]*#board\s*\{[^}]*top:\s*140px[^}]*max-height:\s*min\(180px,\s*28vh\)[^}]*overflow-y:\s*auto/s);
+});
+
+test('landscape touch HUD resets inherited small-screen positioning', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#board\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)/s);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#timer\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*transform:\s*translateX\(-50%\)/s);
+});
+
+test('touch keypad feeds the shared flight state and releases captured pointers safely', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /const\s+\{\s*createCombinedKeyState,\s*createTouchKeyState\s*\}\s*=\s*window\.mobileControls/);
+  assert.match(html, /const keyboardKeys\s*=\s*\{\};[\s\S]*const touchKeys\s*=\s*\{\};[\s\S]*const keys\s*=\s*createCombinedKeyState\(keyboardKeys, touchKeys\)/);
+  assert.match(html, /createTouchKeyState\(touchKeys,[\s\S]*onPress:\s*code\s*=>\s*\{[\s\S]*code === 'Space'[\s\S]*shoot\(\)/);
+  assert.match(html, /onChange:\s*\(code, active\)[\s\S]*setAttribute\('aria-pressed', String\(active\)\)/);
+  assert.match(html, /function clearFlightKeys\(\)\s*\{[\s\S]*touchFlightKeys\?\.clear\(\)/);
+  assert.match(html, /button\.addEventListener\('pointerdown',[\s\S]*setPointerCapture\(event\.pointerId\)[\s\S]*touchFlightKeys\.press\(event\.pointerId, button\.dataset\.flightKey\)/);
+  for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    assert.match(html, new RegExp(`button\\.addEventListener\\('${eventName}', releaseTouchPointer\\)`));
+  }
+  assert.match(html, /button\.addEventListener\('click',[\s\S]*event\.detail !== 0[\s\S]*touchFlightKeys\.isPointerActive\(activationId\)/);
+  assert.match(html, /e\.target\.closest\('#touch-controls'\)/);
+  assert.match(html, /\$\('touch-menu'\)\.addEventListener\('click', openPauseMenu\)/);
+  assert.match(html, /function enterGame\(\)[\s\S]*\$\('touch-fire'\)\.classList\.toggle\('hide', !arena\)/);
+  assert.match(html, /function showResults\(results\)\s*\{[\s\S]*clearFlightKeys\(\)[\s\S]*setUnderlyingGameUiInert\(true\)/);
+});
+
 test('room snapshots preserve active, crashed, and spectator roles', () => {
   const { getLocalRoundRole } = require('../public/room-state.js');
   const room = {

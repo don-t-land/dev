@@ -20,7 +20,7 @@ test('browser loads pure biome recipes before the registry and renderer module',
   const registry = html.indexOf('<script src="./map-gen.js"></script>');
   assert.ok(helpers >= 0 && helpers < desert);
   assert.ok(desert < floating && floating < registry);
-  assert.match(html, /import \{ buildBiomeEnvironment \} from '\.\/biome-visuals\.js';/);
+  assert.match(html, /import \{ buildBiomeEnvironment, terrainCollisionAtPoint \} from '\.\/biome-visuals\.js';/);
 });
 
 test('distance and arena consume the same recipe layout renderer', () => {
@@ -70,13 +70,19 @@ test('curved segmented silhouettes and spatial repacking are wired into producti
   assert.match(biomeHelpers, /goldenAngle/);
 });
 
-test('floating platforms are collidable in both fallback and Rapier paths', () => {
-  assert.match(html, /for \(const platform of platforms\)/);
-  assert.match(html, /Math\.cos\(-platform\.rotation\)/);
-  assert.match(html, /setMapColliders\(\{ spires, rocks, platforms \}\)/);
-  assert.match(physics, /setMapColliders\(\{ spires = \[\], rocks = \[\], platforms = \[\] \}/);
-  assert.match(physics, /ColliderDesc\.cuboid\(/);
-  assert.match(physics, /descriptor\.setRotation/);
+test('rendered terrain and both physics paths consume the same compound colliders', () => {
+  assert.match(visuals, /function buildTerrainColliders/);
+  assert.match(visuals, /type: 'tapered-segment'/);
+  assert.match(visuals, /type: 'ellipsoid'/);
+  assert.match(visuals, /type: 'elliptic-cylinder'/);
+  assert.match(visuals, /'platform-underside'/);
+  assert.match(visuals, /export function terrainCollisionAtPoint/);
+  assert.match(html, /terrainColliders = environment\.colliders/);
+  assert.match(html, /terrainCollisionAtPoint\(craft\.position, terrainColliders, 1\.4\)/);
+  assert.match(html, /setMapColliders\(\{ colliders: terrainColliders \}\)/);
+  assert.match(physics, /setMapColliders\(\{ colliders = \[\], spires = \[\], rocks = \[\], platforms = \[\] \}/);
+  assert.match(physics, /ellipticCylinderHull/);
+  assert.match(physics, /quaternionFromUnitY/);
 });
 
 test('ground treatment follows biome palette and nearly disappears in floating islands', () => {

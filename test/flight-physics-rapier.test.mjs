@@ -80,6 +80,42 @@ test('Rapier map colliders include rotated floating platforms', async () => {
   physics.free();
 });
 
+test('Rapier consumes renderer-authored compound terrain collider transforms', async () => {
+  const physics = await configured(createPaperModel());
+  physics.setMapColliders({
+    colliders: [
+      {
+        type: 'tapered-segment',
+        start: { x: 0, y: 10, z: 0 },
+        end: { x: 16, y: 38, z: -7 },
+        radius0: 5,
+        radius1: 2
+      },
+      {
+        type: 'ellipsoid',
+        center: { x: 20, y: 50, z: -8 },
+        radii: { x: 4, y: 9, z: 6 },
+        rotation: { x: 0, y: .2, z: 0, w: Math.sqrt(.96) }
+      },
+      {
+        type: 'elliptic-cylinder',
+        center: { x: -30, y: 90, z: 16 },
+        radii: { x: 22, z: 15 },
+        halfHeight: 7,
+        rotation: { x: 0, y: .1, z: 0, w: Math.sqrt(.99) }
+      },
+      {
+        type: 'box',
+        center: { x: 0, y: 30, z: 80 },
+        half: { x: 12, y: 30, z: 8 },
+        rotation: { x: 0, y: 0, z: 0, w: 1 }
+      }
+    ]
+  });
+  assert.equal(physics.staticColliders.length, 5, 'ground + four renderer-authored shapes');
+  physics.free();
+});
+
 test('different folded shapes produce different physical trajectories', async () => {
   const squareModel = createPaperModel();
   const halfModel = applyFold(createPaperModel(), [-1, 0], [1, 0], 1);

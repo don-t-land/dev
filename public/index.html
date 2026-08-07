@@ -730,7 +730,7 @@ import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
 import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
 import { createFoldEditor } from './fold-editor-3d.mjs';
-import { buildBiomeEnvironment } from './biome-visuals.js';
+import { buildBiomeEnvironment, terrainCollisionAtPoint } from './biome-visuals.js';
 const { getLaunchPose, localDeadline, getLaunchLayoutKey } = window.launchTransition;
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
@@ -1732,7 +1732,7 @@ function updateAeroHud() {
 }
 
 function syncRapierMap() {
-  rapierFlight?.setMapColliders({ spires, rocks, platforms });
+  rapierFlight?.setMapColliders({ colliders: terrainColliders });
 }
 
 function syncRapierFromCraft() {
@@ -1941,7 +1941,7 @@ const THERMAL_R = 26, THERMAL_LIFT = 15, RING_R = 8;
 const world = new THREE.Group();
 scene.add(world);
 
-let spires = [], rocks = [], platforms = [], thermals = [], ringsArr = [];
+let spires = [], rocks = [], platforms = [], terrainColliders = [], thermals = [], ringsArr = [];
 let biomeEnvironment = null;
 let distanceWidthNoise = null;
 
@@ -1981,7 +1981,7 @@ function clearWorld() {
     if (o.isMesh && !previousEnvironment?.getObjectById(o.id)) o.geometry.dispose?.();
   });
   world.clear();
-  spires = []; rocks = []; platforms = []; thermals = []; ringsArr = [];
+  spires = []; rocks = []; platforms = []; terrainColliders = []; thermals = []; ringsArr = [];
   biomeEnvironment = null;
   distanceWidthNoise = null;
   // 바이옴 팔레트 기본값 복원 — buildDistance/buildArena는 이 직후 자신의 팔레트를
@@ -2020,6 +2020,7 @@ function installBiomeLayout(layout) {
   spires = environment.spires;
   rocks = environment.rocks;
   platforms = environment.platforms;
+  terrainColliders = environment.colliders;
 }
 
 /* ---- 멀리 날기: 시드로 7.5km 직선 협곡을 결정론적으로 생성 ---- */
@@ -2888,24 +2889,7 @@ function physics(dt) {
 
   /* 충돌 */
   if (craft.position.y <= 1.2) return dieLocal();
-  for (const s of spires) {
-    if (craft.position.y < s.h) {
-      const d = Math.hypot(craft.position.x - s.x, craft.position.z - s.z);
-      if (d < s.r * (1 - 0.65 * craft.position.y / s.h) + 1.4) return dieLocal();
-    }
-  }
-  for (const r of rocks)
-    if (craft.position.distanceTo(r.p) < r.r + 1.4) return dieLocal();
-  for (const platform of platforms) {
-    const dx = craft.position.x - platform.x;
-    const dz = craft.position.z - platform.z;
-    const cos = Math.cos(-platform.rotation), sin = Math.sin(-platform.rotation);
-    const localX = dx * cos - dz * sin;
-    const localZ = dx * sin + dz * cos;
-    if (Math.abs(localX) < platform.w * .5 + 1.4 &&
-        Math.abs(localZ) < platform.d * .5 + 1.4 &&
-        Math.abs(craft.position.y - platform.y) < platform.h * .5 + 1.4) return dieLocal();
-  }
+  if (terrainCollisionAtPoint(craft.position, terrainColliders, 1.4)) return dieLocal();
 
   /* 링 */
   for (const ring of ringsArr) {

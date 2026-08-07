@@ -32,6 +32,43 @@ const normalize = v => {
   return magnitude > 1e-9 ? scale(v, 1 / magnitude) : { x: 0, y: 0, z: 0 };
 };
 
+function quaternionFromUnitY(direction) {
+  const unit = normalize(direction);
+  if (unit.y < -0.999999) return { x: 1, y: 0, z: 0, w: 0 };
+  const quaternion = { x: unit.z, y: 0, z: -unit.x, w: 1 + unit.y };
+  const magnitude = Math.hypot(quaternion.x, quaternion.y, quaternion.z, quaternion.w) || 1;
+  return {
+    x: quaternion.x / magnitude,
+    y: quaternion.y / magnitude,
+    z: quaternion.z / magnitude,
+    w: quaternion.w / magnitude
+  };
+}
+
+function ellipsoidHull(radii) {
+  const vertices = [];
+  const push = (x, y, z) => vertices.push(x, y, z);
+  push(radii.x, 0, 0); push(-radii.x, 0, 0);
+  push(0, radii.y, 0); push(0, -radii.y, 0);
+  push(0, 0, radii.z); push(0, 0, -radii.z);
+  const corner = 1 / Math.sqrt(3);
+  for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+    push(x * radii.x * corner, y * radii.y * corner, z * radii.z * corner);
+  }
+  return new Float32Array(vertices);
+}
+
+function ellipticCylinderHull(radii, halfHeight, sides = 12) {
+  const vertices = [];
+  for (const y of [-halfHeight, halfHeight]) {
+    for (let index = 0; index < sides; index++) {
+      const angle = index / sides * Math.PI * 2;
+      vertices.push(Math.cos(angle) * radii.x, y, Math.sin(angle) * radii.z);
+    }
+  }
+  return new Float32Array(vertices);
+}
+
 function rotateVector(vector, quaternion) {
   const { x, y, z, w } = quaternion;
   const tx = 2 * (y * vector.z - z * vector.y);
@@ -144,7 +181,7 @@ export class PaperFlightPhysics {
     this.body.setAngvel(add(this.body.angvel(), delta), true);
   }
 
-  setMapColliders({ spires = [], rocks = [], platforms = [] } = {}) {
+  setMapColliders({ colliders = [], spires = [], rocks = [], platforms = [] } = {}) {
     for (const collider of this.staticColliders) this.world.removeCollider(collider, true);
     this.staticColliders = [];
     const addStatic = (descriptor, position) => {
@@ -152,6 +189,48 @@ export class PaperFlightPhysics {
       this.staticColliders.push(this.world.createCollider(descriptor));
     };
     addStatic(this.RAPIER.ColliderDesc.cuboid(4000, 1, 4000), { x: 0, y: -1, z: 0 });
+    if (colliders.length) {
+      for (const shape of colliders) {
+        let descriptor = null;
+        let position = shape.center;
+        let rotation = shape.rotation;
+        if (shape.type === 'tapered-segment') {
+          let start = shape.start;
+          let end = shape.end;
+          let radius0 = shape.radius0;
+          let radius1 = shape.radius1;
+          if (radius1 > radius0) {
+            [start, end] = [end, start];
+            [radius0, radius1] = [radius1, radius0];
+          }
+          const direction = {
+            x: end.x - start.x,
+            y: end.y - start.y,
+            z: end.z - start.z
+          };
+          const segmentLength = Math.max(.01, length(direction));
+          position = {
+            x: (start.x + end.x) * .5,
+            y: (start.y + end.y) * .5,
+            z: (start.z + end.z) * .5
+          };
+          rotation = quaternionFromUnitY(direction);
+          descriptor = radius1 <= radius0 * .16
+            ? this.RAPIER.ColliderDesc.cone(segmentLength * .5, Math.max(.1, radius0))
+            : this.RAPIER.ColliderDesc.cylinder(segmentLength * .5, Math.max(.1, (radius0 + radius1) * .5));
+        } else if (shape.type === 'ellipsoid') {
+          descriptor = this.RAPIER.ColliderDesc.convexHull(ellipsoidHull(shape.radii));
+        } else if (shape.type === 'elliptic-cylinder') {
+          descriptor = this.RAPIER.ColliderDesc.convexHull(ellipticCylinderHull(shape.radii, shape.halfHeight));
+        } else if (shape.type === 'box') {
+          descriptor = this.RAPIER.ColliderDesc.cuboid(shape.half.x, shape.half.y, shape.half.z);
+        }
+        if (!descriptor || !position) continue;
+        if (rotation) descriptor.setRotation(rotation);
+        addStatic(descriptor, position);
+      }
+      return;
+    }
     for (const spire of spires) {
       addStatic(
         this.RAPIER.ColliderDesc.cone(Math.max(1, spire.h / 2), Math.max(.2, spire.r)),

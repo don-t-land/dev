@@ -435,6 +435,319 @@ function addLandmarks(root, items, biomes, materials) {
   }
 }
 
+function plainVector(vector) {
+  return { x: vector.x, y: vector.y, z: vector.z };
+}
+
+function plainQuaternion(quaternion) {
+  return { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w };
+}
+
+function quaternionFromEuler(x = 0, y = 0, z = 0) {
+  return plainQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z)));
+}
+
+function taperedSegment(start, end, radius0, radius1, source) {
+  return {
+    type: 'tapered-segment',
+    start: plainVector(start),
+    end: plainVector(end),
+    radius0: Math.max(.1, radius0),
+    radius1: Math.max(.1, radius1),
+    source
+  };
+}
+
+function segmentFromTransform(position, rotation, length, radius0, radius1, source) {
+  const start = position.clone();
+  const end = position.clone().add(new THREE.Vector3(0, length, 0).applyQuaternion(rotation));
+  return taperedSegment(start, end, radius0, radius1, source);
+}
+
+function buildTerrainColliders(layout) {
+  const colliders = [];
+  const taperProfiles = [
+    [1, .62], [.92, .5], [1, .08], [1, .72], [.88, .42]
+  ];
+  const spireIndexByBiome = new Map();
+  const forkIndexByBiome = new Map();
+
+  for (const wall of layout.walls || []) {
+    colliders.push({
+      type: 'box', source: 'wall',
+      center: { x: wall.x, y: wall.h * .48, z: wall.z },
+      half: { x: wall.w * .5, y: wall.h * .52, z: wall.d * .5 },
+      rotation: quaternionFromEuler(0, wall.yaw || 0, 0)
+    });
+  }
+
+  for (const spire of layout.spires || []) {
+    const biome = spire.biome || 0;
+    const localIndex = spireIndexByBiome.get(biome) || 0;
+    spireIndexByBiome.set(biome, localIndex + 1);
+    const [bottomRatio, topRatio] = taperProfiles[biome] || taperProfiles[0];
+    for (const entry of spireSegmentEntries([spire], biome)) {
+      const start = spirePoseAt(spire, entry.t0, biome);
+      const end = spirePoseAt(spire, entry.t1, biome);
+      const scaleRadius = spire.r * spireRadiusAt(spire, (entry.t0 + entry.t1) * .5, biome);
+      colliders.push(taperedSegment(
+        start, end,
+        scaleRadius * bottomRatio,
+        scaleRadius * topRatio,
+        'spire'
+      ));
+    }
+
+    if (biome === 1) {
+      [0, 1, 2].forEach(side => {
+        const angle = (spire.yaw || 0) + side * Math.PI * 2 / 3 + (localIndex % 2) * .24;
+        const position = new THREE.Vector3(
+          spire.x + Math.cos(angle) * spire.r * .68,
+          0,
+          spire.z + Math.sin(angle) * spire.r * .68
+        );
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+          Math.cos(angle) * .18,
+          angle,
+          -Math.sin(angle) * .18
+        ));
+        colliders.push(segmentFromTransform(
+          position, rotation,
+          spire.h * (.12 + side * .018),
+          spire.r * .38,
+          .1,
+          'pillar-root'
+        ));
+      });
+      if (spire.fork) {
+        const forkIndex = forkIndexByBiome.get(biome) || 0;
+        forkIndexByBiome.set(biome, forkIndex + 1);
+        const base = spirePoseAt(spire, .43 + (forkIndex % 3) * .07, biome);
+        const angle = (spire.bendYaw || spire.yaw || 0) +
+          (spire.forkSide || 1) * (1.05 + (forkIndex % 2) * .22);
+        const length = spire.h * (.19 + (forkIndex % 3) * .025);
+        const end = base.clone().add(new THREE.Vector3(
+          Math.cos(angle) * length * .62,
+          length * .78,
+          Math.sin(angle) * length * .62
+        ));
+        colliders.push(taperedSegment(base, end, spire.r * .52 * .68, spire.r * .52 * .24, 'pillar-fork'));
+      }
+    } else if (biome === 2) {
+      [-1, 1].forEach((side, companionIndex) => {
+        const angle = (spire.yaw || 0) + side * 1.08;
+        const position = new THREE.Vector3(
+          spire.x + Math.cos(angle) * spire.r * .58,
+          0,
+          spire.z + Math.sin(angle) * spire.r * .58
+        );
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(side * .15, angle, side * .18));
+        colliders.push(segmentFromTransform(
+          position, rotation,
+          spire.h * (.44 + ((localIndex + companionIndex * 7) % 3) * .08),
+          spire.r * .36,
+          .1,
+          'crystal-companion'
+        ));
+      });
+    }
+  }
+
+  for (const rock of layout.rocks || []) {
+    colliders.push({
+      type: 'ellipsoid', source: 'rock',
+      center: { x: rock.x, y: rock.y, z: rock.z },
+      radii: {
+        x: rock.r * (rock.sx || 1),
+        y: rock.r * (rock.sy || 1),
+        z: rock.r * (rock.sz || 1)
+      },
+      rotation: quaternionFromEuler(
+        rock.pitch || ((rock.variant || 0) - 1.5) * .17,
+        rock.yaw || 0,
+        ((rock.variant || 0) - 1.5) * .21
+      )
+    });
+  }
+
+  for (const island of layout.platforms || []) {
+    const shelfRotation = quaternionFromEuler(
+      (island.shelfSkew || 0) * .32,
+      island.rotation || 0,
+      island.shelfSkew || 0
+    );
+    colliders.push({
+      type: 'elliptic-cylinder', source: 'platform-shelf',
+      center: { x: island.x, y: island.y, z: island.z },
+      radii: { x: island.w * .5, z: island.d * .5 },
+      halfHeight: island.h * .5,
+      rotation: shelfRotation
+    });
+    colliders.push({
+      type: 'elliptic-cylinder', source: 'platform-cap',
+      center: { x: island.x, y: island.y + island.h * .52, z: island.z },
+      radii: { x: island.w * .49, z: island.d * .49 },
+      halfHeight: Math.max(1, island.h * .18) * .06,
+      rotation: quaternionFromEuler(0, island.rotation || 0, 0)
+    });
+    const depth = Math.max(18, Math.min(62, island.w * (island.undersideDepth || .62)));
+    const undersideCenter = new THREE.Vector3(island.x, island.y - island.h * .55 - depth * .42, island.z);
+    const undersideRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      0,
+      island.rotation || 0,
+      (island.shelfSkew || 0) * .22
+    ));
+    const undersideAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(undersideRotation);
+    for (let slice = 0; slice < 4; slice++) {
+      const t0 = slice / 4;
+      const t1 = (slice + 1) / 4;
+      const mid = (t0 + t1) * .5;
+      const center = undersideCenter.clone().addScaledVector(undersideAxis, (mid - .5) * depth);
+      colliders.push({
+        type: 'elliptic-cylinder', source: 'platform-underside',
+        center: plainVector(center),
+        radii: { x: Math.max(.1, island.w * .43 * t1), z: Math.max(.1, island.d * .43 * t1) },
+        halfHeight: depth / 8,
+        rotation: plainQuaternion(undersideRotation)
+      });
+    }
+    for (let tier = 0; tier < (island.terraces || 2); tier++) {
+      const scale = .8 - tier * .13;
+      colliders.push({
+        type: 'elliptic-cylinder', source: 'platform-terrace',
+        center: { x: island.x, y: island.y + island.h * .62 + tier * 1.6, z: island.z },
+        radii: { x: island.w * .5 * scale, z: island.d * .5 * scale },
+        halfHeight: Math.max(1, island.h * .12) * .08,
+        rotation: quaternionFromEuler(0, (island.rotation || 0) + tier * .12, 0)
+      });
+    }
+  }
+
+  for (const mark of layout.landmarks || []) {
+    const scale = mark.scale || 1;
+    const base = new THREE.Vector3(mark.x, mark.y || 0, mark.z);
+    if (mark.type === 'wind-gate') {
+      [-1, 1].forEach(side => colliders.push(taperedSegment(
+        base.clone().add(new THREE.Vector3(side * 18 * scale, 0, 0)),
+        base.clone().add(new THREE.Vector3(side * 18 * scale, 42 * scale, 0)),
+        8.5 * scale,
+        5.2 * scale,
+        'wind-gate-tower'
+      )));
+      let previous = null;
+      for (let index = 0; index <= 10; index++) {
+        const angle = index / 10 * Math.PI;
+        const point = base.clone().add(new THREE.Vector3(
+          Math.cos(angle) * 18 * scale,
+          (42 + Math.sin(angle) * 18) * scale,
+          0
+        ));
+        if (previous) colliders.push(taperedSegment(previous, point, 2.4 * scale, 2.4 * scale, 'wind-gate-arch'));
+        previous = point;
+      }
+    } else if (mark.type === 'post-office') {
+      colliders.push({
+        type: 'box', source: 'post-office',
+        center: plainVector(base.clone().add(new THREE.Vector3(0, 9 * scale, 0))),
+        half: { x: 13.5 * scale, y: 9 * scale, z: 10 * scale },
+        rotation: quaternionFromEuler(0, 0, 0)
+      });
+      colliders.push({
+        type: 'box', source: 'post-office-roof',
+        center: plainVector(base.clone().add(new THREE.Vector3(0, 21 * scale, 0))),
+        half: { x: 11.5 * scale, y: 10 * scale, z: 16 * scale },
+        rotation: quaternionFromEuler(0, 0, 0)
+      });
+    } else if (mark.type === 'white-needle') {
+      colliders.push(taperedSegment(base, base.clone().add(new THREE.Vector3(0, 78 * scale, 0)), 7.5 * scale, .8 * scale, 'white-needle'));
+      colliders.push(taperedSegment(
+        base.clone().add(new THREE.Vector3(0, 78 * scale, 0)),
+        base.clone().add(new THREE.Vector3(0, 96 * scale, 0)),
+        3.4 * scale,
+        .1,
+        'white-needle-cap'
+      ));
+    }
+  }
+  return colliders;
+}
+
+const collisionLocal = { x: 0, y: 0, z: 0 };
+
+function inverseRotateDelta(point, center, rotation) {
+  const vx = point.x - center.x;
+  const vy = point.y - center.y;
+  const vz = point.z - center.z;
+  const qx = -(rotation?.x || 0);
+  const qy = -(rotation?.y || 0);
+  const qz = -(rotation?.z || 0);
+  const qw = rotation?.w ?? 1;
+  const tx = 2 * (qy * vz - qz * vy);
+  const ty = 2 * (qz * vx - qx * vz);
+  const tz = 2 * (qx * vy - qy * vx);
+  collisionLocal.x = vx + qw * tx + (qy * tz - qz * ty);
+  collisionLocal.y = vy + qw * ty + (qz * tx - qx * tz);
+  collisionLocal.z = vz + qw * tz + (qx * ty - qy * tx);
+  return collisionLocal;
+}
+
+export function terrainCollisionAtPoint(point, colliders, craftRadius = 1.4) {
+  for (const shape of colliders || []) {
+    if (shape.type === 'tapered-segment') {
+      const broadRadius = Math.max(shape.radius0, shape.radius1) + craftRadius;
+      if (point.x < Math.min(shape.start.x, shape.end.x) - broadRadius ||
+          point.x > Math.max(shape.start.x, shape.end.x) + broadRadius ||
+          point.y < Math.min(shape.start.y, shape.end.y) - broadRadius ||
+          point.y > Math.max(shape.start.y, shape.end.y) + broadRadius ||
+          point.z < Math.min(shape.start.z, shape.end.z) - broadRadius ||
+          point.z > Math.max(shape.start.z, shape.end.z) + broadRadius) continue;
+      const ax = shape.end.x - shape.start.x;
+      const ay = shape.end.y - shape.start.y;
+      const az = shape.end.z - shape.start.z;
+      const px = point.x - shape.start.x;
+      const py = point.y - shape.start.y;
+      const pz = point.z - shape.start.z;
+      const lengthSquared = ax * ax + ay * ay + az * az;
+      const t = Math.max(0, Math.min(1, lengthSquared > 1e-9
+        ? (px * ax + py * ay + pz * az) / lengthSquared
+        : 0));
+      const dx = px - ax * t;
+      const dy = py - ay * t;
+      const dz = pz - az * t;
+      const radius = shape.radius0 + (shape.radius1 - shape.radius0) * t + craftRadius;
+      if (dx * dx + dy * dy + dz * dz <= radius * radius) return shape;
+    } else if (shape.type === 'ellipsoid') {
+      const reach = Math.max(shape.radii.x, shape.radii.y, shape.radii.z) + craftRadius;
+      if (Math.abs(point.x - shape.center.x) > reach ||
+          Math.abs(point.y - shape.center.y) > reach ||
+          Math.abs(point.z - shape.center.z) > reach) continue;
+      const local = inverseRotateDelta(point, shape.center, shape.rotation);
+      const rx = shape.radii.x + craftRadius;
+      const ry = shape.radii.y + craftRadius;
+      const rz = shape.radii.z + craftRadius;
+      if ((local.x / rx) ** 2 + (local.y / ry) ** 2 + (local.z / rz) ** 2 <= 1) return shape;
+    } else if (shape.type === 'elliptic-cylinder') {
+      const reach = Math.hypot(shape.radii.x, shape.halfHeight, shape.radii.z) + craftRadius;
+      if ((point.x - shape.center.x) ** 2 + (point.y - shape.center.y) ** 2 +
+          (point.z - shape.center.z) ** 2 > reach * reach) continue;
+      const local = inverseRotateDelta(point, shape.center, shape.rotation);
+      const rx = shape.radii.x + craftRadius;
+      const rz = shape.radii.z + craftRadius;
+      if (Math.abs(local.y) <= shape.halfHeight + craftRadius &&
+          (local.x / rx) ** 2 + (local.z / rz) ** 2 <= 1) return shape;
+    } else if (shape.type === 'box') {
+      const reach = Math.hypot(shape.half.x, shape.half.y, shape.half.z) + craftRadius;
+      if ((point.x - shape.center.x) ** 2 + (point.y - shape.center.y) ** 2 +
+          (point.z - shape.center.z) ** 2 > reach * reach) continue;
+      const local = inverseRotateDelta(point, shape.center, shape.rotation);
+      if (Math.abs(local.x) <= shape.half.x + craftRadius &&
+          Math.abs(local.y) <= shape.half.y + craftRadius &&
+          Math.abs(local.z) <= shape.half.z + craftRadius) return shape;
+    }
+  }
+  return null;
+}
+
 export function buildBiomeEnvironment({ layout, biomes }) {
   const root = new THREE.Group();
   root.name = 'biome-environment';
@@ -455,6 +768,7 @@ export function buildBiomeEnvironment({ layout, biomes }) {
   };
   return {
     root,
+    colliders: buildTerrainColliders(layout),
     spires: (layout.spires || []).map(s => ({ x: s.x, z: s.z, h: s.h, r: s.r })),
     rocks: (layout.rocks || []).map(r => ({ p: new THREE.Vector3(r.x, r.y, r.z), r: r.r * Math.max(r.sx || 1, r.sy || 1, r.sz || 1) })),
     platforms: (layout.platforms || []).map(p => ({ x: p.x, y: p.y, z: p.z, w: p.w, h: p.h, d: p.d, rotation: p.rotation || 0 }))

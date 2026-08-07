@@ -179,6 +179,6 @@ test('Rapier fixed-step physics is wired to folded colliders, forces, and map co
   assert.match(html, /import\('\.\/flight-physics-rapier\.mjs'\)/);
   assert.match(html, /makeColliderVertices\(activePaperModel\)/);
   assert.match(html, /rapierFlight\.advance\(dt/);
-  assert.match(html, /rapierFlight\?\.setMapColliders\(\{ spires, rocks, platforms \}\)/);
+  assert.match(html, /rapierFlight\?\.setMapColliders\(\{ colliders: terrainColliders \}\)/);
   assert.match(html, /Rapier/);
 });

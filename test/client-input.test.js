@@ -92,6 +92,16 @@ test('the client loads free-flight controls and exposes the ESC settings menu', 
   assert.doesNotMatch(html, /const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT/);
 });
 
+test('the ESC menu persists mouse Y inversion and applies it to free-look', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /for="mouse-invert-y-toggle"/);
+  assert.match(html, /id="mouse-invert-y-toggle"[^>]*type="checkbox"/);
+  assert.match(html, /mouseInvertYFromStorage\(localStorage\.getItem\(['"]pp_mouse_invert_y['"]\)\)/);
+  assert.match(html, /localStorage\.setItem\(['"]pp_mouse_invert_y['"],\s*enabled \? ['"]1['"] : ['"]0['"]\)/);
+  assert.match(html, /updateFreeLook\(freeLook,\s*event\.movementX,\s*event\.movementY,\s*0\.0022,\s*mouseInvertY\)/);
+});
+
 test('the ESC menu exposes persisted runtime graphics settings', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
@@ -133,6 +143,17 @@ test('high graphics defaults extend shadows and view distance across biome envir
   assert.match(html, /THREE\.VSMShadowMap/);
   assert.match(biomeVisuals, /mesh\.castShadow\s*=\s*castShadow/);
   assert.match(biomeVisuals, /mesh\.receiveShadow\s*=\s*true/);
+});
+
+test('thermal shader keeps bloom inputs finite across GPU implementations', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /float bandBase=clamp\([\s\S]*float band=pow\(bandBase,2\.2\)/);
+  assert.match(html, /float ndv=clamp\(abs\(dot\(normalize\(vN\),normalize\(vV\)\)\),0\.,1\.\)/);
+  assert.match(html, /float edge=pow\(max\(0\.,1\.-ndv\),1\.6\)/);
+  assert.match(html, /float fade=\(1\.-smoothstep\(\.35,1\.,vUv\.y\)\)\*smoothstep\(0\.,\.08,vUv\.y\)/);
+  assert.doesNotMatch(html, /pow\(1\.-abs\(dot\(/);
+  assert.doesNotMatch(html, /smoothstep\(1\.,\.35,vUv\.y\)/);
 });
 
 test('graphics teardown releases CSM, remote-player, and GTAO resources', () => {

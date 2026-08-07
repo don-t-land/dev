@@ -735,6 +735,10 @@
           <span><b>키 가이드</b><small>인게임 조작 안내 표시</small></span>
           <input id="key-guide-toggle" type="checkbox" checked>
         </label>
+        <label class="setting-row" for="mouse-invert-y-toggle">
+          <span><b>마우스 상하 반전</b><small>마우스를 위로 움직이면 아래를 바라봅니다</small></span>
+          <input id="mouse-invert-y-toggle" type="checkbox">
+        </label>
         <div class="modal-actions">
           <button id="resume-btn" class="action-btn primary">비행 계속하기</button>
           <button id="pause-leave-btn" class="action-btn danger">라운드 나가기</button>
@@ -858,7 +862,8 @@ const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
   updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage,
-  updateEnergy, consumeDartEnergy, dashAcceleration, speedFov, MAX_ENERGY, DART_ENERGY_COST
+  mouseInvertYFromStorage, updateEnergy, consumeDartEnergy, dashAcceleration, speedFov,
+  MAX_ENERGY, DART_ENERGY_COST
 } = window.flightControls;
 const { getWaitingSlots, canStart, getLocalReady } = window.waitingRoomStatePolicy;
 const {
@@ -1632,6 +1637,7 @@ $('fold-leave-btn').addEventListener('click', () => {
   send({ t: 'leave' });
 });
 $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(event.currentTarget.checked));
+$('mouse-invert-y-toggle').addEventListener('change', event => setMouseInvertY(event.currentTarget.checked));
 const graphicsControlIds = [
   'graphics-resolution', 'graphics-shadows', 'graphics-view-distance', 'graphics-csm',
   'graphics-gtao', 'graphics-bloom', 'graphics-fog-quality', 'graphics-shadow-softness'
@@ -2503,9 +2509,11 @@ const thermalMat = new THREE.ShaderMaterial({
   fragmentShader: `
     uniform float uTime; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
     void main(){
-      float band=pow(sin(vUv.y*26.-uTime*2.6)*.5+.5,2.2);
-      float edge=pow(1.-abs(dot(normalize(vN),normalize(vV))),1.6);
-      float fade=smoothstep(1.,.35,vUv.y)*smoothstep(0.,.08,vUv.y);
+      float bandBase=clamp(sin(vUv.y*26.-uTime*2.6)*.5+.5,0.,1.);
+      float band=pow(bandBase,2.2);
+      float ndv=clamp(abs(dot(normalize(vN),normalize(vV))),0.,1.);
+      float edge=pow(max(0.,1.-ndv),1.6);
+      float fade=(1.-smoothstep(.35,1.,vUv.y))*smoothstep(0.,.08,vUv.y);
       vec3 col=mix(vec3(.25,.85,.62),vec3(1.,.94,.6),band);
       gl_FragColor=vec4(col,(.09+band*.2)*edge*fade);
     }`
@@ -3173,6 +3181,7 @@ function refreshBoard() {
    ============================================================ */
 const keys = {};
 let freeLook = { yaw: 0, pitch: 0 };
+let mouseInvertY = mouseInvertYFromStorage(localStorage.getItem('pp_mouse_invert_y'));
 let pauseReturnFocus = null;
 let resultsReturnFocus = null;
 
@@ -3209,6 +3218,12 @@ function setKeyGuideVisible(visible) {
   $('keys').classList.toggle('hide', !visible);
   $('key-guide-toggle').checked = visible;
   localStorage.setItem('pp_key_guide', visible ? '1' : '0');
+}
+
+function setMouseInvertY(enabled) {
+  mouseInvertY = !!enabled;
+  $('mouse-invert-y-toggle').checked = mouseInvertY;
+  localStorage.setItem('pp_mouse_invert_y', enabled ? '1' : '0');
 }
 
 function hideResults() {
@@ -3277,6 +3292,7 @@ function resumeFlight() {
 }
 
 setKeyGuideVisible(keyGuideVisibleFromStorage(localStorage.getItem('pp_key_guide')));
+$('mouse-invert-y-toggle').checked = mouseInvertY;
 
 $('c').addEventListener('click', () => {
   if ((game.phase === 'playing' || game.phase === 'countdown') && $('pause-menu').classList.contains('hide'))
@@ -3285,7 +3301,7 @@ $('c').addEventListener('click', () => {
 
 document.addEventListener('mousemove', event => {
   if (document.pointerLockElement !== $('c')) return;
-  freeLook = updateFreeLook(freeLook, event.movementX, event.movementY);
+  freeLook = updateFreeLook(freeLook, event.movementX, event.movementY, 0.0022, mouseInvertY);
 });
 
 document.addEventListener('pointerlockchange', () => {

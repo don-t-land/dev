@@ -36,6 +36,23 @@ test('both flight modes use one mode-aware room popup and four-slot waiting room
   assert.match(flowCss, /grid-template-columns:\s*repeat\(4,1fr\)/);
 });
 
+test('Fold N Fly style plane selection is integrated into the folding screen', () => {
+  for (const id of ['fold-preset-list', 'fold-preset-title', 'fold-plane-name', 'fold-stats']) {
+    assert.equal(hasId(id), true, `missing #${id}`);
+  }
+  assert.equal(hasId('entry-plane-list'), false);
+  assert.equal(hasId('entry-fold-btn'), false);
+  assert.match(html, /data-home-action="costume"/);
+  assert.match(html, /function selectedPlaneCommands\(\)/);
+  assert.match(html, /initialPreset:\s*selectedPlaneName\(\)/);
+  assert.match(html, /setSelectedPlaneCommands\(fold\.commands, fold\.preset \|\| 'custom'\)/);
+  assert.match(flowCss, /\.fold-preset-list\s*\{[\s\S]*flex-direction:\s*column/);
+  assert.match(flowCss, /\.fold-preset-card\.active/);
+  assert.match(flowCss, /\.fold-platform/);
+  assert.match(foldUi, /presetThumbnail\(name, meta\.label\)/);
+  assert.match(foldUi, /editor\?\.setAutoRotate\(true\)/);
+});
+
 test('room entry stays translucent over the home scene', () => {
   assert.match(flowCss, /#room-entry\s*\{[\s\S]*rgba\([^)]*,\s*\.72\)[\s\S]*\}/);
   assert.match(flowCss, /\.room-entry-card\s*\{[\s\S]*rgba\([^)]*,\s*\.82\)/);
@@ -72,10 +89,10 @@ test('folding UI exposes the 3d editor, unfold, completion and synchronized prog
   ]) assert.equal(hasId(id), true, `missing #${id}`);
   // 프리셋은 좌측 목록으로 고른다 — 단일 프리셋 버튼은 사라졌다.
   assert.doesNotMatch(html, /fold-preset-btn/);
-  assert.match(html, /<aside class="fold-presets" id="fold-preset-list" aria-label="비행기 프리셋">/);
+  assert.match(html, /<aside class="fold-presets" aria-labelledby="fold-preset-title">/);
   assert.match(foldUi, /api\.presetNames\.map\(/);
   assert.match(foldUi, /api\.createPresetModel\(name\)/);
-  assert.match(flowCss, /\.fold-presets \{ position:absolute; top:14px; left:14px;/);
+  assert.match(flowCss, /\.fold-presets \{ position:absolute; inset:18px auto 18px 18px;/);
   assert.match(html, /import \{ createFoldEditor \} from '\.\/fold-editor-3d\.mjs'/);
   assert.match(html, /attachEditor\(foldEditor\)/);
   assert.match(html, /class="fold-help">돌리기: 빈 공간 드래그/);
@@ -86,10 +103,10 @@ test('folding UI exposes the 3d editor, unfold, completion and synchronized prog
   assert.match(html, /onAdjustHinge: \(foldIndex, angle\) => window\.paperFoldingStage\?\.handleHingeAdjust\(foldIndex, angle\)/);
   assert.match(foldUi, /api\.setFoldAngle\(model, foldIndex, angle\)/);
   assert.doesNotMatch(foldUi, /THREE|getContext\('2d'\)/);
-  assert.match(html, /접을 쪽을 잡아 당겨 접으세요/);
+  assert.match(html, /종이에 선을 그어 직접 접기/);
   assert.match(foldUi, /model = api\.undoFold\(model\)/);
   assert.match(foldUi, /setRoomProgress\(done, total\)/);
-  assert.match(html, /onComplete: fold => send\(\{ t: 'fold_done', commands: fold\.commands \}\)/);
+  assert.match(html, /onComplete: fold => \{[\s\S]*setSelectedPlaneCommands\(fold\.commands, fold\.preset \|\| 'custom'\)[\s\S]*t: 'fold_done'/);
   assert.match(flowCss, /\.fold-angle-badge/);
   assert.doesNotMatch(flowCss, /\.fold-preview\s/);
 });
@@ -131,7 +148,7 @@ test('DIST and ARENA share READY and folding flow while retaining mode-specific 
 test('fold-derived aerodynamic profile drives the actual flight loop and HUD', () => {
   assert.match(html, /<script src="\.\/paper-aero-profile\.js"><\/script>/);
   assert.match(html, /deriveAerodynamicProfile\(sourceModel\)/);
-  assert.match(html, /onComplete: fold => send\(\{ t: 'fold_done', commands: fold\.commands \}\)/);
+  assert.match(html, /initialCommands:\s*selectedPlaneCommands\(\)/);
   assert.match(html, /function applyCraftSnapshots\(crafts\)/);
   assert.match(html, /replayFoldCommands\(snapshot\?\.commands/);
   assert.match(html, /setCraftFromFoldModel\(model, snapshot\?\.aeroProfile/);
@@ -158,6 +175,6 @@ test('Rapier fixed-step physics is wired to folded colliders, forces, and map co
   assert.match(html, /import\('\.\/flight-physics-rapier\.mjs'\)/);
   assert.match(html, /makeColliderVertices\(activePaperModel\)/);
   assert.match(html, /rapierFlight\.advance\(dt/);
-  assert.match(html, /rapierFlight\?\.setMapColliders\(\{ spires, rocks \}\)/);
+  assert.match(html, /rapierFlight\?\.setMapColliders\(\{ spires, rocks, platforms \}\)/);
   assert.match(html, /Rapier/);
 });

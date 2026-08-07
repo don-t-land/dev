@@ -69,6 +69,17 @@ test('Rapier fixed-step flight is independent of render cadence', async () => {
   at144.free();
 });
 
+test('Rapier map colliders include rotated floating platforms', async () => {
+  const physics = await configured(createPaperModel());
+  physics.setMapColliders({
+    spires: [{ x: 4, z: -8, h: 40, r: 5 }],
+    rocks: [{ p: { x: -3, y: 50, z: -12 }, r: 6 }],
+    platforms: [{ x: 20, y: 90, z: -40, w: 50, h: 14, d: 34, rotation: .4 }]
+  });
+  assert.equal(physics.staticColliders.length, 4, 'ground + spire + rock + platform');
+  physics.free();
+});
+
 test('different folded shapes produce different physical trajectories', async () => {
   const squareModel = createPaperModel();
   const halfModel = applyFold(createPaperModel(), [-1, 0], [1, 0], 1);

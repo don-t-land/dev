@@ -3,7 +3,9 @@
   if (typeof module === 'object' && module.exports) module.exports = policy;
   if (root) root.inputPolicy = policy;
 })(typeof globalThis === 'object' ? globalThis : this, () => {
-  const gameKeyCodes = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space']);
+  const gameKeyCodes = new Set([
+    'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight'
+  ]);
 
   function isEditableTarget(target) {
     if (!target || typeof target !== 'object') return false;

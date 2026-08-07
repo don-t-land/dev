@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -91,7 +92,7 @@ function makeLeg(side, materials) {
   return rig;
 }
 
-function makeStandingPlaneMascot() {
+function makeStandingPlaneMascot(costume = null) {
   const mascot = new THREE.Group();
   const body = new THREE.Group();
   body.name = 'foldedPaperBody';
@@ -128,6 +129,7 @@ function makeStandingPlaneMascot() {
   mascot.add(leftLeg, rightLeg);
 
   mascot.userData = { body, leftLeg, rightLeg };
+  if (costume) setCostumeOnObject(mascot, costume, 'standing');
   return mascot;
 }
 
@@ -155,7 +157,7 @@ function mountHomePlane() {
   camera.position.set(0, .18, 14.3);
   camera.lookAt(0, .05, 0);
 
-  const mascot = makeStandingPlaneMascot();
+  const mascot = makeStandingPlaneMascot(globalThis.costumeState?.load?.());
   mascot.position.y = .47;
   mascot.rotation.y = -.24;
   mascot.rotation.z = -.025;
@@ -197,6 +199,9 @@ function mountHomePlane() {
     pointerY = ((event.clientY - rect.top) / rect.height - .5) * 2;
   }, { passive: true });
   homeScreen?.addEventListener('pointerleave', () => { pointerX = 0; pointerY = 0; });
+  window.addEventListener('paper-plane-costume-changed', event => {
+    setCostumeOnObject(mascot, event.detail?.costume, 'standing');
+  });
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -242,6 +247,7 @@ function mountHomePlane() {
     shadow.material.opacity = .38 - Math.max(0, breath) * .045;
     shadow.scale.x = 1.25 - Math.max(0, breath) * .025;
     key.position.x = -3.5 + Math.sin(t * .42) * .65;
+    animateCostumes(mascot, t);
 
     renderer.render(scene, camera);
     requestAnimationFrame(render);

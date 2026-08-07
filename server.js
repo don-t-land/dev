@@ -20,6 +20,7 @@ const {
   serializeFoldCommands
 } = require('./public/paper-fold-model.js');
 const { deriveAerodynamicProfile } = require('./public/paper-aero-profile.js');
+const { normalize: normalizeCostume } = require('./public/costume-state.js');
 
 const DEFAULT_AERO_PROFILE = deriveAerodynamicProfile(createPaperModel());
 
@@ -69,6 +70,9 @@ const sessions = new Map(); // token -> { name, wins }
 /* ---------- 방 ---------- */
 const ROUND_SEC = { DIST: 150, ARENA: 180 };
 const MAX_PLAYERS = { DIST: 4, ARENA: 8 };
+const MAX_ENERGY = 100;
+const ENERGY_REGEN_PER_SECOND = 20;
+const DART_ENERGY_COST = 20;
 const configuredFoldingMs = Number(process.env.FOLDING_MS || 120_000);
 const FOLDING_MS = Number.isFinite(configuredFoldingMs) && configuredFoldingMs >= 0
   ? configuredFoldingMs
@@ -94,6 +98,12 @@ let roomSeq = 0;
 const rooms = new Map();
 let roomListCache = null;
 let roomListBroadcastTimer = null;
+
+function rechargeEnergy(player, now = Date.now()) {
+  const elapsed = Math.max(0, Math.min((now - player.energyAt) / 1000, 2));
+  player.energy = Math.min(MAX_ENERGY, player.energy + ENERGY_REGEN_PER_SECOND * elapsed);
+  player.energyAt = now;
+}
 
 function makeRoomCode() {
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -250,7 +260,8 @@ function craftSnapshots(room) {
     return {
       id,
       commands: player?.foldCommands || '[]',
-      aeroProfile: player?.aeroProfile || DEFAULT_AERO_PROFILE
+      aeroProfile: player?.aeroProfile || DEFAULT_AERO_PROFILE,
+      costume: normalizeCostume(player?.costume)
     };
   });
 }
@@ -278,6 +289,7 @@ function snapshot(room) {
       id: p.id, name: p.name, wins: p.wins, alive: p.alive, ready: p.ready,
       foldDone: Boolean(p.foldDone), foldCommands: p.foldCommands || '[]',
       aeroProfile: p.aeroProfile || DEFAULT_AERO_PROFILE, kills: p.kills || 0,
+      costume: normalizeCostume(p.costume),
       connected: Boolean(p.ws && p.ws.readyState === 1)
     }))
   };
@@ -328,8 +340,8 @@ function resetPlayerForRoom(player) {
   player.movementAt = Date.now();
   player.shots = [];
   player.lastShotAt = 0;
-  player.ammo = 3;
-  player.ammoAt = Date.now();
+  player.energy = MAX_ENERGY;
+  player.energyAt = Date.now();
 }
 
 /* ---------- 라운드 흐름 ---------- */
@@ -354,8 +366,8 @@ function startPreparation(room, phase, duration, nextPhase, transitionDelay = 0)
     p.movementAt = Date.now();
     p.shots = [];
     p.lastShotAt = 0;
-    p.ammo = 3;
-    p.ammoAt = Date.now();
+    p.energy = MAX_ENERGY;
+    p.energyAt = Date.now();
   }
   bcast(room, {
     t: 'phase', phase, seed: room.seed,
@@ -598,6 +610,7 @@ wss.on('connection', (ws) => {
         me.disconnectTimer = null;
         me.ws = ws;
         me.name = s.name || me.name;
+        me.costume = normalizeCostume(m.costume ?? me.costume);
         if (room.phase === 'live' && resumePlayer.alive) {
           // 살아있는 채로 재접속하면 fold_done의 live 가드(!me.alive)를 통과하지 못해
           // 영영 리스폰할 수 없으므로, 재접속 시점에 죽음 처리를 해서 접기→스폰 흐름을 되살립니다.
@@ -614,6 +627,7 @@ wss.on('connection', (ws) => {
         token,
         name: s.name || '무명',
         wins: s.wins,
+        costume: normalizeCostume(m.costume),
         ws,
         ready: false,
         foldDone: false,
@@ -629,8 +643,8 @@ wss.on('connection', (ws) => {
         movementAt: Date.now(),
         shots: [],
         lastShotAt: 0,
-        ammo: 3,
-        ammoAt: Date.now(),
+        energy: MAX_ENERGY,
+        energyAt: Date.now(),
         disconnectTimer: null
       };
       sendJson(ws, { t: 'hello', id: me.id, token, name: me.name, wins: me.wins, resumed: false });
@@ -653,6 +667,15 @@ wss.on('connection', (ws) => {
         bcast(room, snapshot(room));
         if (room.visibility === 'public' && room.hostId === me.id) broadcastRoomList();
       }
+      return;
+    }
+
+    /* -- 코스튬은 허용된 모자/코 ID만 보존하고 방 전체에 즉시 반영합니다 -- */
+    if (m.t === 'costume') {
+      const next = normalizeCostume(m.costume);
+      if (next.hat === me.costume?.hat && next.nose === me.costume?.nose) return;
+      me.costume = next;
+      if (room) bcast(room, snapshot(room));
       return;
     }
 
@@ -710,7 +733,10 @@ wss.on('connection', (ws) => {
       if (!room.hostId) room.hostId = me.id;
 
       bcast(room, snapshot(room));
-      bcast(room, { t: 'pj', pl: { id: me.id, name: me.name, wins: me.wins } }, me.id);
+      bcast(room, {
+        t: 'pj',
+        pl: { id: me.id, name: me.name, wins: me.wins, costume: normalizeCostume(me.costume) }
+      }, me.id);
       broadcastRoomList();
       return;
     }
@@ -796,13 +822,14 @@ wss.on('connection', (ws) => {
       me.state = null;
       me.movementBudget = 40;
       me.movementAt = spawnNow;
-      me.ammo = 3;
-      me.ammoAt = spawnNow;
+      me.energy = MAX_ENERGY;
+      me.energyAt = spawnNow;
       me.shots = [];
       if (!room.order.includes(me.id)) room.order.push(me.id);
       bcast(room, {
         t: 'spawned', id: me.id, name: me.name, angle: me.spawnAngle,
-        profile: me.aeroProfile, commands: me.foldCommands, kills: me.kills
+        profile: me.aeroProfile, commands: me.foldCommands, kills: me.kills,
+        costume: normalizeCostume(me.costume)
       });
       return;
     }
@@ -858,6 +885,10 @@ wss.on('connection', (ws) => {
       if (room.mode === 'DIST') {
         me.score = Math.max(me.score, Math.min(99999, Math.max(0, -m.p[2])));
       }
+      rechargeEnergy(me, stateNow);
+      if (Number.isFinite(m.e)) {
+        me.energy = Math.min(me.energy, Math.max(0, Math.min(MAX_ENERGY, m.e)));
+      }
       me.state = { p: m.p, r: m.r };
       me.stateAt = stateNow;
       return;
@@ -871,17 +902,13 @@ wss.on('connection', (ws) => {
       if (room.mode !== 'ARENA' || !isFlightPhase(room) || !me.alive || !me.state ||
           !finiteVec3(m.o, 10000) || !finiteVec3(m.v, 1000)) return;
       const shotNow = Date.now();
-      const regenerated = Math.floor((shotNow - me.ammoAt) / 2500);
-      if (regenerated > 0) {
-        me.ammo = Math.min(3, me.ammo + regenerated);
-        me.ammoAt += regenerated * 2500;
-      }
-      if (me.ammo <= 0) return;
+      rechargeEnergy(me, shotNow);
+      if (me.energy + 1e-9 < DART_ENERGY_COST) return;
       const speedSquared = m.v[0] ** 2 + m.v[1] ** 2 + m.v[2] ** 2;
       if (vecDistanceSquared(me.state.p, m.o) > 15 ** 2 || speedSquared < 1 || speedSquared > 250 ** 2 ||
           shotNow - me.lastShotAt < 100) return;
       me.lastShotAt = shotNow;
-      me.ammo -= 1;
+      me.energy -= DART_ENERGY_COST;
       me.shots = me.shots.filter(shot => shotNow - shot.at <= 3000);
       me.shots.push({ at: shotNow, o: m.o, v: m.v });
       bcast(room, { t: 'shot', id: me.id, o: m.o, v: m.v }, me.id);

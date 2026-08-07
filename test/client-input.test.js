@@ -5,13 +5,13 @@ const { test } = require('node:test');
 
 const projectRoot = path.join(__dirname, '..');
 
-test('WASD and Space remain editable inside nickname inputs', () => {
+test('flight keys remain editable inside nickname inputs', () => {
   const { shouldCaptureGameKey, isEditableTarget } = require('../public/input-policy.js');
   const input = { tagName: 'INPUT', isContentEditable: false };
 
   assert.equal(isEditableTarget(input), true);
 
-  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space']) {
+  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight']) {
     assert.equal(shouldCaptureGameKey({ code, target: input }), false, `${code} should reach the input`);
   }
 });
@@ -21,6 +21,7 @@ test('game controls are still captured outside editable fields', () => {
   const canvas = { tagName: 'CANVAS', isContentEditable: false };
 
   assert.equal(shouldCaptureGameKey({ code: 'KeyW', target: canvas }), true);
+  assert.equal(shouldCaptureGameKey({ code: 'ShiftLeft', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'Escape', target: canvas }), false);
 });
 
@@ -29,6 +30,16 @@ test('the client keyboard handler uses the editable-target policy', () => {
 
   assert.match(html, /<script\s+src=['"]\.\/input-policy\.js['"]><\/script>/);
   assert.match(html, /if\s*\(!shouldCaptureGameKey\(e\)\)\s*return/);
+});
+
+test('dash and darts share one energy HUD instead of rechargeable ammo pips', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /id="energy"/);
+  assert.match(html, /keys\.ShiftLeft\s*\|\|\s*keys\.ShiftRight/);
+  assert.match(html, /consumeDartEnergy\(me\.energy\)/);
+  assert.match(html, /speedFov\(me\.speed/);
+  assert.doesNotMatch(html, /id="ammo"|me\.ammo|me\.ammoT/);
 });
 
 test('room snapshots preserve active, crashed, and spectator roles', () => {
@@ -100,7 +111,7 @@ test('result and mobile HUD layouts remain scrollable without overlap', () => {
   assert.match(html, /#results \.box\s*\{[^}]*max-height:\s*calc\(100dvh/s);
   assert.match(html, /\.modal-layer\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(html, /\.modal-card\s*\{[^}]*max-height:\s*calc\(100dvh/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#keys\s*\{[^}]*bottom:\s*84px/s);
+  assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#keys\s*\{[^}]*bottom:\s*164px/s);
   assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#board\s*\{[^}]*top:\s*128px/s);
   assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(max-height:\s*400px\)[\s\S]*#keys\s*\{[^}]*display:\s*none/s);
   assert.match(html, /--sky-muted:\s*#5b6d80/);

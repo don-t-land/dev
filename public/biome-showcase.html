@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DON'T LAND — Biome Asset Gallery</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js"
+      }
+    }
+  </script>
+  <script src="./biomes/helpers.js"></script>
+  <script src="./biomes/desert.js"></script>
+  <script src="./biomes/pillars.js"></script>
+  <script src="./biomes/glacier.js"></script>
+  <script src="./biomes/lava.js"></script>
+  <script src="./biomes/floating.js"></script>
+  <script src="./map-gen.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, Pretendard, "Noto Sans KR", system-ui, sans-serif;
+      background: #0b0d12;
+      color: #f4f1e9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      background:
+        radial-gradient(circle at 16% 0%, rgba(111, 91, 150, .22), transparent 31rem),
+        radial-gradient(circle at 88% 8%, rgba(203, 142, 77, .13), transparent 28rem),
+        #0b0d12;
+    }
+
+    header {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 56px 28px 30px;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: #d9bd83;
+      font: 700 11px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+      letter-spacing: .24em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 940px;
+      margin: 0;
+      font-size: clamp(34px, 6vw, 76px);
+      font-weight: 780;
+      line-height: .95;
+      letter-spacing: -.055em;
+    }
+
+    header p {
+      max-width: 700px;
+      margin: 22px 0 0;
+      color: #aaa9a6;
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    .legend span,
+    .chips span {
+      padding: 7px 10px;
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .045);
+      color: #cbc9c3;
+      font-size: 10px;
+      letter-spacing: .05em;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 0 28px 70px;
+    }
+
+    .card {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 22px;
+      background: rgba(19, 21, 27, .78);
+      box-shadow: 0 22px 70px rgba(0, 0, 0, .2);
+    }
+
+    .card:last-child {
+      grid-column: 1 / -1;
+    }
+
+    .viewport {
+      position: relative;
+      height: clamp(310px, 34vw, 440px);
+      overflow: hidden;
+      background: var(--card-sky);
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .viewport:active { cursor: grabbing; }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .index {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      z-index: 2;
+      padding: 7px 9px;
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: 8px;
+      background: rgba(12, 13, 18, .36);
+      color: rgba(255, 255, 255, .82);
+      font: 700 10px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+      letter-spacing: .16em;
+      backdrop-filter: blur(10px);
+    }
+
+    .drag-hint {
+      position: absolute;
+      right: 18px;
+      bottom: 16px;
+      z-index: 2;
+      color: rgba(255, 255, 255, .68);
+      font: 600 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+      letter-spacing: .14em;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, .55);
+    }
+
+    .copy {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
+      padding: 22px 24px 24px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(21px, 2.6vw, 31px);
+      line-height: 1;
+      letter-spacing: -.025em;
+    }
+
+    h2 small {
+      display: block;
+      margin-top: 9px;
+      color: #807f7c;
+      font: 700 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+      letter-spacing: .17em;
+      text-transform: uppercase;
+    }
+
+    .description {
+      max-width: 460px;
+      margin: 14px 0 0;
+      color: #a8a6a1;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+      max-width: 230px;
+    }
+
+    footer {
+      padding: 0 28px 46px;
+      color: #55565c;
+      text-align: center;
+      font: 700 9px/1.6 ui-monospace, "SFMono-Regular", Menlo, monospace;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 760px) {
+      header { padding-top: 38px; }
+      main { grid-template-columns: 1fr; }
+      .card:last-child { grid-column: auto; }
+      .copy { grid-template-columns: 1fr; align-items: start; }
+      .chips { justify-content: flex-start; max-width: none; }
+      .viewport { height: 340px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .drag-hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Don't Land / Environment Asset Study</p>
+    <h1>다섯 개의 하늘,<br>다섯 개의 비행 감각.</h1>
+    <p>실제 게임 렌더러로 구성한 바이옴 에셋 쇼케이스입니다. 각 장면은 인게임과 동일한 절차형 지오메트리, 재질, 색상 팔레트를 사용합니다.</p>
+    <div class="legend" aria-label="전시 에셋 종류">
+      <span>FACETED WALLS</span><span>COMPOUND SPIRES</span><span>WEATHERED ROCKS</span><span>LAYERED CLOUDS</span><span>LANDMARKS</span>
+    </div>
+  </header>
+
+  <main id="gallery" aria-label="바이옴 에셋 갤러리"></main>
+
+  <footer>Drag each scene to inspect · Production geometry / deterministic palettes</footer>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { buildBiomeEnvironment } from './biome-visuals.js';
+
+    const { BIOMES, LAYOUT_KEYS } = window.mapGen;
+    const details = [
+      {
+        code: '01 / DESERT',
+        title: '사막 협곡',
+        description: '층리가 끊겨 올라오는 사암 절벽과 가늘게 깎인 침봉. 풍문 게이트는 코스의 실루엣을 멀리서도 읽게 만드는 수직 랜드마크입니다.',
+        chips: ['층리벽', '사암 침봉', '풍화암', '바람문']
+      },
+      {
+        code: '02 / PILLAR FOREST',
+        title: '기둥숲',
+        description: '부러진 정상, 이중 암석 띠, 뿌리 지지편이 결합된 7면 풍화기둥. 반복되는 수직 리듬이 고속 슬라럼의 길을 만듭니다.',
+        chips: ['풍화기둥', '파손 왕관', '이중 띠', '뿌리편']
+      },
+      {
+        code: '03 / GLACIER',
+        title: '빙하 크레바스',
+        description: '푸른 내부층이 비치는 높은 빙벽과 다발형 결정 첨탑. 길게 찢긴 부빙은 낮은 채도의 차가운 반사를 더합니다.',
+        chips: ['빙벽', '결정 다발', '부빙', '서리구름']
+      },
+      {
+        code: '04 / LAVA',
+        title: '용암 굴뚝',
+        description: '속이 빈 화산 굴뚝과 발광하는 내부 코어, 분화구 테두리. 검은 현무암 사이의 적색 단층이 좁은 코스를 강조합니다.',
+        chips: ['현무암벽', '화산 굴뚝', '발광 코어', '재구름']
+      },
+      {
+        code: '05 / FLOATING ISLES',
+        title: '부유섬 새벽',
+        description: '9면 암반 선반과 잔디 상판, 계단식 테라스, 아래로 길게 떨어지는 역원뿔 지층. 구름 띠와 부유 파편이 벽 없는 경계를 만듭니다.',
+        chips: ['부유 선반', '잔디 상판', '하부 지층', '구름 띠']
+      }
+    ];
+
+    function emptyLayout() {
+      return Object.fromEntries(LAYOUT_KEYS.map(key => [key, []]));
+    }
+
+    function sceneLayout(biome) {
+      const layout = emptyLayout();
+      if (biome !== 4) {
+        layout.walls.push({
+          biome, x: 0, z: -42, w: 126, h: biome === 2 ? 53 : 42,
+          d: biome === 3 ? 20 : 16, yaw: -.025
+        });
+      }
+
+      const spireSets = [
+        [[-36, 13, 62, -.04], [8, 10, 44, .05]],
+        [[-34, 15, 68, -.025], [10, 11, 50, .035]],
+        [[-37, 12, 59, -.08], [2, 10, 47, .1]],
+        [[-34, 14, 62, -.02], [7, 11, 49, .025]],
+        [[-43, 10, 53, -.04], [42, 8, 39, .06]]
+      ];
+      spireSets[biome].forEach(([x, r, h, lean], index) => {
+        layout.spires.push({ biome, x, z: index ? -2 : 5, r, h, lean, yaw: index * .7 - .24 });
+      });
+
+      const rocks = biome === 4
+        ? [[-58, 39, 8, 8], [48, 53, -18, 7], [18, -6, 14, 6]]
+        : [[40, 11, 10, 11], [58, 7, -12, 7], [24, 6, 21, 6]];
+      rocks.forEach(([x, y, z, r], index) => {
+        layout.rocks.push({
+          biome, x, y, z, r, variant: index,
+          sx: 1 + index * .16, sy: biome === 2 ? .62 : .8 + index * .08,
+          sz: biome === 2 ? 1.8 : 1.05 + index * .13, yaw: index * .8
+        });
+      });
+
+      layout.clouds.push({
+        biome, x: biome === 4 ? 7 : 31, y: biome === 4 ? 73 : 72, z: -62,
+        w: biome === 4 ? 78 : 56, h: biome === 4 ? 28 : 23,
+        d: biome === 4 ? 43 : 34, yaw: -.18, variant: biome
+      });
+
+      if (biome === 0) {
+        layout.landmarks.push({ biome, type: 'wind-gate', x: 40, y: 0, z: -17, scale: .72 });
+      }
+
+      if (biome === 4) {
+        layout.platforms.push(
+          { biome, x: -3, y: 22, z: -9, w: 104, h: 12, d: 73, rotation: -.12, terraces: 3 },
+          { biome, x: 73, y: 54, z: -61, w: 49, h: 8, d: 37, rotation: .32, terraces: 2 }
+        );
+        layout.clouds.push(
+          { biome, x: -74, y: 3, z: -25, w: 73, h: 22, d: 41, yaw: .1, variant: 2 },
+          { biome, x: 76, y: 10, z: 5, w: 64, h: 18, d: 36, yaw: -.25, variant: 4 }
+        );
+      }
+      return layout;
+    }
+
+    const gallery = document.querySelector('#gallery');
+    const views = [];
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    BIOMES.forEach((biome, index) => {
+      const meta = details[index];
+      const card = document.createElement('article');
+      card.className = 'card';
+      card.style.setProperty('--card-sky', `linear-gradient(180deg, #${biome.sky.top.toString(16).padStart(6, '0')}, #${biome.sky.mid.toString(16).padStart(6, '0')} 62%, #${biome.sky.bottom.toString(16).padStart(6, '0')})`);
+      card.innerHTML = `
+        <div class="viewport">
+          <span class="index">${meta.code}</span>
+          <span class="drag-hint">DRAG TO ROTATE</span>
+          <canvas aria-label="${meta.title} 3D 에셋 미리보기"></canvas>
+        </div>
+        <div class="copy">
+          <div>
+            <h2>${meta.title}<small>${biome.id}</small></h2>
+            <p class="description">${meta.description}</p>
+          </div>
+          <div class="chips">${meta.chips.map(label => `<span>${label}</span>`).join('')}</div>
+        </div>`;
+      gallery.append(card);
+
+      const canvas = card.querySelector('canvas');
+      const viewport = card.querySelector('.viewport');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = index === 3 ? 1.24 : 1.08;
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(biome.fog, index === 4 ? .00125 : .00155);
+      const camera = new THREE.PerspectiveCamera(34, 1, .1, 700);
+      camera.position.set(index === 4 ? 178 : 151, index === 4 ? 99 : 83, index === 4 ? 202 : 177);
+      camera.lookAt(0, index === 4 ? 16 : 25, -8);
+
+      scene.add(new THREE.HemisphereLight(biome.sky.mid, index === 3 ? 0x2b1512 : biome.terrain.top, index === 3 ? 2.25 : 2.6));
+      const sun = new THREE.DirectionalLight(index === 3 ? 0xffb46d : 0xfff0ce, index === 3 ? 4.7 : 4.15);
+      sun.position.set(-80, 145, 110);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024);
+      sun.shadow.camera.left = -130;
+      sun.shadow.camera.right = 130;
+      sun.shadow.camera.top = 130;
+      sun.shadow.camera.bottom = -80;
+      scene.add(sun);
+
+      const environment = buildBiomeEnvironment({ layout: sceneLayout(index), biomes: BIOMES });
+      scene.add(environment.root);
+
+      if (index !== 4) {
+        const ground = new THREE.Mesh(
+          new THREE.CircleGeometry(118, 48),
+          new THREE.MeshStandardMaterial({ color: biome.terrain.top, roughness: 1, flatShading: true })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -.08;
+        ground.receiveShadow = true;
+        scene.add(ground);
+      }
+
+      const state = { angle: index * .055 - .1, dragging: false, pointerX: 0 };
+      viewport.addEventListener('pointerdown', event => {
+        state.dragging = true;
+        state.pointerX = event.clientX;
+        viewport.setPointerCapture(event.pointerId);
+      });
+      viewport.addEventListener('pointermove', event => {
+        if (!state.dragging) return;
+        state.angle += (event.clientX - state.pointerX) * .008;
+        state.pointerX = event.clientX;
+      });
+      const stopDrag = () => { state.dragging = false; };
+      viewport.addEventListener('pointerup', stopDrag);
+      viewport.addEventListener('pointercancel', stopDrag);
+
+      views.push({ renderer, scene, camera, environment, viewport, state });
+    });
+
+    function resizeView(view) {
+      const width = Math.max(1, view.viewport.clientWidth);
+      const height = Math.max(1, view.viewport.clientHeight);
+      const pixelRatio = view.renderer.getPixelRatio();
+      const targetWidth = Math.floor(width * pixelRatio);
+      const targetHeight = Math.floor(height * pixelRatio);
+      if (view.renderer.domElement.width !== targetWidth || view.renderer.domElement.height !== targetHeight) {
+        view.renderer.setSize(width, height, false);
+        view.camera.aspect = width / height;
+        view.camera.updateProjectionMatrix();
+      }
+    }
+
+    let previous = performance.now();
+    function frame(now) {
+      const delta = Math.min(.04, (now - previous) / 1000);
+      previous = now;
+      for (const view of views) {
+        resizeView(view);
+        if (!reducedMotion && !view.state.dragging) view.state.angle += delta * .055;
+        view.environment.root.rotation.y = view.state.angle;
+        view.renderer.render(view.scene, view.camera);
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    addEventListener('pagehide', () => {
+      for (const view of views) {
+        view.environment.root.userData.dispose?.();
+        view.renderer.dispose();
+      }
+    }, { once: true });
+  </script>
+</body>
+</html>

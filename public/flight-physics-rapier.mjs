@@ -144,7 +144,7 @@ export class PaperFlightPhysics {
     this.body.setAngvel(add(this.body.angvel(), delta), true);
   }
 
-  setMapColliders({ spires = [], rocks = [] } = {}) {
+  setMapColliders({ spires = [], rocks = [], platforms = [] } = {}) {
     for (const collider of this.staticColliders) this.world.removeCollider(collider, true);
     this.staticColliders = [];
     const addStatic = (descriptor, position) => {
@@ -160,6 +160,16 @@ export class PaperFlightPhysics {
     }
     for (const rock of rocks) {
       addStatic(this.RAPIER.ColliderDesc.ball(Math.max(.2, rock.r)), rock.p);
+    }
+    for (const platform of platforms) {
+      const descriptor = this.RAPIER.ColliderDesc.cuboid(
+        Math.max(.2, platform.w / 2),
+        Math.max(.2, platform.h / 2),
+        Math.max(.2, platform.d / 2)
+      );
+      const halfYaw = (platform.rotation || 0) / 2;
+      descriptor.setRotation({ x: 0, y: Math.sin(halfYaw), z: 0, w: Math.cos(halfYaw) });
+      addStatic(descriptor, platform);
     }
   }
 
@@ -177,7 +187,7 @@ export class PaperFlightPhysics {
     const liftMagnitude = GRAVITY * this.profile.liftScale
       * Math.pow(speed / BASE_SPEED, 2)
       * (.18 + .82 * stallRatio * stallRatio);
-    const dragMagnitude = .0062 * this.profile.dragScale * speed * speed;
+    const dragMagnitude = .0038 * this.profile.dragScale * speed * speed;
     const thermalForce = Math.max(0, Number(input.thermalLift) || 0);
     const force = add(
       add(scale(liftDirection, liftMagnitude), scale(velocityDirection, -dragMagnitude)),

@@ -7,6 +7,10 @@
 
   const PI2 = Math.PI * 2;
   const LOOK_PITCH_LIMIT = 1.35;
+  const MAX_ENERGY = 100;
+  const ENERGY_REGEN_PER_SECOND = 20;
+  const DASH_ENERGY_PER_SECOND = 18;
+  const DART_ENERGY_COST = 20;
 
   function normalizeAngle(angle) {
     let normalized = (Number(angle) + Math.PI) % PI2;
@@ -55,11 +59,51 @@
     return value !== '0';
   }
 
+  function updateEnergy(value, dt, wantsDash) {
+    const step = Math.max(0, Math.min(Number(dt) || 0, 0.1));
+    let energy = Math.max(0, Math.min(MAX_ENERGY, Number(value) || 0));
+    if (!wantsDash || step === 0) {
+      energy = Math.min(MAX_ENERGY, energy + ENERGY_REGEN_PER_SECOND * step);
+      return { energy, dashRatio: 0 };
+    }
+    if (energy === 0) return { energy, dashRatio: 0 };
+
+    const activeSeconds = Math.min(step, energy / DASH_ENERGY_PER_SECOND);
+    energy = Math.max(0, energy - DASH_ENERGY_PER_SECOND * activeSeconds);
+    return { energy, dashRatio: activeSeconds / step };
+  }
+
+  function consumeDartEnergy(value) {
+    const energy = Math.max(0, Math.min(MAX_ENERGY, Number(value) || 0));
+    if (energy + 1e-9 < DART_ENERGY_COST) return { energy, fired: false };
+    return { energy: energy - DART_ENERGY_COST, fired: true };
+  }
+
+  function dashAcceleration(speed) {
+    const currentSpeed = Math.max(0, Number(speed) || 0);
+    // 실제 물리 속도가 높을수록 가속을 완만하게 줄여 급격한 속도 점프를 막습니다.
+    return 27 * Math.max(0.48, 1 - Math.max(0, currentSpeed - 22) / 85);
+  }
+
+  function speedFov(speed, dashing) {
+    const currentSpeed = Math.max(0, Number(speed) || 0);
+    const speedAmount = Math.max(0, Math.min(1, (currentSpeed - 18) / 44));
+    return 58 + speedAmount * 12 + (dashing ? 3 : 0);
+  }
+
   return {
     normalizeAngle,
     updateAttitude,
     updateFreeLook,
     keyGuideVisibleFromStorage,
-    LOOK_PITCH_LIMIT
+    updateEnergy,
+    consumeDartEnergy,
+    dashAcceleration,
+    speedFov,
+    LOOK_PITCH_LIMIT,
+    MAX_ENERGY,
+    ENERGY_REGEN_PER_SECOND,
+    DASH_ENERGY_PER_SECOND,
+    DART_ENERGY_COST
   };
 });

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
+import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
 
 const SLOT_EDGE_PADDING_PX = 10;
 const PLAYER_INFO_CLEARANCE_PX = 56;
@@ -155,6 +156,7 @@ function update(players = [], hostId = null) {
       actor.id = player.id;
       tintMascot(actor.mascot, player.id);
     }
+    setCostumeOnObject(actor.mascot, player.costume, 'standing');
     actor.ready = !!player.ready;
     actor.host = player.id === hostId;
   });
@@ -179,6 +181,7 @@ function render(now) {
     right.hip.rotation.x = -.1 - Math.sin(phase * (actor.ready ? 2.3 : 1)) * (actor.ready ? .16 : .05);
     left.knee.rotation.x = .18 + (actor.ready ? .12 : .03) * Math.max(0, Math.sin(phase * 2.3));
     right.knee.rotation.x = .18 + (actor.ready ? .12 : .03) * Math.max(0, -Math.sin(phase * 2.3));
+    animateCostumes(actor.mascot, t);
   });
   if (canvas.offsetParent) renderer.render(scene, camera);
   requestAnimationFrame(render);

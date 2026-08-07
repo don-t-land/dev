@@ -619,6 +619,36 @@ test('a lobby player can rename before joining a room', async () => {
   }
 });
 
+test('costumes are validated and synchronized to every player in a room', async () => {
+  const host = await connectClient();
+  const guest = await connectClient();
+  try {
+    host.send({ t: 'hello', name: '산타', costume: { hat: 'santa', nose: 'rudolph' } });
+    const hostHello = await host.next(message => message.t === 'hello');
+    host.send({ t: 'create', mode: 'DIST', visibility: 'private' });
+    const created = await host.next(message => message.t === 'room');
+    assert.deepEqual(created.players[0].costume, { hat: 'santa', nose: 'rudolph' });
+
+    guest.send({ t: 'hello', name: '마술사', costume: { hat: 'magic', nose: 'none' } });
+    const guestHello = await guest.next(message => message.t === 'hello');
+    guest.send({ t: 'join', code: created.code });
+    const joined = await host.next(message => message.t === 'room' && message.players.length === 2);
+    assert.deepEqual(joined.players.find(player => player.id === guestHello.id).costume, {
+      hat: 'magic', nose: 'none'
+    });
+
+    guest.send({ t: 'costume', costume: { hat: '<script>', nose: 'rudolph' } });
+    const updated = await host.next(message => message.t === 'room' &&
+      message.players.find(player => player.id === guestHello.id)?.costume?.nose === 'rudolph');
+    assert.deepEqual(updated.players.find(player => player.id === guestHello.id).costume, {
+      hat: 'none', nose: 'rudolph'
+    });
+    assert.equal(updated.players.find(player => player.id === hostHello.id).costume.hat, 'santa');
+  } finally {
+    await Promise.all([host.close(), guest.close()]);
+  }
+});
+
 test('a distance room rejects the fifth player', async () => {
   const clients = await Promise.all(Array.from({ length: 5 }, () => connectClient()));
   try {

@@ -4,7 +4,13 @@ const { test } = require('node:test');
 const {
   updateAttitude,
   updateFreeLook,
-  keyGuideVisibleFromStorage
+  keyGuideVisibleFromStorage,
+  updateEnergy,
+  consumeDartEnergy,
+  dashAcceleration,
+  speedFov,
+  MAX_ENERGY,
+  DART_ENERGY_COST
 } = require('../public/flight-controls.js');
 
 test('DIST keeps free pitch while its roll self-levels like ARENA', () => {
@@ -63,4 +69,33 @@ test('the key guide is visible by default and can be persisted off', () => {
   assert.equal(keyGuideVisibleFromStorage(null), true);
   assert.equal(keyGuideVisibleFromStorage('1'), true);
   assert.equal(keyGuideVisibleFromStorage('0'), false);
+});
+
+test('energy regenerates normally and drains continuously while dash is held', () => {
+  const recharged = updateEnergy(50, 0.1, false);
+  assert.ok(recharged.energy > 50);
+  assert.equal(recharged.dashRatio, 0);
+
+  const dashing = updateEnergy(MAX_ENERGY, 0.1, true);
+  assert.ok(dashing.energy < MAX_ENERGY);
+  assert.equal(dashing.dashRatio, 1);
+
+  const depleted = updateEnergy(1, 0.1, true);
+  assert.equal(depleted.energy, 0);
+  assert.ok(depleted.dashRatio > 0 && depleted.dashRatio < 1);
+});
+
+test('darts consume the shared energy pool and fail without enough energy', () => {
+  const fired = consumeDartEnergy(DART_ENERGY_COST);
+  assert.deepEqual(fired, { energy: 0, fired: true });
+  assert.deepEqual(consumeDartEnergy(DART_ENERGY_COST - 1), {
+    energy: DART_ENERGY_COST - 1,
+    fired: false
+  });
+});
+
+test('dash acceleration eases at high physical speeds and speed widens the camera FOV', () => {
+  assert.ok(dashAcceleration(22) > dashAcceleration(60));
+  assert.ok(speedFov(60, false) > speedFov(22, false));
+  assert.ok(speedFov(60, true) > speedFov(60, false));
 });

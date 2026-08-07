@@ -512,38 +512,80 @@
     return model;
   }
 
-  // 좌우 대칭 프리셋들: 날개를 먼저 상반각으로 세우고, 기수 쪽 코너를 각 날개
-  // 위로 접어 넣는다. 날개 접기 이후의 코너 접기는 해당 날개 컴포넌트 안에서만
-  // 일어나므로 어떤 힌지도 찢거나 가로지르지 않는다. 세 프리셋은 날개 접는
-  // 위치·각도만 다르며, deriveAerodynamicProfile 실측으로 성격을 확정했다:
-  //   dart  lift≈.72 drag≈1.19 stall≈14.2 — 균형형 기준점
-  //   wide  lift≈.91 drag≈1.26 stall≈12.6 — 넓은 스팬·얕은 상반각 활공형
-  //   sleek lift≈.35 drag≈1.11 stall≈20.2 — 좁은 평면형·가파른 몸통 접기 속도형
+  // Fold'N Fly의 실제 완성 형상과 측정값을 기준으로 저작한 게임용 근사 모델.
+  // 편집기는 한 번 접힌 힌지를 가로지르는 다층 접기를 허용하지 않으므로 사이트의
+  // 전체 제작 순서를 그대로 재생하지 않고, 최종 실루엣·상반각·비행 성격을 만드는
+  // 최소 대칭 힌지 세트로 표현한다. 각 수치의 출처는 PRESET_INFO.reference에 둔다.
   const PRESETS = {
     dart: [
-      { start: [0.5, 1], end: [0.5, -1], angle: 0.9 },     // 오른 날개 상반각 (바깥쪽이 왼편)
-      { start: [-0.5, -1], end: [-0.5, 1], angle: 0.9 },   // 왼 날개 상반각
-      { start: [0.6, 1], end: [1, 0.5], angle: Math.PI },  // 우상단(기수) 코너를 오른 날개 위로
-      { start: [-1, 0.5], end: [-0.6, 1], angle: Math.PI } // 좌상단(기수) 코너를 왼 날개 위로
+      // 최초 소스의 N/L/R/B 기본 메시(chord/span=2.77/2.4)에 맞춘 다트 실루엣.
+      { start: [0, 1], end: [1, 0], angle: Math.PI },
+      { start: [-1, 0], end: [0, 1], angle: Math.PI },
+      { start: [0, 1], end: [0.52, -1], angle: 3.02 },
+      { start: [-0.52, -1], end: [0, 1], angle: 3.02 }
     ],
-    wide: [
-      { start: [0.55, 1], end: [0.55, -1], angle: 0.5 },   // 오른 날개 — 바깥쪽·얕은 상반각
-      { start: [-0.55, -1], end: [-0.55, 1], angle: 0.5 }, // 왼 날개
-      { start: [0.65, 1], end: [1, 0.65], angle: Math.PI },  // 우상단 코너 살짝 말아 넣기
-      { start: [-1, 0.65], end: [-0.65, 1], angle: Math.PI } // 좌상단 코너
+    stable: [
+      // 넓은 삼각 날개와 짧은 동체를 가진 The Stable의 델타 실루엣.
+      { start: [0, 1], end: [1, 0], angle: 3.1 },
+      { start: [-1, 0], end: [0, 1], angle: 3.1 }
     ],
-    sleek: [
-      { start: [0.5, 1], end: [0.5, -1], angle: 2.6 },     // 오른 날개 — 몸통 위로 가파르게
-      { start: [-0.5, -1], end: [-0.5, 1], angle: 2.6 },   // 왼 날개
-      { start: [0.6, 1], end: [1, 0.6], angle: Math.PI },  // 우상단(기수) 코너
-      { start: [-1, 0.6], end: [-0.6, 1], angle: Math.PI } // 좌상단(기수) 코너
+    stealth: [
+      // Stealth Glider의 넓고 거의 직사각형인 플라잉 윙과 완만한 V자 상반각.
+      { start: [0.65, 1], end: [0.65, -1], angle: 0.74 },
+      { start: [-0.65, -1], end: [-0.65, 1], angle: 0.74 }
+    ],
+    jet: [
+      // Jet Fighter의 좁은 2단 날개와 들린 외측 패널을 단순화한 형상.
+      { start: [0.5, 1], end: [0.5, -1], angle: 1.15 },
+      { start: [-0.5, -1], end: [-0.5, 1], angle: 1.15 },
+      { start: [0.6, 1], end: [1, 0.68], angle: Math.PI },
+      { start: [-1, 0.68], end: [-0.6, 1], angle: Math.PI }
     ]
   };
 
+  const reference = values => Object.freeze(values);
   const PRESET_INFO = Object.freeze({
-    dart: Object.freeze({ label: '기본 종이비행기', tagline: '균형 잡힌 만능형' }),
-    wide: Object.freeze({ label: '넓적 종이비행기', tagline: '높은 양력 · 느긋한 활공' }),
-    sleek: Object.freeze({ label: '날렵 비행기', tagline: '낮은 항력 · 빠른 돌파' })
+    dart: Object.freeze({
+      label: 'Basic Dart', tagline: '빠른 직선 비행 · 초급', role: '기본',
+      reference: reference({ sourceUrl: 'https://www.foldnfly.com/1d.html', folds: 5, distanceM: 12.5, timeAloftS: 1.4, lengthCm: 29.5, wingspanCm: 11.1, wingChordCm: 15.2, wingAreaCm2: 168.5 })
+    }),
+    stable: Object.freeze({
+      label: 'The Stable', tagline: '넓은 선회 · 긴 체공', role: '안정',
+      reference: reference({ sourceUrl: 'https://www.foldnfly.com/2d.html', folds: 7, distanceM: 5.5, timeAloftS: 2.5, lengthCm: 17, wingspanCm: 12.5, wingChordCm: 10.3, wingAreaCm2: 129.2 })
+    }),
+    stealth: Object.freeze({
+      label: 'Stealth Glider', tagline: '넓은 V형 날개 · 활공', role: '체공',
+      reference: reference({ sourceUrl: 'https://www.foldnfly.com/43.html', folds: 10, distanceM: 11.5, timeAloftS: 4.7, lengthCm: 14.1, wingspanCm: 16.4, wingChordCm: 12.6, wingAreaCm2: 206.8 })
+    }),
+    jet: Object.freeze({
+      label: 'Jet Fighter', tagline: '2단 날개 · 빠른 반응', role: '기동',
+      reference: reference({ sourceUrl: 'https://www.foldnfly.com/24d.html', folds: 9, distanceM: 6.4, timeAloftS: 2, lengthCm: 19.1, wingspanCm: 16, wingChordCm: 11.2, wingAreaCm2: 179.1 })
+    })
+  });
+
+  // 프리셋 선택 화면과 실제 비행에서 쓰는 깨끗한 완성 메시. 접기 커맨드는
+  // 서버 검증·공력 계산용이고, 이 메시는 공식 완성 사진의 외곽과 단면을 저작한다.
+  // dart 좌표는 최초 커밋 bdd6135의 makePlaneMesh를 그대로 보존한다.
+  const PRESET_VISUALS = Object.freeze({
+    dart: Object.freeze({
+      vertices: Object.freeze([[0, 0, -1.85], [-1.2, .16, .92], [0, 0, .8], [1.2, .16, .92], [0, -.42, .86]].map(Object.freeze)),
+      faces: Object.freeze([[0, 1, 2], [0, 2, 3], [0, 4, 2]].map(Object.freeze))
+    }),
+    stable: Object.freeze({
+      vertices: Object.freeze([[0, 0, -1.28], [-1.28, .14, .82], [0, 0, .68], [1.28, .14, .82], [0, -.28, .72]].map(Object.freeze)),
+      faces: Object.freeze([[0, 1, 2], [0, 2, 3], [0, 4, 2]].map(Object.freeze))
+    }),
+    stealth: Object.freeze({
+      vertices: Object.freeze([[0, 0, -.98], [-.72, .12, -.76], [-1.26, .2, .82], [0, 0, .66], [1.26, .2, .82], [.72, .12, -.76]].map(Object.freeze)),
+      faces: Object.freeze([[0, 1, 2, 3], [0, 3, 4, 5]].map(Object.freeze))
+    }),
+    jet: Object.freeze({
+      vertices: Object.freeze([
+        [0, 0, -1.5], [-.32, .04, -.15], [-1.12, .32, .68], [-.3, .08, .72],
+        [0, 0, .58], [.32, .04, -.15], [1.12, .32, .68], [.3, .08, .72], [0, -.3, .76]
+      ].map(Object.freeze)),
+      faces: Object.freeze([[0, 1, 4], [1, 2, 3, 4], [0, 4, 5], [5, 4, 7, 6], [0, 8, 4]].map(Object.freeze))
+    })
   });
 
   function getPresetCommands(name) {
@@ -556,6 +598,14 @@
     return commands ? replayFoldCommands(commands) : null;
   }
 
+  function getPresetVisual(name) {
+    const visual = PRESET_VISUALS[name];
+    return visual ? {
+      vertices: visual.vertices.map(vertex => vertex.slice()),
+      faces: visual.faces.map(face => face.slice())
+    } : null;
+  }
+
   return {
     createPaperModel,
     applyFold,
@@ -564,6 +614,7 @@
     serializeFoldCommands,
     replayFoldCommands,
     getPresetCommands,
+    getPresetVisual,
     createPresetModel,
     computeFoldedGeometry,
     presetNames: Object.keys(PRESETS),

@@ -95,10 +95,13 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
   let frame = 0;
   let started = false;
   let interactive = true;
+  let autoRotate = false;
+  let lastFrameTime = 0;
   let disposed = false;
 
   let model = null;         // 확정된 모델 (컨트롤러가 setModel로 소유권 유지)
   let previewShown = false; // paperGroup이 임시(미리보기) 형상을 그리는 중인지
+  let presetVisualName = null;
 
   const orbit = { yaw: 0.5, pitch: 0.95, distance: 4.2 };
   const orbitTarget = new THREE.Vector3(0, 0.35, 0);
@@ -404,6 +407,45 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
         paperGroup.add(outline);
       }
     });
+  }
+
+  function rebuildPresetVisual(name) {
+    if (!paperGroup) return false;
+    const visual = api?.getPresetVisual?.(name);
+    if (!visual) return false;
+    clearGroup(paperGroup);
+    clearGroup(committedCreaseGroup);
+    hingeSegments = [];
+    visual.faces.forEach((face, faceIndex) => {
+      const poly3 = face.map(index => visual.vertices[index]).filter(Boolean);
+      if (poly3.length < 3) return;
+      const vertices = [];
+      for (let index = 1; index < poly3.length - 1; index += 1) {
+        for (const point of [poly3[0], poly3[index], poly3[index + 1]]) vertices.push(...point);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.computeVertexNormals();
+      const lightness = .78 - faceIndex * .055;
+      const frontMesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(FRONT_HUE / 360, FRONT_SAT, clamp(lightness, .54, .84)),
+        roughness: .72,
+        side: THREE.DoubleSide,
+        flatShading: true
+      }));
+      frontMesh.castShadow = true;
+      paperGroup.add(frontMesh);
+
+      const edgePoints = [];
+      for (let index = 0; index < poly3.length; index += 1) {
+        edgePoints.push(new THREE.Vector3(...poly3[index]), new THREE.Vector3(...poly3[(index + 1) % poly3.length]));
+      }
+      paperGroup.add(new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(edgePoints),
+        new THREE.LineBasicMaterial({ color: OUTLINE_COLOR, transparent: true, opacity: .72 })
+      ));
+    });
+    return true;
   }
 
   /* 확정된 접는선을 금색 점선 힌지로 그린다. 각 fold의 변환된 3D 축은
@@ -971,6 +1013,8 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
   function onPointerDown(event) {
     if (!started || !renderer) return;
     if (typeof event.button === 'number' && event.button !== 0) return;
+    setAutoRotate(false);
+    if (presetVisualName) setPresetVisual(null);
     canvas.setPointerCapture?.(event.pointerId);
 
     if (mode === 'angleAdjust') {
@@ -1210,8 +1254,15 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
 
   /* ---------- 렌더 루프 ---------- */
 
-  function tick() {
+  function tick(now = 0) {
     if (!started || !renderer) { frame = 0; return; }
+    const dt = lastFrameTime ? Math.min(0.05, (now - lastFrameTime) / 1000) : 0;
+    lastFrameTime = now;
+    if (autoRotate && mode === 'idle') {
+      const nextYaw = paperGroup.rotation.y + dt * 0.32;
+      paperGroup.rotation.y = nextYaw;
+      committedCreaseGroup.rotation.y = nextYaw;
+    }
     const width = canvas.clientWidth || 1;
     const height = canvas.clientHeight || 1;
     const ratio = renderer.getPixelRatio();
@@ -1235,6 +1286,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
 
   function setModel(nextModel) {
     model = nextModel || null;
+    presetVisualName = null;
     previewShown = false;
     resetInteraction();
     if (renderer) {
@@ -1250,14 +1302,30 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
     }
   }
 
+  function setAutoRotate(value) {
+    autoRotate = Boolean(value);
+  }
+
+  function setPresetVisual(name) {
+    presetVisualName = api?.getPresetVisual?.(name) ? name : null;
+    if (!renderer) return;
+    if (!presetVisualName || !rebuildPresetVisual(presetVisualName)) {
+      rebuildPaper(model);
+      rebuildCommittedCreases(model);
+    }
+  }
+
   function start() {
     if (disposed) return false;
     if (!ensureScene()) return false;
     ensureBadge();
     if (!started) {
       started = true;
-      rebuildPaper(model);
-      rebuildCommittedCreases(model);
+      lastFrameTime = 0;
+      if (!presetVisualName || !rebuildPresetVisual(presetVisualName)) {
+        rebuildPaper(model);
+        rebuildCommittedCreases(model);
+      }
       if (!frame) frame = requestAnimationFrame(tick);
     }
     return true;
@@ -1265,6 +1333,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
 
   function stop() {
     started = false;
+    lastFrameTime = 0;
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
     resetInteraction();
@@ -1310,5 +1379,5 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
     }
   }
 
-  return { setModel, setInteractive, start, stop, dispose };
+  return { setModel, setInteractive, setAutoRotate, setPresetVisual, start, stop, dispose };
 }

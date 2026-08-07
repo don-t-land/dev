@@ -31,14 +31,45 @@
   /* 프리셋 목록(접기 화면 좌측) — WebGL 편집기가 죽어도 동작해야 하므로
      순수 DOM으로만 그린다. 프리셋 프로필은 정적이라 한 번만 계산해 둔다. */
   const presetStatsCache = {};
+  const PRESET_ACCENTS = Object.freeze({
+    dart: '#ffd95a', stable: '#72d7ff', stealth: '#8fe3c4', jet: '#ff8aa0'
+  });
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+  }
+
+  function presetThumbnail(name, label) {
+    const visual = api.getPresetVisual(name);
+    const points = visual?.vertices || [];
+    if (!points.length) return '';
+    const xs = points.map(point => point[0]);
+    const zs = points.map(point => point[2]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minZ = Math.min(...zs), maxZ = Math.max(...zs);
+    const scale = Math.min(148 / Math.max(.01, maxX - minX), 48 / Math.max(.01, maxZ - minZ));
+    const offsetX = 86 - (minX + maxX) * scale / 2;
+    const offsetY = 29 - (minZ + maxZ) * scale / 2;
+    const polygons = visual.faces
+      .map((face, index) => {
+        const vertices = face.map(vertexIndex => visual.vertices[vertexIndex]);
+        const mapped = vertices.map(point => `${(point[0] * scale + offsetX).toFixed(1)},${(point[2] * scale + offsetY).toFixed(1)}`).join(' ');
+        return `<polygon points="${mapped}" fill="${index % 2 ? '#fff' : 'currentColor'}" opacity="${index % 2 ? '.9' : '.72'}"></polygon>`;
+      }).join('');
+    return `<svg viewBox="0 0 172 58" focusable="false" aria-hidden="true">
+      ${polygons}
+      <path d="M86,5 86,53" fill="none" stroke="rgba(8,22,54,.46)" stroke-width="1.5" stroke-linecap="round"></path>
+      <title>${escapeHtml(label)}</title>
+    </svg>`;
+  }
 
   function presetStatsLine(name) {
     if (name in presetStatsCache) return presetStatsCache[name];
-    const aero = root.PaperAeroProfile;
-    const preset = aero ? api.createPresetModel(name) : null;
-    const profile = preset ? aero.deriveAerodynamicProfile(preset) : null;
-    presetStatsCache[name] = profile
-      ? `양력 ${Math.round(profile.liftScale * 100)}% · 실속 ${Math.round(profile.stallSpeed)}m/s`
+    const measured = api.PRESET_INFO?.[name]?.reference;
+    presetStatsCache[name] = measured
+      ? `공식 ${measured.distanceM}m · ${measured.timeAloftS}s`
       : '';
     return presetStatsCache[name];
   }
@@ -47,9 +78,13 @@
     const host = $('fold-preset-list');
     if (!host) return;
     host.querySelectorAll('.fold-preset-card').forEach(card => {
-      card.classList.toggle('active', card.dataset.preset === selectedPreset);
+      const isActive = card.dataset.preset === selectedPreset;
+      card.classList.toggle('active', isActive);
+      card.setAttribute('aria-selected', isActive ? 'true' : 'false');
       card.disabled = locked;
     });
+    const meta = api.PRESET_INFO?.[selectedPreset];
+    if ($('fold-plane-name')) $('fold-plane-name').textContent = meta?.label || 'Custom Fold';
   }
 
   function renderPresetList() {
@@ -59,10 +94,12 @@
     host.innerHTML = api.presetNames.map(name => {
       const meta = info[name] || { label: name, tagline: '' };
       const stats = presetStatsLine(name);
-      return `<button type="button" class="fold-preset-card" data-preset="${name}">
-        <span class="fold-preset-label">${meta.label}</span>
-        <span class="fold-preset-tagline">${meta.tagline}</span>
-        ${stats ? `<span class="fold-preset-stats">${stats}</span>` : ''}
+      const accent = PRESET_ACCENTS[name] || '#71e5f2';
+      return `<button type="button" class="fold-preset-card" role="option" data-preset="${name}" style="--plane-accent:${accent}">
+        <span class="fold-preset-thumb">${presetThumbnail(name, meta.label)}</span>
+        <span class="fold-preset-copy"><span class="fold-preset-label">${escapeHtml(meta.label)}</span>
+        <span class="fold-preset-tagline">${escapeHtml(meta.tagline)}</span>
+        ${stats ? `<span class="fold-preset-stats">${escapeHtml(stats)}</span>` : ''}</span>
       </button>`;
     }).join('');
     refreshPresetList();
@@ -80,6 +117,8 @@
     refreshPresetList();
     updateStats();
     editor?.setModel(model);
+    editor?.setPresetVisual(name);
+    editor?.setAutoRotate(true);
     emitModelChange(model);
   }
 
@@ -87,6 +126,8 @@
   function clearPresetSelection() {
     if (selectedPreset === null) return;
     selectedPreset = null;
+    editor?.setAutoRotate(false);
+    editor?.setPresetVisual(null);
     refreshPresetList();
   }
 
@@ -158,7 +199,7 @@
     refreshPresetList();
     if (!completionSent) {
       completionSent = true;
-      onComplete?.({ commands: api.serializeFoldCommands(model) });
+      onComplete?.({ commands: api.serializeFoldCommands(model), preset: selectedPreset });
     }
   }
 
@@ -180,12 +221,14 @@
     $('folding-screen').classList.remove('hide');
     $('fold-complete-btn').disabled = false;
     $('fold-complete-btn').textContent = '비행기 완성';
-    selectedPreset = null;
+    selectedPreset = api.presetNames.includes(options?.initialPreset) ? options.initialPreset : null;
     renderPresetList();
     editorFailed = false;
     if (editor) {
       editor.setModel(model);
       editor.setInteractive(true);
+      editor.setPresetVisual(selectedPreset);
+      editor.setAutoRotate(Boolean(selectedPreset));
       editorFailed = editor.start() === false; // WebGL 실패 시 프리셋만 사용
     }
     updateStats();

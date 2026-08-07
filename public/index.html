@@ -111,9 +111,12 @@
   #gauge .fill.stall { background: #ff6b5e; }
   #gauge .lbl { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 10px; letter-spacing: .1em; color: #90a2ba; }
 
-  #ammo { position: absolute; bottom: 62px; left: 22px; display: flex; gap: 6px; }
-  #ammo i { width: 22px; height: 7px; border-radius: 2px; background: rgba(255,255,255,.14); }
-  #ammo i.on { background: #ffc861; box-shadow: 0 0 8px rgba(255,200,97,.5); }
+  #energy { position: absolute; bottom: 62px; left: 22px; width: 190px; }
+  #energy .lbl { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 10px; letter-spacing: .1em; color: #ffd889; }
+  #energy .track { height: 7px; overflow: hidden; border-radius: 4px; background: rgba(255,255,255,.14); }
+  #energy .fill { height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffc861, #ffe8a6); box-shadow: 0 0 10px rgba(255,200,97,.38); }
+  #energy.dashing .fill { background: linear-gradient(90deg, #ff9f57, #fff0a0); box-shadow: 0 0 15px rgba(255,174,80,.72); }
+  #energy.low .fill { background: #ff7368; }
 
   #thermal {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, 90px);
@@ -251,8 +254,9 @@
   #gauge { bottom: 32px; left: 30px; width: 250px; padding: 14px 16px; border-radius: 14px; background: rgba(9,18,29,.82); }
   #gauge .track { height: 8px; }
   #gauge .lbl { color: #d3e2ef; font-size: 12px; }
-  #ammo { bottom: 104px; left: 30px; }
-  #ammo i { width: 29px; height: 9px; }
+  #energy { bottom: 104px; left: 30px; width: 250px; padding: 12px 16px; border-radius: 14px; background: rgba(9,18,29,.82); }
+  #energy .track { height: 8px; }
+  #energy .lbl { font-size: 12px; }
   #keys { bottom: 30px; right: 30px; padding: 13px 16px; border-radius: 14px; color: #d3e2ef; background: rgba(9,18,29,.82); font-size: 13px; line-height: 2.15; }
   #keys kbd { padding: 2px 8px; font-family: ui-monospace, monospace; }
   #game-leave-btn { right: 30px; bottom: 130px; padding: 11px 15px; background: rgba(9,18,29,.65); }
@@ -298,8 +302,9 @@
     #board { top: 128px; left: 12px; right: 12px; min-width: 0; width: auto; transform: none; }
     #timer { top: 98px; font-size: 19px; }
     #gauge { left: 12px; right: 12px; bottom: 12px; width: auto; }
-    #keys { left: 12px; right: 12px; bottom: 84px; max-width: none; text-align: center; font-size: 11px; line-height: 1.8; }
-    #game-leave-btn { right: 12px; bottom: 205px; }
+    #energy { left: 12px; right: 12px; bottom: 92px; width: auto; }
+    #keys { left: 12px; right: 12px; bottom: 164px; max-width: none; text-align: center; font-size: 11px; line-height: 1.8; }
+    #game-leave-btn { right: 12px; bottom: 285px; }
   }
   @media (max-width: 560px) and (max-height: 400px) {
     #stats { top: 8px; left: 8px; transform: scale(.68); }
@@ -308,7 +313,7 @@
     #board .h { margin-bottom: 2px; }
     #game-leave-btn { top: 126px; right: 8px; bottom: auto; padding: 8px 11px; }
     #gauge { left: 8px; right: 8px; bottom: 8px; padding: 8px 10px; }
-    #ammo { display: none; }
+    #energy { left: 8px; right: 8px; bottom: 65px; width: auto; padding: 8px 10px; }
     #keys { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -379,6 +384,51 @@
       </div>
     </div>
   </main>
+</section>
+
+<section id="costume-panel" class="hide" aria-modal="true" role="dialog" aria-labelledby="costume-title">
+  <div class="costume-backdrop" data-costume-close></div>
+  <div class="costume-dialog">
+    <button class="costume-close" type="button" aria-label="닫기" data-costume-close>×</button>
+    <div class="costume-kicker">PLANE CUSTOMIZE</div>
+    <h2 id="costume-title">코스튬</h2>
+    <p class="costume-description">두 부위에 원하는 장식을 골라 비행기를 꾸며 보세요.</p>
+
+    <fieldset class="costume-section">
+      <legend><span>01</span> 모자 <small>오른쪽 날개 뒤쪽 ⅔ 지점</small></legend>
+      <div class="costume-options">
+        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="none">
+          <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
+        </button>
+        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="santa">
+          <canvas class="costume-preview-3d" data-costume-preview="santa" aria-hidden="true"></canvas><b>산타 모자</b>
+        </button>
+        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="magic">
+          <canvas class="costume-preview-3d" data-costume-preview="magic" aria-hidden="true"></canvas><b>마술모자</b>
+        </button>
+        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="police">
+          <canvas class="costume-preview-3d" data-costume-preview="police" aria-hidden="true"></canvas><b>경찰 경광등</b>
+        </button>
+      </div>
+    </fieldset>
+
+    <fieldset class="costume-section">
+      <legend><span>02</span> 코 <small>비행기 가장 앞부분</small></legend>
+      <div class="costume-options costume-options-nose">
+        <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="none">
+          <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
+        </button>
+        <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="rudolph">
+          <canvas class="costume-preview-3d" data-costume-preview="rudolph" aria-hidden="true"></canvas><b>루돌프 코</b>
+        </button>
+      </div>
+    </fieldset>
+
+    <div class="costume-actions">
+      <button id="costume-reset" type="button">모두 벗기</button>
+      <button id="costume-done" type="button">적용 완료</button>
+    </div>
+  </div>
 </section>
 
 <section id="room-entry" class="hide" aria-modal="true" role="dialog" aria-labelledby="entry-title">
@@ -527,7 +577,10 @@
     <div id="board"><div class="h" id="b-title">플레이어</div><div id="b-rows"></div></div>
     <button id="game-leave-btn" class="action-btn" aria-keyshortcuts="Escape">설정 <span aria-hidden="true">· ESC</span></button>
 
-    <div id="ammo" class="hide"><i></i><i></i><i></i></div>
+    <div id="energy">
+      <div class="lbl"><span>에너지</span><span id="s-energy">100</span></div>
+      <div class="track"><div class="fill" id="energy-fill"></div></div>
+    </div>
 
     <div id="gauge">
       <div class="lbl"><span>속도</span><span id="s-spd">0</span></div>
@@ -539,7 +592,7 @@
     <div id="biome-badge"></div>
 
     <div id="keys">
-      <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 롤/선회</span><br>
+      <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 롤/선회 · <kbd>Shift</kbd> 대시</span><br>
       <span><kbd>마우스</kbd> 자유 시점 · <kbd>ESC</kbd> 설정</span><br>
       <span id="keys-fire" class="hide"><kbd>Space</kbd> 다트 발사</span>
     </div>
@@ -605,11 +658,17 @@
   </header>
   <main class="fold-stage">
     <canvas id="fold-paper-canvas"></canvas>
-    <div class="fold-hint">종이에 선을 그어 힌지를 만들고 · 접을 쪽을 잡아 당겨 접으세요 · 금색 힌지는 언제든 다시 조절</div>
-    <aside class="fold-presets" id="fold-preset-list" aria-label="비행기 프리셋"></aside>
+    <div class="fold-preview-title"><span id="fold-plane-name">Basic Dart</span><small>천천히 회전</small></div>
+    <div class="fold-platform" aria-hidden="true"></div>
+    <aside class="fold-presets" aria-labelledby="fold-preset-title">
+      <div class="fold-panel-heading"><span>FOLD N FLY</span><strong id="fold-preset-title">종이비행기 선택</strong></div>
+      <div id="fold-preset-list" class="fold-preset-list" role="listbox" aria-label="종이비행기 프리셋"></div>
+    </aside>
     <aside class="fold-side">
+      <div class="fold-panel-heading"><span>FLIGHT PROFILE</span><strong>능력치</strong></div>
       <div id="fold-stats" class="fold-stats" aria-live="polite"></div>
     </aside>
+    <div class="fold-hint">종이에 선을 그어 직접 접기 · 빈 공간을 드래그해 돌리기 · 금색 힌지를 잡아 각도 조절</div>
   </main>
   <footer class="fold-controls">
     <div class="fold-direction">
@@ -634,6 +693,7 @@
 <script src="./input-policy.js"></script>
 <script src="./room-state.js"></script>
 <script src="./flight-controls.js"></script>
+<script src="./costume-state.js"></script>
 <script src="./waiting-room-state.js"></script>
 <script src="./paper-fold-model.js"></script>
 <script src="./paper-aero-profile.js"></script>
@@ -641,24 +701,89 @@
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
+<script src="./biomes/helpers.js"></script>
+<script src="./biomes/desert.js"></script>
+<script src="./biomes/pillars.js"></script>
+<script src="./biomes/glacier.js"></script>
+<script src="./biomes/lava.js"></script>
+<script src="./biomes/floating.js"></script>
 <script src="./map-gen.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
+<script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./waiting-room-3d.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
+import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
 import { createFoldEditor } from './fold-editor-3d.mjs';
+import { buildBiomeEnvironment } from './biome-visuals.js';
 const { getLaunchPose, localDeadline, getLaunchLayoutKey } = window.launchTransition;
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
-const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
+const {
+  updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage,
+  updateEnergy, consumeDartEnergy, dashAcceleration, speedFov, MAX_ENERGY, DART_ENERGY_COST
+} = window.flightControls;
 const { getWaitingSlots, canStart, getLocalReady } = window.waitingRoomStatePolicy;
 
 /* ============================================================
    유틸
    ============================================================ */
 const $ = id => document.getElementById(id);
+const DEFAULT_SELECTED_PLANE = 'dart';
+
+function normalizeFoldCommands(commands) {
+  const api = window.paperFoldModel;
+  const model = api?.replayFoldCommands?.(commands || '[]');
+  return model ? api.serializeFoldCommands(model) : null;
+}
+
+function selectedPlaneCommands() {
+  const api = window.paperFoldModel;
+  const stored = normalizeFoldCommands(localStorage.getItem('pp_selected_commands'));
+  if (stored) return stored;
+  const fallback = api?.createPresetModel?.(DEFAULT_SELECTED_PLANE) || api?.createPaperModel?.();
+  return fallback ? api.serializeFoldCommands(fallback) : '[]';
+}
+
+function setSelectedPlaneCommands(commands, name = 'custom') {
+  const normalized = normalizeFoldCommands(commands);
+  if (!normalized) return null;
+  localStorage.setItem('pp_selected_commands', normalized);
+  localStorage.setItem('pp_selected_plane', name);
+  net.lastFoldCommands = normalized;
+  window.dispatchEvent(new CustomEvent('paper-plane-selected', {
+    detail: { name, commands: normalized, label: name === 'custom' ? 'Custom Fold' : name }
+  }));
+  return normalized;
+}
+
+function selectedPlaneName() {
+  const stored = localStorage.getItem('pp_selected_plane');
+  if (!stored) return DEFAULT_SELECTED_PLANE;
+  return window.paperFoldModel?.presetNames?.includes(stored) ? stored : null;
+}
+
+let selectedCostume = window.costumeState.load();
+
+function renderCostumeOptions() {
+  document.querySelectorAll('[data-costume-slot][data-costume-id]').forEach(button => {
+    const active = selectedCostume[button.dataset.costumeSlot] === button.dataset.costumeId;
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function applySelectedCostume(next, broadcast = true) {
+  selectedCostume = window.costumeState.save(next);
+  renderCostumeOptions();
+  if (typeof craft !== 'undefined') setCostumeOnObject(craft, selectedCostume, 'flight');
+  window.dispatchEvent(new CustomEvent('paper-plane-costume-changed', {
+    detail: { costume: { ...selectedCostume } }
+  }));
+  if (broadcast && net.id) send({ t: 'costume', costume: selectedCostume });
+  return selectedCostume;
+}
 
 /* 시드 난수 — 모든 클라이언트가 같은 시드로 같은 맵을 만듭니다 */
 function mulberry32(a) {
@@ -728,7 +853,10 @@ function send(obj) {
 function sendHello() {
   if (net.helloSent || !net.pendingAction || !net.ws || net.ws.readyState !== WebSocket.OPEN) return;
   net.helloSent = true;
-  send({ t: 'hello', token: localStorage.getItem('pp_token'), name: $('lob-name').value.trim() });
+  send({
+    t: 'hello', token: localStorage.getItem('pp_token'), name: $('lob-name').value.trim(),
+    costume: selectedCostume
+  });
 }
 
 function withSession(action) {
@@ -789,6 +917,8 @@ function syncRoomPlayers(players) {
     existing.alive = Boolean(player.alive);
     existing.ready = Boolean(player.ready);
     existing.connected = player.connected !== false;
+    existing.costume = window.costumeState.normalize(player.costume);
+    setCostumeOnObject(existing.remote.group, existing.costume, 'flight');
   }
 }
 
@@ -883,7 +1013,7 @@ function handle(m) {
     case 'phase':
       if (net.room) net.room.phase = m.phase;
       if (m.phase === 'folding') enterFolding();
-      if (m.phase === 'launch' || m.phase === 'countdown' || m.phase === 'playing') enterGame();
+      else if (m.phase === 'launch' || m.phase === 'countdown' || m.phase === 'playing') enterGame();
       applyPhase(m);
       break;
 
@@ -912,7 +1042,8 @@ function handle(m) {
         freeLook = { yaw: 0, pitch: 0 };
         me.alive = true;
         me.dist = 0; me.surv = 0; me.lifeStartedAt = Date.now();
-        me.ammo = 3; me.ammoT = 0;
+        me.energy = MAX_ENERGY;
+        me.dashing = false;
         game.frozen = false;
         craft.visible = true;
         craft.rotation.set(me.pitch, me.yaw, -me.roll);
@@ -926,11 +1057,13 @@ function handle(m) {
         syncRapierFromCraft();
         hideCenter();
       } else {
-        if (!net.players.has(m.id)) addRemote({ id: m.id, name: m.name, wins: 0 });
+        if (!net.players.has(m.id)) addRemote({ id: m.id, name: m.name, wins: 0, costume: m.costume });
         const player = net.players.get(m.id);
         if (player) {
           player.alive = true;
           player.remote.seen = false;
+          player.costume = window.costumeState.normalize(m.costume ?? player.costume);
+          setCostumeOnObject(player.remote.group, player.costume, 'flight');
           setFoldedCraftVisual(
             player.remote.group,
             player.remote.baseVisual,
@@ -1158,7 +1291,6 @@ function enterGame() {
   const arena = game.mode === 'ARENA';
   $('s-cap').textContent = arena ? '생존 시간' : '직선 거리';
   $('s-unit').textContent = arena ? 's' : 'm';
-  $('ammo').classList.toggle('hide', !arena);
   $('keys-fire').classList.toggle('hide', !arena);
   $('b-title').textContent = '실시간 리더보드';
 }
@@ -1206,6 +1338,29 @@ $('entry-name').value = $('lob-name').value;
 document.querySelectorAll('[data-home-mode]').forEach(button => {
   button.addEventListener('click', () => openRoomEntry(button.dataset.homeMode));
 });
+document.querySelector('[data-home-action="costume"]')?.addEventListener('click', () => {
+  renderCostumeOptions();
+  $('costume-panel').classList.remove('hide');
+  setTimeout(() => $('costume-panel').querySelector('[aria-pressed="true"]')?.focus(), 0);
+});
+document.querySelectorAll('[data-costume-close]').forEach(element => {
+  element.addEventListener('click', () => $('costume-panel').classList.add('hide'));
+});
+document.querySelectorAll('[data-costume-slot][data-costume-id]').forEach(button => {
+  button.addEventListener('click', () => applySelectedCostume({
+    ...selectedCostume,
+    [button.dataset.costumeSlot]: button.dataset.costumeId
+  }));
+});
+$('costume-reset').addEventListener('click', () => applySelectedCostume(window.costumeState.DEFAULT_COSTUME));
+$('costume-done').addEventListener('click', () => $('costume-panel').classList.add('hide'));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('costume-panel').classList.contains('hide')) {
+    event.stopPropagation();
+    $('costume-panel').classList.add('hide');
+  }
+});
+renderCostumeOptions();
 document.querySelectorAll('[data-entry-close]').forEach(element => element.addEventListener('click', closeRoomEntry));
 
 function withEntrySession(action) {
@@ -1333,9 +1488,11 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0xb8c9dd, 0.0026);
+const DIST_FOG_DENSITY = 0.0026;
+const ARENA_FOG_DENSITY = DIST_FOG_DENSITY / 3;
+scene.fog = new THREE.FogExp2(0xb8c9dd, DIST_FOG_DENSITY);
 
-const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 3000);
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 5000);
 camera.position.set(0, 200, 100);
 
 /* 하늘 돔 */
@@ -1372,13 +1529,13 @@ scene.add(sun, sun.target);
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(4000, 4000),
-  new THREE.MeshStandardMaterial({ color: 0x5f7a4e, roughness: 1 })
+  new THREE.MeshStandardMaterial({ color: 0x5f7a4e, roughness: 1, transparent: true })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const grid = new THREE.GridHelper(1600, 40, 0x7a9468, 0x6d8a5c);
+const grid = new THREE.GridHelper(2800, 70, 0x7a9468, 0x6d8a5c);
 grid.material.transparent = true;
 grid.material.opacity = 0.35;
 scene.add(grid);
@@ -1397,12 +1554,19 @@ function biomeLightColor(biome, out) {
   return out.setHex(0xfff0d8).lerp(biomeLerpColor.setHex(biome.sky.mid), 0.22);
 }
 
+function biomeGroundOpacity(biome) {
+  return biome.id === 'floating' ? .055 : biome.id === 'pillars' ? .88 : .96;
+}
+
 function applyBiomePalette(biome) {
   scene.fog.color.setHex(biome.fog);
   sky.material.uniforms.uTop.value.setHex(biome.sky.top);
   sky.material.uniforms.uMid.value.setHex(biome.sky.mid);
   sky.material.uniforms.uBottom.value.setHex(biome.sky.bottom);
   sun.color.copy(biomeLightColor(biome, biomeColorA));
+  ground.material.color.setHex(biome.terrain.top);
+  ground.material.opacity = biomeGroundOpacity(biome);
+  grid.material.opacity = biome.id === 'floating' ? .035 : .24;
 }
 
 function resetBiomeDefaults() {
@@ -1411,6 +1575,9 @@ function resetBiomeDefaults() {
   sky.material.uniforms.uMid.value.setHex(DEFAULT_BIOME.sky.mid);
   sky.material.uniforms.uBottom.value.setHex(DEFAULT_BIOME.sky.bottom);
   sun.color.setHex(0xfff0d8);
+  ground.material.color.setHex(DEFAULT_BIOME.terrain.top);
+  ground.material.opacity = biomeGroundOpacity(DEFAULT_BIOME);
+  grid.material.opacity = .24;
   lastAppliedBiome = { a: 0, b: 0, t: -1 };
   lastBadgeBiome = -1;
   clearTimeout(biomeBadgeT);
@@ -1439,6 +1606,11 @@ function updateDistanceBiomeVisuals(z) {
   biomeLightColor(biomeA, biomeColorA);
   biomeLightColor(biomeB, biomeColorB);
   sun.color.copy(biomeColorA.lerp(biomeColorB, tQuant));
+
+  biomeColorA.setHex(biomeA.terrain.top).lerp(biomeColorB.setHex(biomeB.terrain.top), tQuant);
+  ground.material.color.copy(biomeColorA);
+  ground.material.opacity = THREE.MathUtils.lerp(biomeGroundOpacity(biomeA), biomeGroundOpacity(biomeB), tQuant);
+  grid.material.opacity = THREE.MathUtils.lerp(biomeA.id === 'floating' ? .035 : .24, biomeB.id === 'floating' ? .035 : .24, tQuant);
 
   const dominant = tQuant < 0.5 ? s.a : s.b;
   showBiomeBadge(dominant);
@@ -1499,10 +1671,12 @@ function addRemote(pl) {
   const baseVisual = makePlaneMesh(color);
   group.add(baseVisual);
   group.add(makeLabel(pl.name, '#' + color.getHexString()));
+  const costume = window.costumeState.normalize(pl.costume);
+  setCostumeOnObject(group, costume, 'flight');
   group.visible = false;
   scene.add(group);
   net.players.set(pl.id, {
-    name: pl.name, wins: pl.wins, alive: !!pl.alive, score: 0,
+    name: pl.name, wins: pl.wins, alive: !!pl.alive, score: 0, costume,
     remote: {
       group, baseVisual, color,
       tp: new THREE.Vector3(), tr: new THREE.Vector3(), seen: false
@@ -1517,9 +1691,17 @@ const craft = new THREE.Group();
 craft.rotation.order = 'YXZ';
 const baseCraftVisual = makePlaneMesh(0xfdfcf7);
 craft.add(baseCraftVisual);
+setCostumeOnObject(craft, selectedCostume, 'flight');
 scene.add(craft);
 
 const defaultPaperModel = window.paperFoldModel.createPaperModel();
+const basicPresetCommandKey = window.paperFoldModel.serializeFoldCommands(
+  window.paperFoldModel.createPresetModel(DEFAULT_SELECTED_PLANE)
+);
+const presetNameByCommandKey = new Map(window.paperFoldModel.presetNames.map(name => [
+  window.paperFoldModel.serializeFoldCommands(window.paperFoldModel.createPresetModel(name)),
+  name
+]));
 let activePaperModel = defaultPaperModel;
 let aeroProfile = window.PaperAeroProfile.deriveAerodynamicProfile(defaultPaperModel);
 let rapierApi = null;
@@ -1528,11 +1710,11 @@ let rapierFlight = null;
 function updateAeroHud() {
   const engine = rapierFlight ? ' · Rapier' : '';
   $('s-aero').textContent = `양력 ${Math.round(aeroProfile.liftScale * 100)}% · 항력 ${Math.round(aeroProfile.dragScale * 100)}%${engine}`;
-  $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / 48 * 100)}%`;
+  $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / 70 * 100)}%`;
 }
 
 function syncRapierMap() {
-  rapierFlight?.setMapColliders({ spires, rocks });
+  rapierFlight?.setMapColliders({ spires, rocks, platforms });
 }
 
 function syncRapierFromCraft() {
@@ -1612,11 +1794,46 @@ function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {
   return visual.children.length ? visual : null;
 }
 
+function makePresetCraftVisual(name, tint = new THREE.Color(0xfdfcf7)) {
+  const authored = window.paperFoldModel.getPresetVisual?.(name);
+  if (!authored) return null;
+  const visual = new THREE.Group();
+  visual.name = 'foldedCraftVisual';
+  authored.faces.forEach((face, faceIndex) => {
+    const poly3 = face.map(index => authored.vertices[index]).filter(Boolean);
+    const vertices = [];
+    for (let index = 1; index < poly3.length - 1; index += 1) {
+      for (const point of [poly3[0], poly3[index], poly3[index + 1]]) {
+        vertices.push(point[0] * 1.35, point[1] * 1.35, point[2] * 1.35);
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    const color = tint.clone().lerp(new THREE.Color(0xffffff), .34 - faceIndex * .055);
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+      color, roughness: .72, side: THREE.DoubleSide, flatShading: true
+    }));
+    mesh.castShadow = true;
+    visual.add(mesh);
+  });
+  return visual.children.length ? visual : null;
+}
+
 function setFoldedCraftVisual(owner, baseVisual, model, tint, commandKey = '[]') {
   const cacheKey = typeof commandKey === 'string' ? commandKey : JSON.stringify(commandKey || []);
   if (owner.userData.foldCommandKey === cacheKey) return;
   disposeObject3D(owner.getObjectByName('foldedCraftVisual'));
-  const visual = makeFoldedCraftVisual(model, tint);
+  if (cacheKey === basicPresetCommandKey) {
+    // Basic은 서비스 최초 버전의 N/L/R/B/K 종이비행기 메시가 기준 외형이다.
+    baseVisual.visible = true;
+    owner.userData.foldCommandKey = cacheKey;
+    return;
+  }
+  const presetName = presetNameByCommandKey.get(cacheKey);
+  const visual = presetName
+    ? makePresetCraftVisual(presetName, tint)
+    : makeFoldedCraftVisual(model, tint);
   baseVisual.visible = !visual;
   if (visual) owner.add(visual);
   owner.userData.foldCommandKey = cacheKey;
@@ -1655,6 +1872,11 @@ function applyCraftSnapshots(crafts) {
   if (!Array.isArray(crafts)) return;
   const snapshots = new Map(crafts.filter(item => item?.id).map(item => [item.id, item]));
   const applyOne = (owner, baseVisual, tint, snapshot, isLocal = false) => {
+    setCostumeOnObject(
+      owner,
+      isLocal ? selectedCostume : snapshot?.costume,
+      'flight'
+    );
     const model = window.paperFoldModel.replayFoldCommands(snapshot?.commands ?? '[]');
     if (!model) {
       if (isLocal) setCraftFromFoldModel(defaultPaperModel, null, '[]');
@@ -1677,8 +1899,11 @@ function applyCraftSnapshots(crafts) {
   }
 }
 
-const GRAVITY = 21, DRAG = 0.0062, MAX_ALT = 420;
-const me = { yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false, dist: 0, surv: 0, ammo: 3, ammoT: 0, lifeStartedAt: 0 };
+const GRAVITY = 21, DRAG = 0.0038, MAX_ALT = 420;
+const me = {
+  yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false,
+  dist: 0, surv: 0, energy: MAX_ENERGY, dashing: false, lifeStartedAt: 0
+};
 
 /* ============================================================
    게임 상태 · 월드
@@ -1691,15 +1916,15 @@ const game = {
 
 /* 코스 상수 */
 const DIST_HALF = 155, DIST_LEN = 7500;
-const ARENA_R = 240;
+const ARENA_R = window.mapGen.ARENA_R;
 const THERMAL_R = 26, THERMAL_LIFT = 15, RING_R = 8;
 
 /* 월드 컨테이너 — 라운드마다 비우고 다시 만듭니다 */
 const world = new THREE.Group();
 scene.add(world);
 
-let spires = [], rocks = [], thermals = [], ringsArr = [], clouds = [];
-let spireMesh = null, rockMesh = null, wallMesh = null;
+let spires = [], rocks = [], platforms = [], thermals = [], ringsArr = [];
+let biomeEnvironment = null;
 let distanceWidthNoise = null;
 
 const thermalMat = new THREE.ShaderMaterial({
@@ -1726,26 +1951,20 @@ const thermalMat = new THREE.ShaderMaterial({
 });
 const thermalRingMat = new THREE.MeshBasicMaterial({ color: 0x4fd6a4, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
 const ringMat = new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 1.6, roughness: 0.4 });
-const rockLikeMat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true });
-const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
-
-const unitBox = new THREE.BoxGeometry(1, 1, 1); unitBox.translate(0, 0.5, 0);
-const unitCone = new THREE.CylinderGeometry(0.35, 1, 1, 7, 1); unitCone.translate(0, 0.5, 0);
-const unitRock = new THREE.IcosahedronGeometry(1, 0);
-const dummy = new THREE.Object3D();
 
 function clearWorld() {
   if (typeof launchState !== 'undefined') {
     clearLaunchActors();
     clearLaunchTowers();
   }
+  const previousEnvironment = biomeEnvironment;
+  previousEnvironment?.userData.dispose?.();
   world.traverse(o => {
-    if (o.isMesh && o.geometry !== unitBox && o.geometry !== unitCone && o.geometry !== unitRock)
-      o.geometry.dispose?.();
+    if (o.isMesh && !previousEnvironment?.getObjectById(o.id)) o.geometry.dispose?.();
   });
   world.clear();
-  spires = []; rocks = []; thermals = []; ringsArr = []; clouds = [];
-  spireMesh = rockMesh = wallMesh = null;
+  spires = []; rocks = []; platforms = []; thermals = []; ringsArr = [];
+  biomeEnvironment = null;
   distanceWidthNoise = null;
   // 바이옴 팔레트 기본값 복원 — buildDistance/buildArena는 이 직후 자신의 팔레트를
   // 다시 적용하므로(동기 호출) 로비 경로(enterHome/enterLobby/enterRoomLobby)에서만
@@ -1753,7 +1972,7 @@ function clearWorld() {
   resetBiomeDefaults();
 }
 
-function addThermal(x, z) {
+function addThermal(x, z, strength = 1) {
   const g = new THREE.Group();
   const col = new THREE.Mesh(new THREE.CylinderGeometry(THERMAL_R, THERMAL_R * 0.55, 340, 22, 1, true), thermalMat);
   col.position.y = 170;
@@ -1762,6 +1981,7 @@ function addThermal(x, z) {
   mark.rotation.x = -Math.PI / 2; mark.position.y = 0.6;
   g.add(mark);
   g.position.set(x, 0, z);
+  g.userData.strength = strength;
   world.add(g);
   thermals.push(g);
 }
@@ -1775,88 +1995,32 @@ function addRing(x, y, z, rng) {
   ringsArr.push(m);
 }
 
-function addClouds(rng, count, area) {
-  for (let i = 0; i < count; i++) {
-    const g = new THREE.Group();
-    const puffs = 3 + Math.floor(rng() * 3);
-    for (let p = 0; p < puffs; p++) {
-      const r = 9 + rng() * 11;
-      const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), cloudMat);
-      puff.position.set((rng() - 0.5) * 34, (rng() - 0.5) * 7, (rng() - 0.5) * 26);
-      puff.scale.y = 0.55;
-      g.add(puff);
-    }
-    area(g, rng);
-    g.position.y = 95 + rng() * 220;
-    world.add(g);
-    clouds.push(g);
-  }
+function installBiomeLayout(layout) {
+  const environment = buildBiomeEnvironment({ layout, biomes: window.mapGen.BIOMES });
+  biomeEnvironment = environment.root;
+  world.add(biomeEnvironment);
+  spires = environment.spires;
+  rocks = environment.rocks;
+  platforms = environment.platforms;
 }
 
 /* ---- 멀리 날기: 시드로 7.5km 직선 협곡을 결정론적으로 생성 ---- */
 function buildDistance(seed) {
   clearWorld();
+  scene.fog.density = DIST_FOG_DENSITY;
   const rng = mulberry32(seed);
   const { BIOMES: mgBiomes } = window.mapGen;
   const layout = window.mapGen.buildDistanceLayout(seed);
   distanceWidthNoise = window.mapGen.makeNoise1d((seed ^ 0x2f6e1a3d) >>> 0);
-  const tmpColor = new THREE.Color();
 
   // 진입 순간 팔레트를 즉시 기준 바이옴으로 맞춰 ARENA 테마가 한 프레임 잔존하는 것을 방지.
   applyBiomePalette(mgBiomes[0]);
   lastAppliedBiome = { a: -1, b: -1, t: -1 };
-
-  // 협곡 벽
-  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), layout.walls.length);
-  layout.walls.forEach((wall, i) => {
-    dummy.position.set(wall.x, 0, wall.z);
-    dummy.scale.set(wall.w, wall.h, wall.d);
-    dummy.rotation.set(0, 0, 0);
-    dummy.updateMatrix();
-    wallMesh.setMatrixAt(i, dummy.matrix);
-    wallMesh.setColorAt(i, tmpColor.setHex(mgBiomes[wall.biome].terrain.wall));
-  });
-  wallMesh.instanceColor.needsUpdate = true;
-  world.add(wallMesh);
-
-  // 첨탑 — 렌더는 인스턴스 1콜, 충돌은 데이터 배열
-  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), layout.spires.length);
-  spireMesh.castShadow = true;
-  layout.spires.forEach((spire, i) => {
-    dummy.position.set(spire.x, 0, spire.z);
-    dummy.scale.set(spire.r, spire.h, spire.r);
-    dummy.rotation.set(0, 0, 0);
-    dummy.updateMatrix();
-    spireMesh.setMatrixAt(i, dummy.matrix);
-    spireMesh.setColorAt(i, tmpColor.setHex(mgBiomes[spire.biome].terrain.spire));
-    spires.push({ x: spire.x, z: spire.z, h: spire.h, r: spire.r });
-  });
-  spireMesh.instanceColor.needsUpdate = true;
-  world.add(spireMesh);
-
-  // 공중 바위
-  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), layout.rocks.length);
-  rockMesh.castShadow = true;
-  layout.rocks.forEach((rock, i) => {
-    dummy.position.set(rock.x, rock.y, rock.z);
-    dummy.scale.setScalar(rock.r);
-    dummy.rotation.set(rng() * 3, rng() * 3, 0);
-    dummy.updateMatrix();
-    rockMesh.setMatrixAt(i, dummy.matrix);
-    rockMesh.setColorAt(i, tmpColor.setHex(mgBiomes[rock.biome].terrain.rock));
-    rocks.push({ p: new THREE.Vector3(rock.x, rock.y, rock.z), r: rock.r });
-  });
-  rockMesh.instanceColor.needsUpdate = true;
-  world.add(rockMesh);
+  installBiomeLayout(layout);
 
   // 상승기류 · 부스트 링
-  layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z));
+  layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z, thermal.strength));
   layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng));
-
-  addClouds(rng, 24, (g, r2) => {
-    g.position.x = (r2() * 2 - 1) * (DIST_HALF + 90);
-    g.position.z = -r2() * DIST_LEN;
-  });
 
   // 중앙선
   const line = new THREE.Mesh(
@@ -1871,79 +2035,22 @@ function buildDistance(seed) {
 /* ---- 오래 날기: 원형 아레나 ---- */
 function buildArena(seed) {
   clearWorld();
+  scene.fog.density = ARENA_FOG_DENSITY;
   const rng = mulberry32(seed);
-  const theme = window.mapGen.arenaTheme(seed);
+  const layout = window.mapGen.buildArenaLayout(seed);
+  const theme = window.mapGen.BIOMES[layout.biome];
   applyBiomePalette(theme);
   // ARENA는 z 기반 전환 캐시를 쓰지 않음 — 다음 DIST 진입 시 sampleBiome 결과가
   // 우연히 이전 캐시와 같아도 팔레트가 강제로 재적용되도록 무효화해 둔다.
   lastAppliedBiome = { a: -1, b: -1, t: -1 };
 
-  // 외벽 바위 링
-  const nWall = 56;
-  wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(theme.terrain.wall), nWall);
-  for (let i = 0; i < nWall; i++) {
-    const a = (i / nWall) * Math.PI * 2;
-    const rr = ARENA_R + 22 + rng() * 14;
-    dummy.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
-    dummy.scale.set(30 + rng() * 18, 70 + rng() * 110, 30 + rng() * 18);
-    dummy.rotation.set(0, a, 0);
-    dummy.updateMatrix();
-    wallMesh.setMatrixAt(i, dummy.matrix);
-  }
-  world.add(wallMesh);
-
-  // 내부 첨탑 — 엄폐물
-  const nSp = 13;
-  spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(theme.terrain.spire), nSp);
-  spireMesh.castShadow = true;
-  for (let i = 0; i < nSp; i++) {
-    const h = 60 + rng() * 130, r = 7 + rng() * 9;
-    const a = rng() * Math.PI * 2, d = 40 + rng() * (ARENA_R - 80);
-    const x = Math.cos(a) * d, z = Math.sin(a) * d;
-    dummy.position.set(x, 0, z);
-    dummy.scale.set(r, h, r);
-    dummy.updateMatrix();
-    spireMesh.setMatrixAt(i, dummy.matrix);
-    spires.push({ x, z, h, r });
-  }
-  world.add(spireMesh);
-
-  // 공중 바위
-  const nRk = 18;
-  rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(theme.terrain.rock), nRk);
-  rockMesh.castShadow = true;
-  for (let i = 0; i < nRk; i++) {
-    const r = 5 + rng() * 7;
-    const a = rng() * Math.PI * 2, d = rng() * (ARENA_R - 40);
-    const p = new THREE.Vector3(Math.cos(a) * d, 35 + rng() * 150, Math.sin(a) * d);
-    dummy.position.copy(p);
-    dummy.scale.setScalar(r);
-    dummy.rotation.set(rng() * 3, rng() * 3, 0);
-    dummy.updateMatrix();
-    rockMesh.setMatrixAt(i, dummy.matrix);
-    rocks.push({ p, r });
-  }
-  world.add(rockMesh);
-
-  // 상승기류 · 탄약 링
-  for (let i = 0; i < 8; i++) {
-    const a = rng() * Math.PI * 2, d = 50 + rng() * (ARENA_R - 90);
-    addThermal(Math.cos(a) * d, Math.sin(a) * d);
-  }
-  for (let i = 0; i < 6; i++) {
-    const a = rng() * Math.PI * 2, d = 40 + rng() * (ARENA_R - 70);
-    addRing(Math.cos(a) * d, 45 + rng() * 150, Math.sin(a) * d, rng);
-  }
-
-  addClouds(rng, 12, (g, r2) => {
-    const a = r2() * Math.PI * 2, d = r2() * (ARENA_R + 150);
-    g.position.x = Math.cos(a) * d;
-    g.position.z = Math.sin(a) * d;
-  });
+  installBiomeLayout(layout);
+  layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z, thermal.strength));
+  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng));
 
   // 경계 표시 링
   const bound = new THREE.Mesh(
-    new THREE.RingGeometry(ARENA_R - 2, ARENA_R, 80),
+    new THREE.RingGeometry(ARENA_R - 6, ARENA_R, 160),
     new THREE.MeshBasicMaterial({ color: 0xff8b7e, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
   );
   bound.rotation.x = -Math.PI / 2;
@@ -2142,8 +2249,10 @@ function spawnDart(origin, vel, ownerId, color) {
 }
 
 function shoot() {
-  if (game.mode !== 'ARENA' || !me.alive || game.phase !== 'playing' || me.ammo <= 0) return;
-  me.ammo--;
+  if (game.mode !== 'ARENA' || !me.alive || game.phase !== 'playing') return;
+  const spent = consumeDartEnergy(me.energy);
+  if (!spent.fired) return;
+  me.energy = spent.energy;
   const dir = new THREE.Vector3(
     -Math.sin(me.yaw) * Math.cos(me.pitch),
      Math.sin(me.pitch),
@@ -2200,9 +2309,10 @@ function enterLiveArena(m) {
   enterFolding();
   window.paperFoldingStage?.enter({
     ends: null,
-    initialCommands: net.lastFoldCommands || '[]',
+    initialCommands: selectedPlaneCommands(),
+    initialPreset: selectedPlaneName(),
     onComplete: fold => {
-      net.lastFoldCommands = fold.commands;
+      setSelectedPlaneCommands(fold.commands, fold.preset || 'custom');
       send({ t: 'fold_done', commands: fold.commands });
     }
   });
@@ -2248,7 +2358,6 @@ function applyPhase(m) {
     (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
     buildLaunchTowers();
     spawnSelf();
-    setCraftFromFoldModel(null);
     for (const player of net.players.values()) {
       player.alive = true;
       player.score = 0;
@@ -2262,9 +2371,15 @@ function applyPhase(m) {
         '[]'
       );
     }
+    enterFolding();
     window.paperFoldingStage?.enter({
       ends: game.ends,
-      onComplete: fold => send({ t: 'fold_done', commands: fold.commands })
+      initialCommands: selectedPlaneCommands(),
+      initialPreset: selectedPlaneName(),
+      onComplete: fold => {
+        setSelectedPlaneCommands(fold.commands, fold.preset || 'custom');
+        send({ t: 'fold_done', commands: fold.commands });
+      }
     });
     const roomPlayers = net.room?.players || [];
     window.paperFoldingStage?.setRoomProgress(
@@ -2374,7 +2489,8 @@ function spawnSelf() {
   freeLook = { yaw: 0, pitch: 0 };
   me.alive = false;          // playing 페이즈에서 true
   me.dist = 0; me.surv = 0;
-  me.ammo = 3; me.ammoT = 0;
+  me.energy = MAX_ENERGY;
+  me.dashing = false;
   game.frozen = true;
   craft.visible = true;
   craft.rotation.set(me.pitch, me.yaw, -me.roll);
@@ -2385,6 +2501,7 @@ function spawnSelf() {
 function dieLocal(report = true) {
   if (!me.alive) return;
   me.alive = false;
+  me.dashing = false;
   if (report) send({ t: 'crash' });
   if (net.room?.phase === 'live') {
     if (report) showRespawnOverlay(null);
@@ -2610,7 +2727,7 @@ addEventListener('keydown', e => {
   if (!shouldCaptureGameKey(e)) return;
   keys[e.code] = true;
   e.preventDefault();
-  if (e.code === 'Space') shoot();
+  if (e.code === 'Space' && !e.repeat) shoot();
 });
 addEventListener('keyup', e => {
   if (e.code in keys) keys[e.code] = false;
@@ -2640,11 +2757,21 @@ function physics(dt) {
       craft.position.z - thermal.position.z
     );
     if (distance < THERMAL_R && craft.position.y < 340) {
-      inTh = Math.max(inTh, 1 - (distance / THERMAL_R) * .75);
+      inTh = Math.max(inTh, (1 - (distance / THERMAL_R) * .75) * (thermal.userData.strength || 1));
     }
   }
 
+  const energyStep = updateEnergy(
+    me.energy,
+    dt,
+    keys.ShiftLeft || keys.ShiftRight
+  );
+  me.energy = energyStep.energy;
+  me.dashing = energyStep.dashRatio > 0;
+  const dashSpeedDelta = dashAcceleration(me.speed) * dt * energyStep.dashRatio;
+
   if (rapierFlight) {
+    if (dashSpeedDelta > 0) rapierFlight.boostSpeed(dashSpeedDelta);
     const state = rapierFlight.advance(dt, {
       pitch: (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0),
       roll: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0),
@@ -2681,6 +2808,7 @@ function physics(dt) {
     me.roll = THREE.MathUtils.clamp(me.roll, -.95, .95);
 
     const dragCoefficient = DRAG * aeroProfile.dragScale;
+    me.speed += dashSpeedDelta;
     me.speed += (-Math.sin(me.pitch) * GRAVITY - dragCoefficient * me.speed * me.speed) * dt;
     me.speed = Math.max(me.speed, 3);
     if (me.speed < aeroProfile.stallSpeed) {
@@ -2728,9 +2856,6 @@ function physics(dt) {
       }
     }
     me.surv = roundClock;
-    // 탄약 재생
-    me.ammoT += dt;
-    if (me.ammoT > 2.5 && me.ammo < 3) { me.ammo++; me.ammoT = 0; }
   }
 
   /* 상승기류: Rapier에서는 고정 스텝 외력으로 이미 적용됩니다. */
@@ -2753,6 +2878,16 @@ function physics(dt) {
   }
   for (const r of rocks)
     if (craft.position.distanceTo(r.p) < r.r + 1.4) return dieLocal();
+  for (const platform of platforms) {
+    const dx = craft.position.x - platform.x;
+    const dz = craft.position.z - platform.z;
+    const cos = Math.cos(-platform.rotation), sin = Math.sin(-platform.rotation);
+    const localX = dx * cos - dz * sin;
+    const localZ = dx * sin + dz * cos;
+    if (Math.abs(localX) < platform.w * .5 + 1.4 &&
+        Math.abs(localZ) < platform.d * .5 + 1.4 &&
+        Math.abs(craft.position.y - platform.y) < platform.h * .5 + 1.4) return dieLocal();
+  }
 
   /* 링 */
   for (const ring of ringsArr) {
@@ -2760,7 +2895,7 @@ function physics(dt) {
     if (craft.position.distanceTo(ring.position) < RING_R) {
       ring.userData.taken = true;
       ring.visible = false;
-      if (game.mode === 'ARENA') me.ammo = Math.min(3, me.ammo + 1);
+      if (game.mode === 'ARENA') me.energy = Math.min(MAX_ENERGY, me.energy + 35);
       else {
         me.speed += 6;
         rapierFlight?.boostSpeed(6);
@@ -2772,7 +2907,9 @@ function physics(dt) {
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
   const now = Date.now();
-  thermalMat.uniforms.uTime.value = clock.getElapsedTime();
+  const elapsed = clock.getElapsedTime();
+  thermalMat.uniforms.uTime.value = elapsed;
+  animateCostumes(scene, elapsed);
 
   if (game.phase === 'lobby') { renderer.render(scene, camera); return; }
 
@@ -2824,7 +2961,8 @@ renderer.setAnimationLoop(() => {
 
   fwdH.set(-Math.sin(followYaw), 0, -Math.cos(followYaw));
   const orbitYaw = followYaw + freeLook.yaw;
-  const orbitRadius = 16;
+  const speedCameraAmount = THREE.MathUtils.clamp((me.speed - 22) / 48, 0, 1);
+  const orbitRadius = 16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0);
   const orbitHorizontal = Math.cos(freeLook.pitch) * orbitRadius;
   camPos.set(
     followPos.x + Math.sin(orbitYaw) * orbitHorizontal,
@@ -2836,6 +2974,12 @@ renderer.setAnimationLoop(() => {
   lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
   lookAt.y += 1.2;
   camera.lookAt(lookAt);
+  const targetFov = speedFov(me.speed, me.dashing && me.alive);
+  const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.pow(0.025, dt));
+  if (Math.abs(nextFov - camera.fov) > 0.01) {
+    camera.fov = nextFov;
+    camera.updateProjectionMatrix();
+  }
 
   /* ---- 배경 추적 ---- */
   sky.position.copy(camera.position);
@@ -2860,7 +3004,8 @@ renderer.setAnimationLoop(() => {
       t: 's',
       p: [+craft.position.x.toFixed(1), +craft.position.y.toFixed(1), +craft.position.z.toFixed(1)],
       r: [+me.pitch.toFixed(2), +me.yaw.toFixed(2), +me.roll.toFixed(2)],
-      d: Math.floor(me.dist)
+      d: Math.floor(me.dist),
+      e: +me.energy.toFixed(1)
     });
   }
 
@@ -2869,13 +3014,12 @@ renderer.setAnimationLoop(() => {
   $('s-alt').textContent = Math.floor(craft.position.y);
   $('s-spd').textContent = Math.floor(me.speed * 3.6);
   const fill = $('s-fill');
-  fill.style.width = Math.min(100, (me.speed / 48) * 100) + '%';
+  fill.style.width = Math.min(100, (me.speed / 70) * 100) + '%';
   fill.classList.toggle('stall', me.speed < aeroProfile.stallSpeed);
-
-  if (game.mode === 'ARENA') {
-    const pips = $('ammo').children;
-    for (let i = 0; i < 3; i++) pips[i].classList.toggle('on', i < me.ammo);
-  }
+  $('s-energy').textContent = Math.ceil(me.energy);
+  $('energy-fill').style.width = `${me.energy}%`;
+  $('energy').classList.toggle('dashing', me.dashing);
+  $('energy').classList.toggle('low', me.energy < DART_ENERGY_COST);
 
   if (game.phase === 'playing' || game.phase === 'countdown' || game.phase === 'launch') {
     const left = Math.max(0, (game.ends - now) / 1000);

@@ -8,6 +8,11 @@
    맡는다.
 
    포인터 상태기계:
+     idle → hingeAdjust  확정된 금색 힌지 위 pointerdown (화면 좌표
+                         점-선분 거리 히트) — 힌지를 네온 시안으로
+                         선택하고, 세로 드래그로 각도를 다시 정한다.
+                         pointerup에 onAdjustHinge(foldIndex, angle),
+                         각도가 그대로면 콜백 없이 원상 복귀
      idle → orbiting     빈 공간 pointerdown (시점 회전, 휠 줌)
      idle → drawing      종이 위 pointerdown (레이캐스트 히트) — 드래그를
                          히트 면의 3D 평면에 투영하고, 그 면의
@@ -20,9 +25,10 @@
    Escape는 언제든 취소.
 
    시각 언어(main과 통일): 앞면 하늘색/뒷면 보라색 종이, 확정된 접는선은
-   금색 점선, 그리는 중인 접는선은 각도 부호로 색이 바뀌는(양수 민트/
-   음수 코랄) 네온 점선 + 화살촉, 각도 조절 중인 힌지 축은 유효할 때
-   금색 점선/거부되면 빨강으로 표시한다. */
+   금색 점선이며 종이처럼 영구히 다시 접을 수 있는 힌지다(선택 시 네온
+   시안 #65eee9 + glow), 그리는 중인 접는선은 각도 부호로 색이 바뀌는
+   (양수 민트/음수 코랄) 네온 점선 + 화살촉, 각도 조절 중인 힌지 축은
+   유효할 때 금색 점선/거부되면 빨강으로 표시한다. */
 import * as THREE from 'three';
 
 const MIN_DRAG = 0.05;   // paper-fold-model의 최소 선 길이와 동일
@@ -46,8 +52,10 @@ const CREASE_GOLD = 0xf4cd6c;       // 확정된 접는선 — 금색 점선
 const CREASE_MINT = 0x69e3b6;       // 그리는 중 · 양의 각도(밸리)
 const CREASE_CORAL = 0xff8d86;      // 그리는 중 · 음의 각도(마운틴)
 const REJECT_COLOR = 0xff6b61;      // 접을 수 없는 각도
+const HINGE_SELECT = 0x65eee9;      // 선택된 힌지 — 네온 시안 (선택 하이라이트 규약)
+const HINGE_PICK_PX = 14;           // 힌지 클릭 판정 반경 (화면 px)
 
-export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
+export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge }) {
   const api = typeof window !== 'undefined' ? window.paperFoldModel : null;
 
   let renderer = null;
@@ -59,6 +67,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
   let creaseArrow = null;
   let hingeLine = null;
   let committedCreaseGroup = null;
+  let hingeSelectGlow = null;
   let badge = null;
   let frame = 0;
   let started = false;
@@ -71,11 +80,13 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
   const orbit = { yaw: 0.5, pitch: 0.95, distance: 4.2 };
   const orbitTarget = new THREE.Vector3(0, 0.35, 0);
 
-  let mode = 'idle'; // idle | orbiting | drawing | angleAdjust | angleDrag
+  let mode = 'idle'; // idle | orbiting | drawing | angleAdjust | angleDrag | hingeAdjust
   let orbitDrag = null;
   let drawState = null;
   let pending = null;
   let angleDrag = null;
+  let hingeAdjustDrag = null;
+  let hingeSegments = []; // rebuildCommittedCreases가 채우는 픽킹용 3D 선분들
 
   const raycaster = new THREE.Raycaster();
   const pointerNdc = new THREE.Vector2();
@@ -175,6 +186,19 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     hingeLine.visible = false;
     hingeLine.frustumCulled = false;
     scene.add(hingeLine);
+
+    // 선택된 힌지 밑에 깔리는 네온 시안 glow — creaseGlowLine과 같은
+    // additive-blend 방식의 선택 하이라이트.
+    hingeSelectGlow = new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({
+        color: HINGE_SELECT, transparent: true, opacity: 0.4,
+        blending: THREE.AdditiveBlending, depthWrite: false, linewidth: 6
+      })
+    );
+    hingeSelectGlow.visible = false;
+    hingeSelectGlow.frustumCulled = false;
+    scene.add(hingeSelectGlow);
 
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
@@ -276,74 +300,126 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     });
   }
 
-  /* 확정된 접는선을 금색 점선 힌지로 그린다. 각 fold의 (A, d)는 전개도
-     좌표의 직선이며, computeFoldedGeometry의 axisFor와 동일한 방식으로
-     그 fold의 parents(생성 당시 힌지가 얹혀 있던 접힘들)를 통해 3D로
-     끌어올려야 실제로 접힌 후의 위치가 나온다. 이 함수는 그 변환을 순수
-     읽기 전용으로 재현할 뿐, 모델을 갱신하거나 엔진 동작을 바꾸지 않는다. */
+  /* 확정된 접는선을 금색 점선 힌지로 그린다. 각 fold의 변환된 3D 축은
+     computeFoldedGeometry(model).hinges가 그대로 내려주므로(origin3/dir3),
+     여기서는 축 위 선분 범위만 정하면 된다. 회전은 등거리 변환이라 접는선
+     위의 점은 전개도에서의 선상 파라미터 t = (P−A)·d 그대로
+     origin3 + t·dir3 에 온다 — 실제로 그은 start/end(model.commands)를
+     그 방식으로 끌어올린다. 그린 선분들은 hingeSegments에 담아 화면 좌표
+     픽킹(pickHinge)에도 쓴다. */
   function rebuildCommittedCreases(sourceModel) {
     if (!committedCreaseGroup) return;
     clearGroup(committedCreaseGroup);
-    if (!sourceModel || !Array.isArray(sourceModel.folds) || !sourceModel.folds.length) return;
+    hingeSegments = [];
+    if (!sourceModel || !api || !Array.isArray(sourceModel.folds) || !sourceModel.folds.length) return;
 
-    const basePoint3 = point => new THREE.Vector3(point[0], 0, -point[1]);
-    const axisCache = new Array(sourceModel.folds.length).fill(null);
-
-    function transformThrough(point3, foldIndices) {
-      let current = point3;
-      for (const index of foldIndices) {
-        const fold = sourceModel.folds[index];
-        if (!fold) continue;
-        const axis = axisFor(index);
-        current = rotateAround(current, axis.origin3, axis.dir3, fold.angle);
-      }
-      return current;
-    }
-
-    function rotateAround(point3, origin3, dir3, angle) {
-      const local = point3.clone().sub(origin3);
-      local.applyAxisAngle(dir3, angle);
-      return local.add(origin3);
-    }
-
-    function axisFor(index) {
-      if (axisCache[index]) return axisCache[index];
-      const fold = sourceModel.folds[index];
-      const parents = fold.parents.slice().sort((left, right) => left - right);
-      const origin3 = transformThrough(basePoint3(fold.A), parents);
-      const tip3 = transformThrough(basePoint3([fold.A[0] + fold.d[0], fold.A[1] + fold.d[1]]), parents);
-      const dir3 = tip3.clone().sub(origin3).normalize();
-      axisCache[index] = { origin3, dir3 };
-      return axisCache[index];
-    }
-
+    const hinges = api.computeFoldedGeometry(sourceModel).hinges || [];
     const commands = Array.isArray(sourceModel.commands) ? sourceModel.commands : [];
-    sourceModel.folds.forEach((fold, index) => {
-      const parents = fold.parents.slice().sort((left, right) => left - right);
-      // 힌지 선분 자체는 실제로 그려졌던 start/end(model.commands[index])를
-      // 쓴다 — fold.d는 방향 단위벡터일 뿐 실제 그은 길이가 아니다. 이
-      // 선도 그 힌지가 생성될 때 얹혀 있던 부모 접힘들만 통과해 3D로
-      // 끌어올린다 (computeFoldedGeometry의 axisFor와 동일한 부모 체인).
-      const command = commands[index];
+    hinges.forEach(hinge => {
+      const fold = sourceModel.folds[hinge.foldIndex];
+      if (!fold) return;
+      // 힌지 선분 자체는 실제로 그려졌던 start/end(model.commands)를 쓴다 —
+      // fold.d는 방향 단위벡터일 뿐 실제 그은 길이가 아니다.
+      const command = commands[hinge.foldIndex];
       const rawStart = command ? command.start : fold.A;
       const rawEnd = command ? command.end : [fold.A[0] + fold.d[0], fold.A[1] + fold.d[1]];
-      const start3 = transformThrough(basePoint3(rawStart), parents);
-      const end3 = transformThrough(basePoint3(rawEnd), parents);
+      const origin3 = new THREE.Vector3(hinge.origin3[0], hinge.origin3[1], hinge.origin3[2]);
+      const dir3 = new THREE.Vector3(hinge.dir3[0], hinge.dir3[1], hinge.dir3[2]);
+      const tOf = point => (point[0] - fold.A[0]) * fold.d[0] + (point[1] - fold.A[1]) * fold.d[1];
       // paperGroup의 법선-오프셋(겹침 방지)과 같은 결의 미세 리프트 —
       // 힌지 선이 종이 표면과 z-fighting 없이 살짝 위에 뜨도록 한다.
       const lift = new THREE.Vector3(0, 0.006 * (fold.parents.length + 1), 0);
-      const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-        start3.clone().add(lift), end3.clone().add(lift)
-      ]);
+      const start3 = origin3.clone().addScaledVector(dir3, tOf(rawStart)).add(lift);
+      const end3 = origin3.clone().addScaledVector(dir3, tOf(rawEnd)).add(lift);
       const line = new THREE.Line(
-        lineGeometry,
+        new THREE.BufferGeometry().setFromPoints([start3, end3]),
         new THREE.LineDashedMaterial({ color: CREASE_GOLD, dashSize: 0.07, gapSize: 0.06, transparent: true, opacity: 0.68 })
       );
       line.computeLineDistances();
       line.frustumCulled = false;
-      line.userData.foldIndex = index;
+      line.userData.foldIndex = hinge.foldIndex;
       committedCreaseGroup.add(line);
+      hingeSegments.push({ foldIndex: hinge.foldIndex, start3, end3, line });
     });
+  }
+
+  /* ---------- 힌지 픽킹 · 재조절 ---------- */
+
+  /* 포인터 좌표에서 HINGE_PICK_PX 이내인 가장 가까운 확정 힌지 선분.
+     선분 양 끝을 화면 좌표로 투영해 점-선분 거리로 판정한다. */
+  function pickHinge(event) {
+    if (!hingeSegments.length || !camera) return null;
+    const rect = canvas.getBoundingClientRect();
+    const px = event.clientX - rect.left;
+    const py = event.clientY - rect.top;
+    const halfWidth = Math.max(1, rect.width) / 2;
+    const halfHeight = Math.max(1, rect.height) / 2;
+    let best = null;
+    for (const segment of hingeSegments) {
+      const a = segment.start3.clone().project(camera);
+      const b = segment.end3.clone().project(camera);
+      if (a.z > 1 || b.z > 1) continue; // 카메라 뒤/절두체 밖
+      const ax = (a.x + 1) * halfWidth;
+      const ay = (1 - a.y) * halfHeight;
+      const bx = (b.x + 1) * halfWidth;
+      const by = (1 - b.y) * halfHeight;
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lengthSq = dx * dx + dy * dy;
+      const t = lengthSq > 0 ? clamp(((px - ax) * dx + (py - ay) * dy) / lengthSq, 0, 1) : 0;
+      const distance = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+      if (distance <= HINGE_PICK_PX && (!best || distance < best.distance)) {
+        best = { segment, distance };
+      }
+    }
+    return best ? best.segment : null;
+  }
+
+  /* 선택 중인 힌지를 네온 시안(거부 시 빨강)으로 칠하고 glow를 깐다.
+     preview로 힌지 선들이 재생성돼도 foldIndex로 다시 찾아 칠한다. */
+  function applyHingeSelection() {
+    if (!hingeAdjustDrag || !hingeSelectGlow) return;
+    const segment = hingeSegments.find(entry => entry.foldIndex === hingeAdjustDrag.foldIndex);
+    if (!segment) { hingeSelectGlow.visible = false; return; }
+    const color = hingeAdjustDrag.rejected ? REJECT_COLOR : HINGE_SELECT;
+    segment.line.material.color.setHex(color);
+    segment.line.material.opacity = 1;
+    hingeSelectGlow.material.color.setHex(color);
+    hingeSelectGlow.geometry.setFromPoints([segment.start3, segment.end3]);
+    hingeSelectGlow.visible = true;
+  }
+
+  /* 힌지 재조절 미리보기 — 각도 미리보기(previewFold)와 같은 감도·양자화.
+     확정 전까지는 setFoldAngle의 임시 결과를 그려 보기만 한다. */
+  function previewHinge(nextAngle) {
+    if (!hingeAdjustDrag || !api || !model) return;
+    hingeAdjustDrag.angle = clamp(nextAngle, -MAX_ANGLE, MAX_ANGLE);
+    const step = Math.round(hingeAdjustDrag.angle / PREVIEW_STEP);
+    if (step === hingeAdjustDrag.lastStep) return;
+    hingeAdjustDrag.lastStep = step;
+    const angle = step * PREVIEW_STEP;
+    if (badge) badge.textContent = `${Math.round(angle * 180 / Math.PI)}°`;
+
+    if (Math.abs(angle) < MIN_ANGLE) {
+      // 0° 근처 — 힌지를 완전히 펴는 것은 한 번 펴기(undo)의 몫이라 거부.
+      hingeAdjustDrag.rejected = true;
+      applyHingeSelection();
+      return;
+    }
+    const next = api.setFoldAngle(model, hingeAdjustDrag.foldIndex, angle);
+    // 같은 각도로 되돌아온 경우(next === model)도 유효한 상태다.
+    const sameAngle = angle === model.folds[hingeAdjustDrag.foldIndex]?.angle;
+    if (next === model && !sameAngle) {
+      hingeAdjustDrag.rejected = true;
+      applyHingeSelection();
+      return;
+    }
+    hingeAdjustDrag.rejected = false;
+    hingeAdjustDrag.lastValidAngle = angle;
+    previewShown = true;
+    rebuildPaper(next);
+    rebuildCommittedCreases(next); // 자식 힌지들도 새 각도를 따라 움직인다
+    applyHingeSelection();
   }
 
   /* ---------- 전개도 좌표 역매핑 ---------- */
@@ -443,20 +519,27 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
   }
 
   function resetInteraction() {
+    const hadHingeSelection = Boolean(hingeAdjustDrag);
     mode = 'idle';
     orbitDrag = null;
     drawState = null;
     angleDrag = null;
     pending = null;
+    hingeAdjustDrag = null;
     setOrbiting(false);
+    if (canvas) canvas.style.cursor = '';
     if (creaseLine) creaseLine.visible = false;
     if (creaseGlowLine) creaseGlowLine.visible = false;
     if (creaseArrow) creaseArrow.visible = false;
     if (hingeLine) hingeLine.visible = false;
+    if (hingeSelectGlow) hingeSelectGlow.visible = false;
     if (badge) badge.style.display = 'none';
     if (previewShown) {
       previewShown = false;
       rebuildPaper(model);
+      rebuildCommittedCreases(model);
+    } else if (hadHingeSelection) {
+      rebuildCommittedCreases(model); // 하이라이트 색을 금색으로 원복
     }
   }
 
@@ -516,6 +599,33 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       return;
     }
     if (mode !== 'idle') return;
+    canvas.style.cursor = ''; // hover 커서 잔상 제거 — 드래그 종류별 커서는 CSS 몫
+
+    // 확정된 힌지가 그리기보다 우선 — 금색 점선 근처를 누르면 재조절 시작.
+    if (interactive && model && api) {
+      const hinge = pickHinge(event);
+      if (hinge && model.folds[hinge.foldIndex]) {
+        const currentAngle = model.folds[hinge.foldIndex].angle;
+        mode = 'hingeAdjust';
+        hingeAdjustDrag = {
+          pointerId: event.pointerId,
+          foldIndex: hinge.foldIndex,
+          originalAngle: currentAngle,
+          angle: currentAngle,
+          lastStep: Math.round(currentAngle / PREVIEW_STEP),
+          lastValidAngle: null,
+          rejected: false,
+          lastY: event.clientY
+        };
+        applyHingeSelection();
+        ensureBadge();
+        if (badge) {
+          badge.textContent = `${Math.round(currentAngle * 180 / Math.PI)}°`;
+          badge.style.display = 'block';
+        }
+        return;
+      }
+    }
 
     if (interactive && model && paperGroup) {
       setPointer(event);
@@ -548,6 +658,21 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
   function onPointerMove(event) {
     if (!started || !renderer) return;
 
+    // idle에서 힌지 위에 올리면 포인터 커서로 "집을 수 있음"을 알린다.
+    if (mode === 'idle') {
+      if (interactive && model && hingeSegments.length) {
+        canvas.style.cursor = pickHinge(event) ? 'pointer' : '';
+      }
+      return;
+    }
+
+    if (mode === 'hingeAdjust' && hingeAdjustDrag && event.pointerId === hingeAdjustDrag.pointerId) {
+      const deltaY = hingeAdjustDrag.lastY - event.clientY;
+      hingeAdjustDrag.lastY = event.clientY;
+      previewHinge(hingeAdjustDrag.angle + deltaY * RADIANS_PER_PIXEL);
+      return;
+    }
+
     if (mode === 'orbiting' && orbitDrag && event.pointerId === orbitDrag.pointerId) {
       orbit.yaw -= (event.clientX - orbitDrag.x) * 0.0085;
       orbit.pitch = clamp(orbit.pitch + (event.clientY - orbitDrag.y) * 0.007, MIN_PITCH, MAX_PITCH);
@@ -576,6 +701,16 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
 
   function onPointerUp(event) {
     if (!started || !renderer) return;
+
+    if (mode === 'hingeAdjust' && hingeAdjustDrag && event.pointerId === hingeAdjustDrag.pointerId) {
+      const foldIndex = hingeAdjustDrag.foldIndex;
+      const commitAngle = hingeAdjustDrag.lastValidAngle;
+      const changed = typeof commitAngle === 'number'
+        && Math.abs(commitAngle - hingeAdjustDrag.originalAngle) > 1e-9;
+      resetInteraction();
+      if (changed) onAdjustHinge?.(foldIndex, commitAngle);
+      return;
+    }
 
     if (mode === 'orbiting' && orbitDrag && event.pointerId === orbitDrag.pointerId) {
       mode = 'idle';
@@ -635,7 +770,8 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
 
   function onKeyDown(event) {
     if (!started || event.key !== 'Escape') return;
-    if (mode === 'drawing' || mode === 'angleAdjust' || mode === 'angleDrag') {
+    // hingeAdjust는 wasFolding에 안 들어가므로 onCancel 없이 원상 복귀만 한다.
+    if (mode === 'drawing' || mode === 'angleAdjust' || mode === 'angleDrag' || mode === 'hingeAdjust') {
       cancelInteraction(true);
     }
   }
@@ -684,7 +820,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
 
   function setInteractive(value) {
     interactive = Boolean(value);
-    if (!interactive && (mode === 'drawing' || mode === 'angleAdjust' || mode === 'angleDrag')) {
+    if (!interactive && (mode === 'drawing' || mode === 'angleAdjust' || mode === 'angleDrag' || mode === 'hingeAdjust')) {
       cancelInteraction(false);
     }
   }
@@ -730,6 +866,8 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       creaseArrow.material.dispose();
       hingeLine.geometry.dispose();
       hingeLine.material.dispose();
+      hingeSelectGlow.geometry.dispose();
+      hingeSelectGlow.material.dispose();
       renderer.dispose();
       renderer = null;
     }

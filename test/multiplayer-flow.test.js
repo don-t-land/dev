@@ -76,6 +76,9 @@ test('folding UI exposes the 3d editor, unfold, completion and synchronized prog
   assert.doesNotMatch(html, /fold-dir-valley|fold-dir-mountain|fold-preview-canvas|foldPreview/);
   assert.match(foldUi, /api\.applyFold\(model, start, end, angle\)/);
   assert.match(foldUi, /attachEditor/);
+  // 확정된 힌지 재조절: 편집기 onAdjustHinge → 컨트롤러 setFoldAngle 경로.
+  assert.match(html, /onAdjustHinge: \(foldIndex, angle\) => window\.paperFoldingStage\?\.handleHingeAdjust\(foldIndex, angle\)/);
+  assert.match(foldUi, /api\.setFoldAngle\(model, foldIndex, angle\)/);
   assert.doesNotMatch(foldUi, /THREE|getContext\('2d'\)/);
   assert.match(html, /선을 그은 방향의 왼쪽 면/);
   assert.match(foldUi, /model = api\.undoFold\(model\)/);

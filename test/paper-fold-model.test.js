@@ -7,6 +7,7 @@ const { test } = require('node:test');
 const {
   createPaperModel,
   applyFold,
+  setFoldAngle,
   undoFold,
   serializeFoldCommands,
   replayFoldCommands,
@@ -37,7 +38,7 @@ test('the UMD build exposes the same functions in a browser-like context', () =>
 
   assert.deepEqual(
     Object.keys(context.paperFoldModel).sort(),
-    ['applyFold', 'computeFoldedGeometry', 'createPaperModel', 'createPresetModel', 'getPresetCommands', 'presetNames', 'replayFoldCommands', 'serializeFoldCommands', 'undoFold']
+    ['applyFold', 'computeFoldedGeometry', 'createPaperModel', 'createPresetModel', 'getPresetCommands', 'presetNames', 'replayFoldCommands', 'serializeFoldCommands', 'setFoldAngle', 'undoFold']
   );
 });
 
@@ -220,6 +221,88 @@ test('small drags, invalid angles, and sliver polygons are rejected atomically',
   // A crease this close to the edge leaves a polygon narrower than the area threshold.
   assert.strictEqual(applyFold(model, [0.9999998, -1], [0.9999998, 1], Math.PI / 2), model);
   assert.deepEqual(model, createPaperModel());
+});
+
+test('setFoldAngle re-folds an existing hinge and actually moves the geometry', () => {
+  const folded = applyFold(createPaperModel(), [-1, 0], [1, 0], Math.PI / 2);
+  const adjusted = setFoldAngle(folded, 0, Math.PI / 4);
+
+  assert.notStrictEqual(adjusted, folded);
+  assert.equal(adjusted.folds[0].angle, Math.PI / 4);
+  assert.equal(adjusted.commands[0].angle, Math.PI / 4);
+  // Face splits are angle-independent: material partition is untouched.
+  assert.deepEqual(adjusted.faces, folded.faces);
+  // Material (x, 1) sat at y = 1 under 90°; at 45° it drops to sin(45°).
+  const before = computeFoldedGeometry(folded);
+  const after = computeFoldedGeometry(adjusted);
+  assert.ok(Math.abs(before.maxY - 1) < 1e-9);
+  assert.ok(Math.abs(after.maxY - Math.sin(Math.PI / 4)) < 1e-9);
+  // The original model is untouched (immutable-style, like applyFold).
+  assert.equal(folded.folds[0].angle, Math.PI / 2);
+  assert.equal(folded.commands[0].angle, Math.PI / 2);
+});
+
+test('setFoldAngle rejects bad indices and invalid angles by returning the same object', () => {
+  const folded = applyFold(createPaperModel(), [-1, 0], [1, 0], Math.PI / 2);
+  const before = JSON.stringify(folded);
+
+  assert.strictEqual(setFoldAngle(folded, -1, Math.PI / 4), folded);
+  assert.strictEqual(setFoldAngle(folded, 1, Math.PI / 4), folded);
+  assert.strictEqual(setFoldAngle(folded, 0.5, Math.PI / 4), folded);
+  assert.strictEqual(setFoldAngle(folded, 0, 0), folded);
+  assert.strictEqual(setFoldAngle(folded, 0, 0.04), folded);
+  assert.strictEqual(setFoldAngle(folded, 0, Math.PI + 0.001), folded);
+  assert.strictEqual(setFoldAngle(folded, 0, Number.NaN), folded);
+  // The angle it already has is a no-op, not a new history entry.
+  assert.strictEqual(setFoldAngle(folded, 0, Math.PI / 2), folded);
+  const flat = createPaperModel();
+  assert.strictEqual(setFoldAngle(flat, 0, Math.PI / 4), flat);
+  assert.equal(JSON.stringify(folded), before);
+});
+
+test('setFoldAngle keeps serialize→replay faithful to the adjusted angle', () => {
+  const once = applyFold(createPaperModel(), [-1, 0], [1, 0], Math.PI / 2);
+  const twice = applyFold(once, [-1, 0.5], [1, 0.5], -Math.PI / 3);
+  const adjusted = setFoldAngle(twice, 0, Math.PI / 3);
+
+  const replayed = replayFoldCommands(serializeFoldCommands(adjusted));
+  assert.ok(replayed);
+  assert.deepEqual(replayed.faces, adjusted.faces);
+  assert.deepEqual(replayed.folds, adjusted.folds);
+  assert.deepEqual(replayed.commands, adjusted.commands);
+  assert.equal(replayed.folds[0].angle, Math.PI / 3);
+  assert.equal(replayed.folds[1].angle, -Math.PI / 3);
+});
+
+test('undoFold restores the angle a hinge had before the adjustment', () => {
+  const folded = applyFold(createPaperModel(), [-1, 0], [1, 0], Math.PI / 2);
+  const adjusted = setFoldAngle(folded, 0, Math.PI / 4);
+
+  assert.equal(adjusted.history.length, folded.history.length + 1);
+  const undone = undoFold(adjusted);
+  assert.deepEqual(undone, folded);
+  assert.equal(undone.folds[0].angle, Math.PI / 2);
+});
+
+test('computeFoldedGeometry exposes one transformed hinge axis per fold', () => {
+  assert.deepEqual(computeFoldedGeometry(createPaperModel()).hinges, []);
+  assert.deepEqual(computeFoldedGeometry(null).hinges, []);
+
+  const once = applyFold(createPaperModel(), [-1, 0], [1, 0], Math.PI / 2);
+  const twice = applyFold(once, [-1, 0.5], [1, 0.5], -Math.PI / 3);
+  const geometry = computeFoldedGeometry(twice);
+
+  assert.equal(geometry.hinges.length, twice.folds.length);
+  assert.deepEqual(geometry.hinges.map(hinge => hinge.foldIndex), [0, 1]);
+  assert.deepEqual(geometry.hinges.map(hinge => hinge.angle), [Math.PI / 2, -Math.PI / 3]);
+  const round3 = point => roundPoint(point).map(value => (value === 0 ? 0 : value));
+  // Fold 0 has no parents: its axis is the material line lifted to (x, 0, -y).
+  assert.deepEqual(round3(geometry.hinges[0].origin3), [-1, 0, 0]);
+  assert.deepEqual(round3(geometry.hinges[0].dir3), [1, 0, 0]);
+  // Fold 1 was drawn at material y = 0.5 on the flap lifted by fold 0 (+90°):
+  // the axis is carried to height y = 0.5 on the vertical plane z = 0.
+  assert.deepEqual(round3(geometry.hinges[1].origin3), [-1, 0.5, 0]);
+  assert.deepEqual(round3(geometry.hinges[1].dir3), [1, 0, 0]);
 });
 
 test('at most ten folds and sixty-four faces are accepted', () => {

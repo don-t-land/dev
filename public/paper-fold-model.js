@@ -363,7 +363,7 @@
    * of the folds that existed on its component when it was created (parents).
    */
   function computeFoldedGeometry(model) {
-    if (!isUsableModel(model)) return { faces: [], minY: 0, maxY: 0 };
+    if (!isUsableModel(model)) return { faces: [], minY: 0, maxY: 0, hinges: [] };
 
     const axisCache = new Array(model.folds.length).fill(null);
 
@@ -415,7 +415,55 @@
       minY = 0;
       maxY = 0;
     }
-    return { faces, minY, maxY };
+
+    // Each fold's transformed 3D axis — the persistent hinge renderers/pickers
+    // need exactly what axisFor already derives, so expose it (additive only).
+    const hinges = model.folds.map((fold, index) => {
+      const axis = axisFor(index);
+      return {
+        origin3: axis.origin3.slice(),
+        dir3: axis.dir3.slice(),
+        angle: fold.angle,
+        foldIndex: index
+      };
+    });
+
+    return { faces, minY, maxY, hinges };
+  }
+
+  /**
+   * Re-fold an existing hinge to a new angle. Face splits and hinge guards are
+   * angle-independent, so replacing folds[k].angle (and the matching command
+   * angle, so serialize→replay stays faithful) keeps the model consistent.
+   * Like applyFold, a rejected call returns the original model unchanged; a
+   * history snapshot is pushed so undo restores the previous angle.
+   */
+  function setFoldAngle(model, foldIndex, angle) {
+    if (!isUsableModel(model)
+        || !Number.isInteger(foldIndex)
+        || foldIndex < 0
+        || foldIndex >= model.folds.length
+        || !isValidAngle(angle)
+        || model.folds[foldIndex].angle === angle) {
+      return model;
+    }
+
+    const snapshot = {
+      faces: model.faces.map(cloneFace),
+      folds: model.folds.map(cloneFold),
+      commands: model.commands.map(cloneCommand)
+    };
+    const folds = model.folds.map(cloneFold);
+    folds[foldIndex].angle = angle;
+    const commands = model.commands.map(cloneCommand);
+    if (commands[foldIndex]) commands[foldIndex].angle = angle;
+
+    return {
+      faces: model.faces.map(cloneFace),
+      folds,
+      history: model.history.map(cloneSnapshot).concat(snapshot),
+      commands
+    };
   }
 
   function undoFold(model) {
@@ -489,6 +537,7 @@
   return {
     createPaperModel,
     applyFold,
+    setFoldAngle,
     undoFold,
     serializeFoldCommands,
     replayFoldCommands,

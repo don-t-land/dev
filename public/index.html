@@ -1626,6 +1626,7 @@ function setFoldedCraftVisual(owner, baseVisual, model, tint, commandKey = '[]')
 const foldEditor = createFoldEditor({
   canvas: document.getElementById('fold-paper-canvas'),
   onCommitFold: (start, end, angle) => window.paperFoldingStage?.handleFoldCommit(start, end, angle),
+  onAdjustHinge: (foldIndex, angle) => window.paperFoldingStage?.handleHingeAdjust(foldIndex, angle),
   onCancel: () => window.paperFoldingStage?.handleFoldCancel()
 });
 window.paperFoldingStage?.attachEditor(foldEditor);

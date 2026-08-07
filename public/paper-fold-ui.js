@@ -156,6 +156,20 @@
     emitModelChange(model);
   }
 
+  /* 편집기의 onAdjustHinge — 확정된 접는선(힌지)의 각도를 다시 정한다. */
+  function handleHingeAdjust(foldIndex, angle) {
+    if (!active || locked || !model) return;
+    const next = api.setFoldAngle(model, foldIndex, angle);
+    if (next === model) {
+      $('fold-status').textContent = '힌지를 조절할 수 없어요';
+      return;
+    }
+    model = next;
+    updateStats();
+    editor?.setModel(model);
+    emitModelChange(model);
+  }
+
   /* 편집기의 onCancel — 거부 문구가 남아 있으면 기본 상태 문구로 되돌린다. */
   function handleFoldCancel() {
     if (!active || locked) return;
@@ -195,6 +209,7 @@
     attachEditor,
     handleFoldCommit,
     handleFoldCancel,
+    handleHingeAdjust,
     getModel: () => model,
     getCommands: () => model ? api.serializeFoldCommands(model) : '[]',
     isLocked: () => locked,

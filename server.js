@@ -462,6 +462,7 @@ function finishResultsIfReady(room) {
   for (const player of room.players.values()) {
     player.ready = false;
     player.alive = false;
+    player.foldDone = false;
   }
   bcast(room, snapshot(room));
   broadcastRoomList();

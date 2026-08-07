@@ -141,6 +141,18 @@ test('graphics teardown releases CSM, remote-player, and GTAO resources', () => 
   assert.match(html, /function detachMaterialFromCsm\([\s\S]*csm\.shaders\.delete\(material\)/);
   assert.match(html, /function unregisterLitMaterial\([\s\S]*detachMaterialFromCsm\(material\)/);
   assert.match(html, /function disposeObject3D\([\s\S]*unregisterLitMaterial\(material\)/);
+  assert.match(html, /function registerObjectMaterials\([\s\S]*registerLitMaterial\(material\)/);
+  assert.match(html, /function setupMaterialWithCsm\([\s\S]*csmOriginalOnBeforeCompile[\s\S]*original\.apply\(this, args\)[\s\S]*setupCsmShader\.apply\(this, args\)/);
+  assert.match(html, /function restoreMaterialCompileHook\([\s\S]*material\.onBeforeCompile = original/);
+  assert.match(html, /function disposeCsm\([\s\S]*materials\.forEach\(restoreMaterialCompileHook\)/);
+  assert.match(html, /function detachObjectMaterials\([\s\S]*csmMaterials\.delete\(material\)[\s\S]*detachMaterialFromCsm\(material\)/);
+  assert.match(html, /registerObjectMaterials\(biomeEnvironment\)/);
+  assert.match(html, /detachObjectMaterials\(previousEnvironment\)/);
+  assert.match(html, /registerObjectMaterials\(towerGroup\)/);
+  assert.match(html, /registerObjectMaterials\(mascot\)/);
+  assert.match(html, /function setGameplayCostume\([\s\S]*detachObjectMaterials\(previous\)[\s\S]*registerObjectMaterials\(current\)/);
+  assert.match(html, /function clearDarts\([\s\S]*scene\.remove\(dart\.mesh\)[\s\S]*unregisterLitMaterial\(dart\.mesh\.material\)[\s\S]*darts\.length = 0/);
+  assert.match(html, /function clearWorld\([\s\S]*clearDarts\(\)/);
   assert.match(html, /gtaoPass\?\.gtaoMaterial\?\.dispose/);
   assert.match(html, /gtaoPass\?\.blendMaterial\?\.dispose/);
   assert.match(html, /Unsupported Three\.js GTAOPass visibility contract/);

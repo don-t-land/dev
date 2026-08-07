@@ -915,7 +915,7 @@ function renderCostumeOptions() {
 function applySelectedCostume(next, broadcast = true) {
   selectedCostume = window.costumeState.save(next);
   renderCostumeOptions();
-  if (typeof craft !== 'undefined') setCostumeOnObject(craft, selectedCostume, 'flight');
+  if (typeof craft !== 'undefined') setGameplayCostume(craft, selectedCostume, 'flight');
   window.dispatchEvent(new CustomEvent('paper-plane-costume-changed', {
     detail: { costume: { ...selectedCostume } }
   }));
@@ -1056,7 +1056,7 @@ function syncRoomPlayers(players) {
     existing.ready = Boolean(player.ready);
     existing.connected = player.connected !== false;
     existing.costume = window.costumeState.normalize(player.costume);
-    setCostumeOnObject(existing.remote.group, existing.costume, 'flight');
+    setGameplayCostume(existing.remote.group, existing.costume, 'flight');
   }
 }
 
@@ -1205,7 +1205,7 @@ function handle(m) {
           player.alive = true;
           player.remote.seen = false;
           player.costume = window.costumeState.normalize(m.costume ?? player.costume);
-          setCostumeOnObject(player.remote.group, player.costume, 'flight');
+          setGameplayCostume(player.remote.group, player.costume, 'flight');
           setFoldedCraftVisual(
             player.remote.group,
             player.remote.baseVisual,
@@ -1692,8 +1692,34 @@ let postEffectSignature = '';
 
 function registerLitMaterial(material) {
   csmMaterials.add(material);
-  if (csm) csm.setupMaterial(material);
+  if (csm) setupMaterialWithCsm(material);
   return material;
+}
+
+function setupMaterialWithCsm(material) {
+  if (!csm || !material || csm.shaders.has(material)) return;
+  material.userData ||= {};
+  if (!Object.hasOwn(material.userData, 'csmOriginalOnBeforeCompile')) {
+    material.userData.csmOriginalOnBeforeCompile = Object.hasOwn(material, 'onBeforeCompile')
+      ? material.onBeforeCompile
+      : null;
+  }
+  const original = material.userData.csmOriginalOnBeforeCompile;
+  csm.setupMaterial(material);
+  const setupCsmShader = material.onBeforeCompile;
+  if (original) {
+    material.onBeforeCompile = function (...args) {
+      original.apply(this, args);
+      setupCsmShader.apply(this, args);
+    };
+  }
+}
+
+function restoreMaterialCompileHook(material) {
+  if (!material?.userData || !Object.hasOwn(material.userData, 'csmOriginalOnBeforeCompile')) return;
+  const original = material.userData.csmOriginalOnBeforeCompile;
+  delete material.onBeforeCompile;
+  if (original) material.onBeforeCompile = original;
 }
 
 function detachMaterialFromCsm(material) {
@@ -1711,6 +1737,7 @@ function detachMaterialFromCsm(material) {
     delete shader.uniforms.shadowFar;
   }
   csm.shaders.delete(material);
+  restoreMaterialCompileHook(material);
   material.needsUpdate = true;
 }
 
@@ -1718,6 +1745,49 @@ function unregisterLitMaterial(material) {
   csmMaterials.delete(material);
   detachMaterialFromCsm(material);
   material?.dispose?.();
+}
+
+function isCsmLitMaterial(material) {
+  return Boolean(material?.isMeshStandardMaterial || material?.isMeshPhysicalMaterial);
+}
+
+function forEachObjectMaterial(object, callback) {
+  if (!object) return;
+  const seen = new Set();
+  object.traverse(child => {
+    const materials = Array.isArray(child.material) ? child.material : child.material ? [child.material] : [];
+    materials.forEach(material => {
+      if (!material || seen.has(material)) return;
+      seen.add(material);
+      callback(material);
+    });
+  });
+}
+
+function registerObjectMaterials(object) {
+  forEachObjectMaterial(object, material => {
+    if (isCsmLitMaterial(material)) registerLitMaterial(material);
+  });
+  return object;
+}
+
+function detachObjectMaterials(object) {
+  forEachObjectMaterial(object, material => {
+    if (!csmMaterials.has(material)) return;
+    csmMaterials.delete(material);
+    detachMaterialFromCsm(material);
+  });
+}
+
+function setGameplayCostume(owner, value, layout = 'flight') {
+  if (!owner) return null;
+  const normalized = window.costumeState.normalize(value);
+  const key = `${layout}:${normalized.hat}:${normalized.nose}`;
+  const previous = owner.getObjectByName('planeCostume');
+  if (previous?.userData.costumeKey !== key) detachObjectMaterials(previous);
+  const current = setCostumeOnObject(owner, normalized, layout);
+  registerObjectMaterials(current);
+  return current;
 }
 
 function configureShadowFilter(light) {
@@ -1728,9 +1798,11 @@ function configureShadowFilter(light) {
 
 function disposeCsm() {
   if (!csm) return;
+  const materials = [...csmMaterials];
   for (const light of csm.lights) disposeShadowResources(light.shadow);
   csm.remove();
   csm.dispose();
+  materials.forEach(restoreMaterialCompileHook);
   csm = null;
 }
 
@@ -1779,7 +1851,7 @@ function rebuildShadowSystem() {
       light.color.set(0xfff0d8);
       configureShadowFilter(light);
     }
-    for (const material of csmMaterials) csm.setupMaterial(material);
+    for (const material of csmMaterials) setupMaterialWithCsm(material);
     csm.updateFrustums();
   } else {
     sun.shadow.mapSize.set(resolvedGraphics.shadow.mapSize, resolvedGraphics.shadow.mapSize);
@@ -2084,7 +2156,7 @@ function addRemote(pl) {
   group.add(baseVisual);
   group.add(makeLabel(pl.name, '#' + color.getHexString()));
   const costume = window.costumeState.normalize(pl.costume);
-  setCostumeOnObject(group, costume, 'flight');
+  setGameplayCostume(group, costume, 'flight');
   group.visible = false;
   scene.add(group);
   net.players.set(pl.id, {
@@ -2103,7 +2175,7 @@ const craft = new THREE.Group();
 craft.rotation.order = 'YXZ';
 const baseCraftVisual = makePlaneMesh(0xfdfcf7);
 craft.add(baseCraftVisual);
-setCostumeOnObject(craft, selectedCostume, 'flight');
+setGameplayCostume(craft, selectedCostume, 'flight');
 scene.add(craft);
 
 const defaultPaperModel = window.paperFoldModel.createPaperModel();
@@ -2284,7 +2356,7 @@ function applyCraftSnapshots(crafts) {
   if (!Array.isArray(crafts)) return;
   const snapshots = new Map(crafts.filter(item => item?.id).map(item => [item.id, item]));
   const applyOne = (owner, baseVisual, tint, snapshot, isLocal = false) => {
-    setCostumeOnObject(
+    setGameplayCostume(
       owner,
       isLocal ? selectedCostume : snapshot?.costume,
       'flight'
@@ -2337,9 +2409,36 @@ if (graphicsQaEnabled) {
         csmLights: csm?.lights.length || 0,
         csmMaterials: csmMaterials.size,
         csmShaders: csm?.shaders?.size || 0,
+        csmConsistent: !csm || csmMaterials.size === csm.shaders.size,
+        darts: darts.length,
         postPasses: composer?.passes.length || 0,
         memory: { ...renderer.info.memory }
       };
+    },
+    dartLifecycle() {
+      const before = this.set({});
+      spawnDart(craft.position, new THREE.Vector3(0, 0, -1), 'qa', 0x8fe3c4);
+      const spawned = this.set({});
+      clearDarts();
+      return { before, spawned, after: this.set({}) };
+    },
+    launchLifecycle() {
+      const previous = {
+        order: [...game.order], phase: game.phase, frozen: game.frozen,
+        craftVisible: craft.visible, alive: me.alive
+      };
+      game.order = ['qa'];
+      buildLaunchTowers();
+      startLaunchSequence({ duration: 4400 });
+      const active = this.set({});
+      clearLaunchActors();
+      clearLaunchTowers();
+      game.order = previous.order;
+      game.phase = previous.phase;
+      game.frozen = previous.frozen;
+      craft.visible = previous.craftVisible;
+      me.alive = previous.alive;
+      return { active, after: this.set({}) };
     },
     preview(mode = 'DIST', seed = 4312) {
       game.mode = mode === 'ARENA' ? 'ARENA' : 'DIST';
@@ -2394,11 +2493,13 @@ const thermalRingMat = new THREE.MeshBasicMaterial({ color: 0x4fd6a4, transparen
 const ringMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 2.4, roughness: 0.4 }));
 
 function clearWorld() {
+  clearDarts();
   if (typeof launchState !== 'undefined') {
     clearLaunchActors();
     clearLaunchTowers();
   }
   const previousEnvironment = biomeEnvironment;
+  detachObjectMaterials(previousEnvironment);
   previousEnvironment?.userData.dispose?.();
   world.traverse(o => {
     if (o.isMesh && !previousEnvironment?.getObjectById(o.id)) o.geometry.dispose?.();
@@ -2439,6 +2540,7 @@ function addRing(x, y, z, rng) {
 function installBiomeLayout(layout) {
   const environment = buildBiomeEnvironment({ layout, biomes: window.mapGen.BIOMES });
   biomeEnvironment = environment.root;
+  registerObjectMaterials(biomeEnvironment);
   world.add(biomeEnvironment);
   spires = environment.spires;
   rocks = environment.rocks;
@@ -2567,6 +2669,7 @@ function buildLaunchTowers() {
     }
     towerGroup.add(tower);
   }
+  registerObjectMaterials(towerGroup);
   world.add(towerGroup);
   launchState.towerGroup = towerGroup;
   launchState.towerLayoutKey = getLaunchLayoutKey(game.mode, game.seed, game.order);
@@ -2597,6 +2700,7 @@ function startLaunchSequence(phase) {
   const localIndex = Math.max(0, game.order.indexOf(net.id));
   game.order.forEach((id, index) => {
     const mascot = makeStandingPlaneMascot();
+    registerObjectMaterials(mascot);
     mascot.scale.setScalar(.92);
     const start = launchSpawnPoint(index, count, 'start');
     const end = launchSpawnPoint(index, count, 'end');
@@ -2690,6 +2794,14 @@ function spawnDart(origin, vel, ownerId, color) {
   m.position.copy(origin);
   scene.add(m);
   darts.push({ mesh: m, v: vel.clone(), owner: ownerId, life: 2.6 });
+}
+
+function clearDarts() {
+  for (const dart of darts) {
+    scene.remove(dart.mesh);
+    unregisterLitMaterial(dart.mesh.material);
+  }
+  darts.length = 0;
 }
 
 function shoot() {

@@ -57,8 +57,9 @@ test('selection cards render the same procedural costume meshes as rotating 3d p
 test('costumes are persisted, rendered on local and remote craft, and sent to the server', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
   assert.match(html, /window\.costumeState\.save\(next\)/);
-  assert.match(html, /setCostumeOnObject\(craft, selectedCostume, 'flight'\)/);
-  assert.match(html, /setCostumeOnObject\(existing\.remote\.group, existing\.costume, 'flight'\)/);
+  assert.match(html, /setGameplayCostume\(craft, selectedCostume, 'flight'\)/);
+  assert.match(html, /setGameplayCostume\(existing\.remote\.group, existing\.costume, 'flight'\)/);
+  assert.match(html, /function setGameplayCostume\([\s\S]*detachObjectMaterials\(previous\)[\s\S]*setCostumeOnObject\(owner, normalized, layout\)[\s\S]*registerObjectMaterials\(current\)/);
   assert.match(html, /t: 'hello'[\s\S]*costume: selectedCostume/);
   assert.match(html, /send\(\{ t: 'costume', costume: selectedCostume \}\)/);
 });

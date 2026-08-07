@@ -30,6 +30,7 @@ const DEFAULT_AERO_PROFILE = deriveAerodynamicProfile(createPaperModel());
 
 const PORT = Number(process.env.PORT || 3000);
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('PORT must be an integer from 1 to 65535');
+const HOST = process.env.HOST || '0.0.0.0';
 const RELEASE_ID = process.env.RELEASE_ID || 'development';
 const PUB = path.join(__dirname, 'public');
 const MIME = {
@@ -1004,8 +1005,8 @@ const leaderboardBroadcastTimer = setInterval(() => {
 leaderboardBroadcastTimer.unref();
 
 if (require.main === module) {
-  httpServer.listen(PORT, () => {
-    console.log(`종이비행기 서버 실행 중 → http://localhost:${PORT}`);
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`종이비행기 서버 실행 중 → http://${HOST}:${PORT}`);
   });
 }
 

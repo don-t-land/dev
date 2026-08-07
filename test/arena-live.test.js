@@ -55,7 +55,7 @@ async function connectClient() {
       }
       return taken;
     },
-    next(predicate, timeout = 1000) {
+    next(predicate, timeout = 1000, label = 'WebSocket message') {
       const index = queued.findIndex(predicate);
       if (index >= 0) return Promise.resolve(queued.splice(index, 1)[0]);
       return new Promise((resolve, reject) => {
@@ -63,7 +63,7 @@ async function connectClient() {
         waiter.timer = setTimeout(() => {
           const waiterIndex = waiters.indexOf(waiter);
           if (waiterIndex >= 0) waiters.splice(waiterIndex, 1);
-          reject(new Error('timed out waiting for WebSocket message'));
+          reject(new Error(`timed out waiting for ${label}`));
         }, timeout);
         waiters.push(waiter);
       });
@@ -267,42 +267,54 @@ test('spawn 가드: 미접기 FOLD_REQUIRED, 생존 중 ALREADY_ALIVE, 사망 �
 });
 
 test('격추 시 killer의 kills가 증가하고 리더보드가 kills/생존초 형식이다', async () => {
-  const { host, guest, hostHello, guestHello } = await createAndJoinLiveArena('저격수', '표적');
-  try {
+  let setup = null;
+  const elapsed = 2.75;
+  for (let attempt = 0; attempt < 12 && !setup; attempt++) {
+    const candidate = await createAndJoinLiveArena('저격수', '표적');
+    const { host, guest, hostHello, guestHello } = candidate;
     host.send({ t: 'fold_done', commands: DART_COMMANDS });
-    await host.next(message => message.t === 'fold_ok');
+    await host.next(message => message.t === 'fold_ok', 1_000, 'host fold_ok');
     guest.send({ t: 'fold_done', commands: DART_COMMANDS });
-    await guest.next(message => message.t === 'fold_ok');
+    await guest.next(message => message.t === 'fold_ok', 1_000, 'guest fold_ok');
 
     host.send({ t: 'spawn' });
-    const hostSpawned = await host.next(message => message.t === 'spawned' && message.id === hostHello.id);
+    const hostSpawned = await host.next(message => message.t === 'spawned' && message.id === hostHello.id, 1_000, 'host spawned');
     guest.send({ t: 'spawn' });
-    const guestSpawned = await guest.next(message => message.t === 'spawned' && message.id === guestHello.id);
-    await host.next(message => message.t === 'spawned' && message.id === guestHello.id);
+    const guestSpawned = await guest.next(message => message.t === 'spawned' && message.id === guestHello.id, 1_000, 'guest spawned');
+    await host.next(message => message.t === 'spawned' && message.id === guestHello.id, 1_000, 'host observing guest spawn');
 
     const shooterPos = spawnPosition(hostSpawned);
     const targetPos = spawnPosition(guestSpawned);
-    host.send({ t: 's', p: shooterPos, r: [0, 0, 0] });
-    guest.send({ t: 's', p: targetPos, r: [0, 0, 0] });
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const elapsed = 2.5;
-    const v = [
+    const velocity = [
       (targetPos[0] - shooterPos[0]) / elapsed,
       (targetPos[1] - shooterPos[1] + 4 * elapsed * elapsed) / elapsed,
       (targetPos[2] - shooterPos[2]) / elapsed
     ];
-    host.send({ t: 'shoot', o: shooterPos, v });
-    await guest.next(message => message.t === 'shot');
+    if (Math.hypot(...velocity) <= 245) {
+      setup = { ...candidate, shooterPos, targetPos, velocity };
+    } else {
+      await Promise.all([host.close(), guest.close()]);
+    }
+  }
+
+  assert.ok(setup, 'a safe random spawn pair should be within verified dart range');
+  const { host, guest, hostHello, guestHello, shooterPos, targetPos, velocity } = setup;
+  try {
+    host.send({ t: 's', p: shooterPos, r: [0, 0, 0] });
+    guest.send({ t: 's', p: targetPos, r: [0, 0, 0] });
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    host.send({ t: 'shoot', o: shooterPos, v: velocity });
+    await guest.next(message => message.t === 'shot', 1_000, 'guest observing shot');
 
     await new Promise(resolve => setTimeout(resolve, elapsed * 1000));
     host.send({ t: 'hit', id: guestHello.id, p: targetPos });
-    const crashed = await guest.next(message => message.t === 'crashed');
+    const crashed = await guest.next(message => message.t === 'crashed', 1_000, 'guest crash');
     assert.equal(crashed.id, guestHello.id);
     assert.equal(crashed.by, '저격수');
 
     const leaderboard = await host.next(message => message.t === 'leaderboard' &&
-      message.rows.some(row => row.id === hostHello.id && row.kills === 1), 1_500);
+      message.rows.some(row => row.id === hostHello.id && row.kills === 1), 1_500, 'kill leaderboard');
     const shooterRow = leaderboard.rows.find(row => row.id === hostHello.id);
     const targetRow = leaderboard.rows.find(row => row.id === guestHello.id);
     assert.equal(shooterRow.kills, 1);

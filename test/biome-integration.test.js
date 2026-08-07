@@ -8,6 +8,8 @@ const path = require('node:path');
 const publicDir = path.join(__dirname, '..', 'public');
 const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
 const visuals = fs.readFileSync(path.join(publicDir, 'biome-visuals.js'), 'utf8');
+const showcase = fs.readFileSync(path.join(publicDir, 'biome-showcase.html'), 'utf8');
+const showroomMaterials = fs.readFileSync(path.join(publicDir, 'showroom-materials.js'), 'utf8');
 const biomeHelpers = fs.readFileSync(path.join(publicDir, 'biomes', 'helpers.js'), 'utf8');
 const physics = fs.readFileSync(path.join(publicDir, 'flight-physics-rapier.mjs'), 'utf8');
 
@@ -39,6 +41,23 @@ test('environment renderer uses layered instancing for every requested asset fam
   assert.match(visuals, /wind-gate/);
   assert.match(visuals, /post-office/);
   assert.match(visuals, /white-needle/);
+});
+
+test('weathered rocks keep duplicated face corners welded during deformation', () => {
+  const rockGeometry = visuals.match(/function weatheredRockGeometry[\s\S]*?\n}/)?.[0] || '';
+  assert.match(rockGeometry, /const cornerNoise = Math\.sin\(/);
+  assert.match(rockGeometry, /x \* 127\.1 \+ y \* 311\.7 \+ z \* 74\.7/);
+  assert.doesNotMatch(rockGeometry, /Math\.sin\(\(i \+ 1\)/);
+  assert.match(rockGeometry, /geometry\.computeBoundingSphere\(\)/);
+});
+
+test('showroom orbits the camera while triplanar textures stay in surface space', () => {
+  assert.match(showcase, /view\.camera\.position\.set\(/);
+  assert.match(showcase, /view\.camera\.lookAt\(view\.orbitTarget\)/);
+  assert.doesNotMatch(showcase, /view\.environment\.root\.rotation\.y/);
+  assert.match(showroomMaterials, /varying vec3 vAtlasSurfacePosition/);
+  assert.match(showroomMaterials, /instanceMatrix \* vec4\(atlasSurfacePosition/);
+  assert.doesNotMatch(showroomMaterials, /vAtlasWorldPosition/);
 });
 
 test('curved segmented silhouettes and spatial repacking are wired into production', () => {

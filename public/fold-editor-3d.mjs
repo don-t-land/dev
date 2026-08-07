@@ -48,6 +48,7 @@
    무게중심 그립 구슬)도 같은 색 규약(민트/코랄/거부 빨강)에 additive-blend
    glow를 따른다. */
 import * as THREE from 'three';
+import { paperFiberTexture } from './showroom-materials.js';
 
 const MIN_DRAG = 0.05;   // paper-fold-model의 최소 선 길이와 동일
 const MIN_ANGLE = 0.05;  // 이보다 작은 각도는 "아직 안 접음"으로 본다
@@ -346,13 +347,22 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
       const offset = normal.clone().multiplyScalar(0.012 * foldDepth);
 
       const vertices = [];
+      const uvs = [];
       for (let index = 1; index < poly3.length - 1; index += 1) {
-        for (const point of [poly3[0], poly3[index], poly3[index + 1]]) {
+        const triangleIndices = [0, index, index + 1];
+        for (const pointIndex of triangleIndices) {
+          const point = poly3[pointIndex];
           vertices.push(point[0] + offset.x, point[1] + offset.y, point[2] + offset.z);
+          const materialPoint = face.materialPoly?.[pointIndex] || [point[0], point[2]];
+          uvs.push(
+            clamp((materialPoint[0] + 1) * .5, 0, 1),
+            clamp((materialPoint[1] + 1) * .5, 0, 1)
+          );
         }
       }
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
       geometry.computeVertexNormals();
 
       // main과 같은 밝기 곡선: depthRatio가 커질수록(더 깊이 접힐수록)
@@ -364,10 +374,12 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
       const backColor = new THREE.Color().setHSL(BACK_HUE / 360, BACK_SAT, clamp(backLightness / 100, 0.4, 0.92));
 
       const frontMaterial = new THREE.MeshStandardMaterial({
-        color: frontColor, roughness: 0.72, side: THREE.FrontSide, flatShading: true
+        color: frontColor, map: paperFiberTexture(), roughnessMap: paperFiberTexture(),
+        roughness: 0.78, side: THREE.FrontSide, flatShading: true
       });
       const backMaterial = new THREE.MeshStandardMaterial({
-        color: backColor, roughness: 0.72, side: THREE.BackSide, flatShading: true
+        color: backColor, map: paperFiberTexture(), roughnessMap: paperFiberTexture(),
+        roughness: 0.8, side: THREE.BackSide, flatShading: true
       });
 
       const frontMesh = new THREE.Mesh(geometry, frontMaterial);
@@ -420,16 +432,23 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
       const poly3 = face.map(index => visual.vertices[index]).filter(Boolean);
       if (poly3.length < 3) return;
       const vertices = [];
+      const uvs = [];
       for (let index = 1; index < poly3.length - 1; index += 1) {
-        for (const point of [poly3[0], poly3[index], poly3[index + 1]]) vertices.push(...point);
+        for (const point of [poly3[0], poly3[index], poly3[index + 1]]) {
+          vertices.push(...point);
+          uvs.push(clamp((point[0] + 1) * .5, 0, 1), clamp((point[2] + 1) * .5, 0, 1));
+        }
       }
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
       geometry.computeVertexNormals();
       const lightness = .78 - faceIndex * .055;
       const frontMesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
         color: new THREE.Color().setHSL(FRONT_HUE / 360, FRONT_SAT, clamp(lightness, .54, .84)),
-        roughness: .72,
+        map: paperFiberTexture(),
+        roughnessMap: paperFiberTexture(),
+        roughness: .78,
         side: THREE.DoubleSide,
         flatShading: true
       }));

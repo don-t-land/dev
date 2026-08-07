@@ -392,41 +392,51 @@
     <button class="costume-close" type="button" aria-label="닫기" data-costume-close>×</button>
     <div class="costume-kicker">PLANE CUSTOMIZE</div>
     <h2 id="costume-title">코스튬</h2>
-    <p class="costume-description">두 부위에 원하는 장식을 골라 비행기를 꾸며 보세요.</p>
+    <p class="costume-description">쇼룸에서 기체를 돌려 보며 두 부위의 장식을 조합하세요.</p>
 
-    <fieldset class="costume-section">
-      <legend><span>01</span> 모자 <small>오른쪽 날개 뒤쪽 ⅔ 지점</small></legend>
-      <div class="costume-options">
-        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="none">
-          <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
-        </button>
-        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="santa">
-          <canvas class="costume-preview-3d" data-costume-preview="santa" aria-hidden="true"></canvas><b>산타 모자</b>
-        </button>
-        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="magic">
-          <canvas class="costume-preview-3d" data-costume-preview="magic" aria-hidden="true"></canvas><b>마술모자</b>
-        </button>
-        <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="police">
-          <canvas class="costume-preview-3d" data-costume-preview="police" aria-hidden="true"></canvas><b>경찰 경광등</b>
-        </button>
+    <div class="costume-showroom-layout">
+      <section class="costume-showroom-stage" aria-label="코스튬 3D 쇼룸. 드래그하여 기체를 회전할 수 있습니다.">
+        <canvas id="costume-showroom-canvas"></canvas>
+        <div class="showroom-plaque" aria-hidden="true"><span>LOOK 01</span><strong>PAPER PILOT</strong><small>DRAG TO ROTATE · WHEEL TO ZOOM</small></div>
+        <div class="showroom-material-chips" aria-hidden="true"><i>FIBER PAPER</i><i>MINERAL WALL</i><i>ANODIZED METAL</i></div>
+      </section>
+
+      <div class="costume-wardrobe">
+        <fieldset class="costume-section">
+          <legend><span>01</span> 모자 <small>오른쪽 날개 뒤쪽 ⅔ 지점</small></legend>
+          <div class="costume-options">
+            <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="none">
+              <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
+            </button>
+            <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="santa">
+              <canvas class="costume-preview-3d" data-costume-preview="santa" aria-hidden="true"></canvas><b>산타 모자</b>
+            </button>
+            <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="magic">
+              <canvas class="costume-preview-3d" data-costume-preview="magic" aria-hidden="true"></canvas><b>마술모자</b>
+            </button>
+            <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="police">
+              <canvas class="costume-preview-3d" data-costume-preview="police" aria-hidden="true"></canvas><b>경찰 경광등</b>
+            </button>
+          </div>
+        </fieldset>
+
+        <fieldset class="costume-section">
+          <legend><span>02</span> 코 <small>비행기 가장 앞부분</small></legend>
+          <div class="costume-options costume-options-nose">
+            <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="none">
+              <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
+            </button>
+            <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="rudolph">
+              <canvas class="costume-preview-3d" data-costume-preview="rudolph" aria-hidden="true"></canvas><b>루돌프 코</b>
+            </button>
+          </div>
+        </fieldset>
+
+        <div class="costume-actions">
+          <button id="costume-reset" type="button">모두 벗기</button>
+          <button id="costume-done" type="button">적용 완료</button>
+        </div>
       </div>
-    </fieldset>
-
-    <fieldset class="costume-section">
-      <legend><span>02</span> 코 <small>비행기 가장 앞부분</small></legend>
-      <div class="costume-options costume-options-nose">
-        <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="none">
-          <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
-        </button>
-        <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="rudolph">
-          <canvas class="costume-preview-3d" data-costume-preview="rudolph" aria-hidden="true"></canvas><b>루돌프 코</b>
-        </button>
-      </div>
-    </fieldset>
-
-    <div class="costume-actions">
-      <button id="costume-reset" type="button">모두 벗기</button>
-      <button id="costume-done" type="button">적용 완료</button>
     </div>
   </div>
 </section>
@@ -659,6 +669,8 @@
   <main class="fold-stage">
     <canvas id="fold-paper-canvas"></canvas>
     <div class="fold-preview-title"><span id="fold-plane-name">Basic Dart</span><small>천천히 회전</small></div>
+    <div class="fold-showroom-plaque" aria-hidden="true"><span>AIRFRAME GALLERY</span><strong>01 / SELECT &amp; FOLD</strong><small>PAPER FIBER · BIOME SERIES</small></div>
+    <div class="fold-showroom-lights" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="fold-platform" aria-hidden="true"></div>
     <aside class="fold-presets" aria-labelledby="fold-preset-title">
       <div class="fold-panel-heading"><span>FOLD N FLY</span><strong id="fold-preset-title">종이비행기 선택</strong></div>
@@ -710,6 +722,7 @@
 <script src="./map-gen.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./costume-preview-3d.js"></script>
+<script type="module" src="./costume-showroom-3d.js"></script>
 <script type="module" src="./waiting-room-3d.js"></script>
 
 <script type="module">

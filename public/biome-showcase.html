@@ -379,7 +379,13 @@
       scene.fog = new THREE.FogExp2(biome.fog, index === 4 ? .00125 : .00155);
       const camera = new THREE.PerspectiveCamera(34, 1, .1, 700);
       camera.position.set(index === 4 ? 178 : 151, index === 4 ? 99 : 83, index === 4 ? 202 : 177);
-      camera.lookAt(0, index === 4 ? 16 : 25, -8);
+      const orbitTarget = new THREE.Vector3(0, index === 4 ? 16 : 25, -8);
+      const orbitRadius = Math.hypot(
+        camera.position.x - orbitTarget.x,
+        camera.position.z - orbitTarget.z
+      );
+      const orbitHeight = camera.position.y - orbitTarget.y;
+      camera.lookAt(orbitTarget);
 
       scene.add(new THREE.HemisphereLight(biome.sky.mid, index === 3 ? 0x2b1512 : biome.terrain.top, index === 3 ? 2.25 : 2.6));
       const sun = new THREE.DirectionalLight(index === 3 ? 0xffb46d : 0xfff0ce, index === 3 ? 4.7 : 4.15);
@@ -406,7 +412,14 @@
         scene.add(ground);
       }
 
-      const state = { angle: index * .055 - .1, dragging: false, pointerX: 0 };
+      const state = {
+        angle: Math.atan2(
+          camera.position.x - orbitTarget.x,
+          camera.position.z - orbitTarget.z
+        ) + index * .055 - .1,
+        dragging: false,
+        pointerX: 0
+      };
       viewport.addEventListener('pointerdown', event => {
         state.dragging = true;
         state.pointerX = event.clientX;
@@ -421,7 +434,7 @@
       viewport.addEventListener('pointerup', stopDrag);
       viewport.addEventListener('pointercancel', stopDrag);
 
-      views.push({ renderer, scene, camera, environment, viewport, state });
+      views.push({ renderer, scene, camera, environment, viewport, state, orbitTarget, orbitRadius, orbitHeight });
     });
 
     function resizeView(view) {
@@ -444,7 +457,12 @@
       for (const view of views) {
         resizeView(view);
         if (!reducedMotion && !view.state.dragging) view.state.angle += delta * .055;
-        view.environment.root.rotation.y = view.state.angle;
+        view.camera.position.set(
+          view.orbitTarget.x + Math.sin(view.state.angle) * view.orbitRadius,
+          view.orbitTarget.y + view.orbitHeight,
+          view.orbitTarget.z + Math.cos(view.state.angle) * view.orbitRadius
+        );
+        view.camera.lookAt(view.orbitTarget);
         view.renderer.render(view.scene, view.camera);
       }
       requestAnimationFrame(frame);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyTriplanarAtlas, biomeSurfaceTexture } from './showroom-materials.js';
 
 const WALL_TOPS = [
   [0, .08, -.03, .13, .02, .09],
@@ -31,6 +32,10 @@ function facetedWallGeometry(variant = 0) {
   tri([right, 0, .5], [right, .88 + top[5], -.5], [right, .88 + top[5], .5]);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(Array.from({ length: positions.length / 3 }, (_, index) => {
+    const offset = index * 3;
+    return [positions[offset] + .5, Math.max(0, Math.min(1, positions[offset + 1]))];
+  }).flat(), 2));
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -40,11 +45,20 @@ function weatheredRockGeometry(seed) {
   const position = geometry.attributes.position;
   for (let i = 0; i < position.count; i++) {
     const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
-    const scale = .83 + ((Math.sin((i + 1) * (seed + 2) * 12.9898) + 1) * .5) * .26;
+    // DodecahedronGeometry is non-indexed, so a geometric corner is duplicated
+    // for every adjacent face. Deforming by the buffer index pulls those copies
+    // apart and leaves visible cracks. Position-based noise keeps every copy of
+    // the same corner welded while retaining the irregular low-poly silhouette.
+    const cornerNoise = Math.sin(
+      x * 127.1 + y * 311.7 + z * 74.7 + (seed + 2) * 53.13
+    ) * 43758.5453123;
+    const scale = .83 + (cornerNoise - Math.floor(cornerNoise)) * .26;
     position.setXYZ(i, x * scale, y * (scale * .94 + .06), z * (1.08 - (scale - .83) * .35));
   }
   position.needsUpdate = true;
   geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
   return geometry;
 }
 
@@ -66,8 +80,19 @@ function weatheredPillarGeometry() {
 }
 
 function material(color, options = {}) {
-  return new THREE.MeshStandardMaterial({
-    color,
+  const finish = options.surface || 'mineral';
+  const physical = finish === 'ice'
+    ? { clearcoat: .82, clearcoatRoughness: .22, transmission: .08, thickness: .8, ior: 1.31 }
+    : finish === 'basalt'
+      ? { clearcoat: .1, clearcoatRoughness: .7 }
+      : finish === 'moss'
+        ? { sheen: .22, sheenRoughness: .92, sheenColor: new THREE.Color(color).offsetHSL(.05, .05, .08) }
+        : finish === 'paper-cloud'
+          ? { sheen: .16, sheenRoughness: 1, sheenColor: new THREE.Color(0xffffff) }
+          : { clearcoat: .035, clearcoatRoughness: .92 };
+  const surface = new THREE.MeshPhysicalMaterial({
+    color: options.map ? 0xffffff : color,
+    map: options.map || null,
     roughness: options.roughness ?? .91,
     metalness: options.metalness ?? 0,
     flatShading: true,
@@ -76,8 +101,19 @@ function material(color, options = {}) {
     emissive: options.emissive ?? 0x000000,
     emissiveIntensity: options.emissiveIntensity ?? 0,
     side: options.side ?? THREE.FrontSide,
-    depthWrite: options.depthWrite ?? true
+    depthWrite: options.depthWrite ?? true,
+    ...physical
   });
+  if (options.map) applyTriplanarAtlas(surface, options.map, options.textureScale ?? .045);
+  surface.userData.finish = finish;
+  return surface;
+}
+
+function biomeFinish(biomeIndex, role = 'rock') {
+  if (biomeIndex === 2) return 'ice';
+  if (biomeIndex === 3) return 'basalt';
+  if (biomeIndex === 4 && role === 'top') return 'moss';
+  return 'mineral';
 }
 
 function createMesh(root, geometry, meshMaterial, items, transform, castShadow = true) {
@@ -111,10 +147,10 @@ function addWalls(root, groups, biomes, materials) {
   groups.forEach((items, biomeIndex) => {
     if (!items.length) return;
     const palette = biomes[biomeIndex].terrain;
-    const baseMat = material(palette.wall, { roughness: biomeIndex === 2 ? .68 : .96 });
+    const baseMat = material(palette.wall, { map: biomeSurfaceTexture(biomeIndex), roughness: biomeIndex === 2 ? .68 : .96, surface: biomeFinish(biomeIndex) });
     const accentMat = material(palette.wallAccent, biomeIndex === 3
-      ? { emissive: palette.wallAccent, emissiveIntensity: 1.7, roughness: .65 }
-      : { opacity: biomeIndex === 2 ? .34 : .72, roughness: biomeIndex === 2 ? .35 : .88 });
+      ? { emissive: palette.wallAccent, emissiveIntensity: 1.7, roughness: .65, surface: 'basalt' }
+      : { opacity: biomeIndex === 2 ? .34 : .72, roughness: biomeIndex === 2 ? .35 : .88, surface: biomeFinish(biomeIndex) });
     materials.push(baseMat, accentMat);
     createMesh(root, facetedWallGeometry(biomeIndex), baseMat, items, (o, wall) => {
       o.position.set(wall.x, 0, wall.z);
@@ -189,10 +225,10 @@ function addSpires(root, groups, biomes, materials) {
   groups.forEach((items, biomeIndex) => {
     if (!items.length) return;
     const palette = biomes[biomeIndex].terrain;
-    const baseMat = material(palette.spire, { roughness: biomeIndex === 2 ? .58 : .94 });
+    const baseMat = material(palette.spire, { map: biomeSurfaceTexture(biomeIndex), roughness: biomeIndex === 2 ? .58 : .94, surface: biomeFinish(biomeIndex) });
     const accentMat = material(palette.wallAccent, biomeIndex === 3
-      ? { emissive: palette.wallAccent, emissiveIntensity: 2.1, roughness: .45 }
-      : { opacity: biomeIndex === 2 ? .4 : .82, roughness: .62 });
+      ? { emissive: palette.wallAccent, emissiveIntensity: 2.1, roughness: .45, surface: 'basalt' }
+      : { opacity: biomeIndex === 2 ? .4 : .82, roughness: .62, surface: biomeFinish(biomeIndex) });
     materials.push(baseMat, accentMat);
     const primary = spireGeometry(biomeIndex);
     if (biomeIndex !== 1) primary.translate(0, .5, 0);
@@ -273,7 +309,7 @@ function addRocks(root, groups, biomes, materials) {
   groups.forEach((items, biomeIndex) => {
     if (!items.length) return;
     const palette = biomes[biomeIndex].terrain;
-    const rockMat = material(palette.rock, { roughness: biomeIndex === 2 ? .54 : .94 });
+    const rockMat = material(palette.rock, { map: biomeSurfaceTexture(biomeIndex), roughness: biomeIndex === 2 ? .54 : .94, surface: biomeFinish(biomeIndex) });
     materials.push(rockMat);
     createMesh(root, weatheredRockGeometry(biomeIndex), rockMat, items, (o, rock) => {
       o.position.set(rock.x, rock.y, rock.z);
@@ -282,8 +318,8 @@ function addRocks(root, groups, biomes, materials) {
     });
     if (biomeIndex === 2 || biomeIndex === 3) {
       const accent = material(palette.wallAccent, biomeIndex === 3
-        ? { emissive: palette.wallAccent, emissiveIntensity: 1.8, roughness: .5 }
-        : { opacity: .42, roughness: .28 });
+        ? { emissive: palette.wallAccent, emissiveIntensity: 1.8, roughness: .5, surface: 'basalt' }
+        : { opacity: .42, roughness: .28, surface: 'ice' });
       materials.push(accent);
       createMesh(root, weatheredRockGeometry(biomeIndex + 11), accent, items.filter((_, i) => i % 3 === 0), (o, rock) => {
         o.position.set(rock.x, rock.y + rock.r * .14, rock.z);
@@ -297,8 +333,8 @@ function addRocks(root, groups, biomes, materials) {
 function addPlatforms(root, items, biome, materials) {
   if (!items.length) return;
   const palette = biome.terrain;
-  const stone = material(palette.platform, { roughness: .96 });
-  const top = material(palette.top, { roughness: .88 });
+  const stone = material(palette.platform, { map: biomeSurfaceTexture(4), roughness: .96, surface: 'mineral' });
+  const top = material(palette.top, { map: biomeSurfaceTexture(4), roughness: .88, surface: 'moss' });
   const edge = material(palette.wallAccent, { opacity: .62, roughness: .7 });
   materials.push(stone, top, edge);
 
@@ -336,9 +372,9 @@ function addClouds(root, groups, biomes, materials) {
   groups.forEach((clouds, biomeIndex) => {
     if (!clouds.length) return;
     const color = biomes[biomeIndex].terrain.cloud;
-    const cloudMat = material(color, { opacity: biomeIndex === 3 ? .68 : .82, roughness: 1, depthWrite: false, side: THREE.DoubleSide });
+    const cloudMat = material(color, { opacity: biomeIndex === 3 ? .68 : .82, roughness: 1, depthWrite: false, side: THREE.DoubleSide, surface: 'paper-cloud' });
     const shadeColor = new THREE.Color(color).multiplyScalar(biomeIndex === 3 ? .48 : .78);
-    const shadeMat = material(shadeColor, { opacity: .34, roughness: 1, depthWrite: false });
+    const shadeMat = material(shadeColor, { opacity: .34, roughness: 1, depthWrite: false, surface: 'paper-cloud' });
     materials.push(cloudMat, shadeMat);
     const offsets = [
       [-.3, .02, .02, .36], [-.12, .2, -.08, .43], [.14, .23, .04, .5], [.34, .04, -.04, .34], [.03, -.02, .18, .44]

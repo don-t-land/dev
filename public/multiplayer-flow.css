@@ -218,3 +218,99 @@
 .respawn-card h2 { font-size:clamp(24px,3vw,36px); letter-spacing:-.04em; }
 .respawn-card p { color:#cfe6f4; font-size:14px; }
 .respawn-card .button-row { display:flex; gap:10px; justify-content:center; }
+
+/* Airframe 3D showroom — biome material wall + exhibition lighting */
+#folding-screen {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(61, 109, 132, .26), transparent 31%),
+    linear-gradient(145deg, #07101d, #0d1729 53%, #050b15);
+}
+.fold-stage {
+  isolation: isolate;
+  border-color: rgba(132, 204, 218, .34);
+  border-radius: 12px 28px 12px 28px;
+  background:
+    radial-gradient(circle at 50% 31%, rgba(52, 80, 102, .72), transparent 34%),
+    linear-gradient(180deg, #132132 0 63%, #050a12 100%);
+  box-shadow: inset 0 0 95px rgba(1, 5, 12, .6), 0 23px 70px rgba(0, 0, 0, .35);
+}
+.fold-stage::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 57% -8% -42%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 0, rgba(75, 190, 209, .28), transparent 38%),
+    repeating-linear-gradient(90deg, rgba(131, 184, 197, .1) 0 1px, transparent 1px 74px),
+    repeating-linear-gradient(0deg, rgba(131, 184, 197, .08) 0 1px, transparent 1px 74px),
+    linear-gradient(180deg, #14283b, #07111f 60%);
+  transform: perspective(580px) rotateX(57deg) scale(1.45);
+  transform-origin: 50% 0;
+  opacity: .86;
+}
+.fold-stage::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(2, 7, 14, .48), transparent 23% 77%, rgba(2, 7, 14, .5));
+}
+.fold-presets, .fold-side {
+  border-color: rgba(138, 205, 217, .3);
+  border-radius: 5px 17px 5px 17px;
+  background: linear-gradient(150deg, rgba(9, 19, 31, .9), rgba(4, 10, 19, .84));
+  box-shadow: 0 14px 35px rgba(0, 0, 0, .22), inset 0 1px rgba(255, 255, 255, .035);
+}
+.fold-preset-card {
+  border-radius: 5px 13px 5px 13px;
+  background: rgba(15, 29, 43, .88);
+}
+.fold-preset-card.active {
+  background: linear-gradient(100deg, rgba(118, 229, 239, .19), rgba(13, 26, 40, .9));
+}
+.fold-platform {
+  z-index: 0;
+  bottom: 10%;
+  width: min(45%, 470px);
+  aspect-ratio: 4.7 / 1;
+  border: 2px solid rgba(105, 226, 238, .48);
+  background:
+    radial-gradient(ellipse, rgba(99, 222, 235, .28) 0 15%, transparent 16%),
+    repeating-radial-gradient(ellipse, transparent 0 13%, rgba(105, 226, 238, .16) 14% 15%, transparent 16% 27%),
+    linear-gradient(180deg, rgba(39, 72, 91, .74), rgba(6, 16, 26, .72));
+  box-shadow: 0 32px 22px rgba(0, 0, 0, .42), 0 0 46px rgba(81, 203, 233, .22), inset 0 0 28px rgba(91, 215, 229, .15);
+}
+.fold-preview-title {
+  top: 17px;
+  padding: 9px 13px;
+  border-bottom: 1px solid rgba(244, 205, 108, .45);
+  background: rgba(4, 10, 18, .53);
+  backdrop-filter: blur(8px);
+}
+.fold-showroom-plaque {
+  position: absolute;
+  z-index: 3;
+  left: 254px;
+  top: 20px;
+  display: grid;
+  gap: 4px;
+  padding-left: 11px;
+  border-left: 3px solid #70e0ec;
+  color: #eef7f8;
+  pointer-events: none;
+}
+.fold-showroom-plaque span { color: #f4cd6c; font: 800 8px/1 ui-monospace, monospace; letter-spacing: .16em; }
+.fold-showroom-plaque strong { font: 900 12px/1.1 ui-monospace, monospace; }
+.fold-showroom-plaque small { color: #8fa5b2; font: 700 7px/1 ui-monospace, monospace; letter-spacing: .08em; }
+.fold-showroom-lights { position: absolute; z-index: 0; inset: -2px 0 auto; display: flex; justify-content: center; gap: 12%; pointer-events: none; }
+.fold-showroom-lights i { width: 2px; height: 48vh; max-height: 440px; opacity: .34; background: linear-gradient(#f8e6c4, rgba(127, 223, 236, .08) 56%, transparent); transform: rotate(8deg); filter: blur(.3px); box-shadow: 0 0 13px rgba(190, 236, 242, .36); }
+.fold-showroom-lights i:nth-child(2) { transform: rotate(0); opacity: .18; }
+.fold-showroom-lights i:nth-child(3) { transform: rotate(-8deg); }
+
+@media (max-width: 760px) {
+  .fold-showroom-plaque { display: none; }
+  .fold-preview-title { padding: 7px 9px; }
+  .fold-platform { bottom: 27%; width: 66%; }
+}

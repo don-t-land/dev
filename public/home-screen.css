@@ -110,3 +110,46 @@
 @media (max-width: 620px) { #costume-panel { padding: 10px; }.costume-dialog { max-height: calc(100vh - 20px); padding: 25px 16px 18px; }.costume-dialog h2 { font-size: 29px; }.costume-options { grid-template-columns: repeat(2, 1fr); }.costume-options-nose { width: 100%; }.costume-option { min-height: 102px; }.costume-section legend small { display: none; }.costume-actions { position: sticky; bottom: -18px; margin: 22px -16px -18px; padding: 12px 16px 18px; background: linear-gradient(transparent, #0a102d 24%); }.costume-actions button { flex: 1; } }
 @media (max-width: 780px) and (max-height: 720px) { .home-content { padding-top: 58px; padding-bottom: 14px; }.home-wordmark { margin: 6px 0; font-size: clamp(64px, 17vw, 82px); }.home-mode-grid { grid-template-columns: 1fr; gap: 7px; }.home-mode-card { min-height: 64px; grid-template-columns: 48px 1fr 29px; padding: 6px 14px 6px 8px; }.home-mode-icon { width: 40px; height: 40px; border-radius: 12px 6px; }.home-mode-icon svg { width: 25px; height: 25px; }.home-mode-label { padding-left: 5px; font-size: 19px; }.home-mode-arrow { width: 25px; height: 25px; font-size: 23px; }.home-plane-stage { left: 45%; top: 9%; bottom: auto; height: 37vh; } }
 @media (prefers-reduced-motion: reduce) { .home-vertical-plane { animation: none; }.home-plane-stage { transition: none; } }
+
+/* 3D costume showroom */
+.costume-dialog {
+  width: min(1180px, 100%);
+  padding: 24px;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(14, 24, 43, .98), rgba(5, 12, 25, .99));
+}
+.costume-dialog h2 { font-size: 31px; }
+.costume-description { margin: 4px 0 16px; }
+.costume-showroom-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(350px, .85fr); gap: 16px; min-height: 0; }
+.costume-showroom-stage { position: relative; min-height: min(60vh, 610px); overflow: hidden; border: 1px solid rgba(116, 224, 237, .32); border-radius: 19px 5px 19px 5px; background: radial-gradient(circle at 50% 34%, #23364c, #07101c 68%); cursor: grab; touch-action: none; isolation: isolate; }
+.costume-showroom-stage:active { cursor: grabbing; }
+.costume-showroom-stage::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, rgba(4, 10, 20, .36), transparent 18% 82%, rgba(4, 10, 20, .4)), linear-gradient(180deg, rgba(255, 255, 255, .025), transparent 24%, rgba(1, 4, 10, .22)); box-shadow: inset 0 0 62px rgba(0, 0, 0, .36); }
+#costume-showroom-canvas { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; }
+.showroom-plaque { position: absolute; z-index: 3; left: 17px; top: 17px; display: grid; gap: 4px; padding: 11px 13px; border-left: 3px solid #70e0ec; color: #f4f8fb; background: rgba(4, 10, 20, .72); backdrop-filter: blur(10px); pointer-events: none; }
+.showroom-plaque span { color: #f4cd6c; font: 800 8px/1 ui-monospace, monospace; letter-spacing: .18em; }
+.showroom-plaque strong { font: 900 14px/1.05 "Noto Sans KR", sans-serif; letter-spacing: -.02em; }
+.showroom-plaque small { color: #92aabb; font: 700 7px/1.3 ui-monospace, monospace; letter-spacing: .09em; }
+.showroom-material-chips { position: absolute; z-index: 3; right: 14px; bottom: 14px; display: flex; gap: 5px; pointer-events: none; }
+.showroom-material-chips i { padding: 6px 7px; border: 1px solid rgba(183, 225, 235, .18); border-radius: 99px; color: #9eb5c4; background: rgba(4, 9, 18, .66); font: 700 7px/1 ui-monospace, monospace; font-style: normal; letter-spacing: .08em; }
+.costume-wardrobe { min-width: 0; max-height: min(60vh, 610px); overflow: auto; padding: 2px 4px 0 3px; scrollbar-color: rgba(112, 224, 236, .35) transparent; }
+.costume-wardrobe .costume-section { margin-top: 12px; }
+.costume-wardrobe .costume-section:first-child { margin-top: 2px; }
+.costume-wardrobe .costume-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.costume-wardrobe .costume-options-nose { width: 100%; }
+.costume-wardrobe .costume-option { min-height: 105px; }
+.costume-wardrobe .costume-actions { position: sticky; bottom: 0; z-index: 2; margin-top: 17px; padding: 14px 0 3px; background: linear-gradient(transparent, #08101e 34%); }
+
+@media (max-width: 900px) {
+  .costume-dialog { max-height: calc(100vh - 20px); padding: 22px 14px 14px; overflow: auto; }
+  .costume-showroom-layout { grid-template-columns: 1fr; }
+  .costume-showroom-stage { min-height: 390px; }
+  .costume-wardrobe { max-height: none; overflow: visible; }
+  .costume-wardrobe .costume-section { margin-top: 18px; }
+}
+
+@media (max-width: 620px) {
+  .costume-showroom-stage { min-height: 310px; }
+  .showroom-material-chips { display: none; }
+  .costume-wardrobe .costume-option { min-height: 96px; }
+  .costume-wardrobe .costume-actions { margin: 14px -14px -14px; padding: 18px 14px 14px; }
+}

@@ -1,11 +1,20 @@
 import * as THREE from 'three';
 import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
+import { applyPaperSurface } from './showroom-materials.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
 function makeFacet(points, material) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(points.flat(), 3));
+  const xs = points.map(point => point[0]);
+  const ys = points.map(point => point[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(points.flatMap(point => [
+    (point[0] - minX) / Math.max(.001, maxX - minX),
+    (point[1] - minY) / Math.max(.001, maxY - minY)
+  ]), 2));
   geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
@@ -129,6 +138,7 @@ function makeStandingPlaneMascot(costume = null) {
   mascot.add(leftLeg, rightLeg);
 
   mascot.userData = { body, leftLeg, rightLeg };
+  applyPaperSurface(body);
   if (costume) setCostumeOnObject(mascot, costume, 'standing');
   return mascot;
 }

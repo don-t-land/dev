@@ -331,6 +331,10 @@
   .graphics-settings { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1); }
   .graphics-settings h3 { color: #dcecff; font-size: 12px; letter-spacing: .08em; }
   .graphics-settings .setting-row { margin-top: 10px; cursor: default; }
+  .audio-settings { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1); }
+  .audio-settings h3 { color: #dcecff; font-size: 12px; letter-spacing: .08em; }
+  .audio-settings .setting-row { margin-top: 10px; cursor: default; }
+  .audio-settings input[type="range"] { width: 146px; height: 24px; accent-color: #0a8cff; }
   .setting-row select {
     flex: 0 0 146px; min-height: 38px; padding: 7px 28px 7px 10px; border: 1px solid #46627d;
     border-radius: 9px; color: #eff7ff; background: #18334d; font: inherit; font-size: 12px;
@@ -415,6 +419,17 @@
     #board .state { display: none; }
     #timer { top: 8px; left: 50%; right: auto; transform: translateX(-50%); font-size: 17px; }
   }
+  #audio-quick-toggle {
+    position: fixed; z-index: 80; top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right)); width: 46px; height: 46px;
+    display: grid; place-items: center; border: 1px solid rgba(174,215,255,.28);
+    border-radius: 50%; color: #eef7ff; background: rgba(7,16,28,.74);
+    box-shadow: 0 8px 24px rgba(0,0,0,.22); backdrop-filter: blur(10px);
+    font-size: 18px; cursor: pointer; transition: opacity .15s, border-color .15s, transform .15s;
+  }
+  #audio-quick-toggle:hover { border-color: #8fe3c4; transform: translateY(-1px); }
+  #audio-quick-toggle:focus-visible { outline: 3px solid #8fe3c4; outline-offset: 3px; }
+  #audio-quick-toggle[aria-pressed="true"] { color: #ff9d93; border-color: rgba(255,139,126,.5); }
   @media (prefers-reduced-motion: reduce) {
     .lobby-plane, .cloud { animation: none; }
   }
@@ -423,6 +438,7 @@
 <body>
 
 <canvas id="c"></canvas>
+<button id="audio-quick-toggle" type="button" aria-label="전체 음소거" aria-pressed="false" title="오디오 켜기/끄기">🔊</button>
 
 <section id="home-screen" aria-labelledby="home-title">
   <div class="home-aurora" aria-hidden="true"></div>
@@ -835,6 +851,29 @@
           </label>
           <output id="graphics-summary" aria-live="polite"></output>
         </section>
+        <section class="audio-settings" aria-labelledby="audio-title">
+          <h3 id="audio-title">오디오 설정</h3>
+          <label class="setting-row" for="audio-muted">
+            <span><b>전체 음소거</b><small>모든 배경음과 효과음 끄기</small></span>
+            <input id="audio-muted" type="checkbox">
+          </label>
+          <label class="setting-row" for="audio-master">
+            <span><b>전체 볼륨</b><small>오디오 출력 레벨</small></span>
+            <input id="audio-master" type="range" min="0" max="1" step="0.05">
+          </label>
+          <label class="setting-row" for="audio-music">
+            <span><b>음악</b><small>장면별 배경음 볼륨</small></span>
+            <input id="audio-music" type="range" min="0" max="1" step="0.05">
+          </label>
+          <label class="setting-row" for="audio-sfx">
+            <span><b>효과음</b><small>조작과 비행 효과음 볼륨</small></span>
+            <input id="audio-sfx" type="range" min="0" max="1" step="0.05">
+          </label>
+          <label class="setting-row" for="audio-reduced">
+            <span><b>간소화된 오디오</b><small>반복적인 장식음을 줄입니다</small></span>
+            <input id="audio-reduced" type="checkbox">
+          </label>
+        </section>
         <label class="setting-row" for="key-guide-toggle">
           <span><b>키 가이드</b><small>인게임 조작 안내 표시</small></span>
           <input id="key-guide-toggle" type="checkbox" checked>
@@ -948,6 +987,8 @@
 <script type="module" src="./costume-showroom-3d.js"></script>
 <script type="module" src="./waiting-room-3d.js"></script>
 <script src="./graphics-settings.js"></script>
+<script src="./audio-policy.js"></script>
+<script src="./audio-engine.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
@@ -993,6 +1034,10 @@ const game = {
    유틸
    ============================================================ */
 const $ = id => document.getElementById(id);
+const audioDirector = window.createAudioDirector?.({ scene: 'HOME' }) || {
+  setScene() {}, phaseSnapshot() {}, updateDeadline() {}, setFlight() {}, play() {},
+  setSettings() {}, getSettings() { return {}; }
+};
 const DEFAULT_SELECTED_PLANE = 'dart';
 
 function normalizeFoldCommands(commands) {
@@ -1018,6 +1063,7 @@ function setSelectedPlaneCommands(commands, name = 'custom') {
   window.dispatchEvent(new CustomEvent('paper-plane-selected', {
     detail: { name, commands: normalized, label: name === 'custom' ? 'Custom Fold' : name }
   }));
+  audioDirector.play('select');
   return normalized;
 }
 
@@ -1295,6 +1341,7 @@ function handle(m) {
         window.paperFoldingStage?.leave();
         $('respawn-overlay').classList.add('hide');
         enterGame();
+        audioDirector.setScene('FLIGHT_ARENA');
         game.phase = 'playing';
         const angle = Number(m.angle) || 0;
         const spawnPosition = Array.isArray(m.position) && m.position.length === 3 &&
@@ -1322,6 +1369,8 @@ function handle(m) {
         syncRapierMap();
         syncRapierFromCraft();
         hideCenter();
+        if (liveSpawnGeneration++ === 0) audioDirector.play('start');
+        else audioDirector.play('respawn');
       } else {
         if (!net.players.has(m.id)) addRemote({ id: m.id, name: m.name, wins: 0, costume: m.costume });
         const player = net.players.get(m.id);
@@ -1385,7 +1434,10 @@ function handle(m) {
       } else {
         const player = net.players.get(m.id);
         if (player) { player.alive = false; player.remote.group.visible = false; }
-        if (m.by === myName) showKill(`${player ? player.name : '?'} 격추!`);
+        if (m.by === myName) {
+          audioDirector.play('score');
+          showKill(`${player ? player.name : '?'} 격추!`);
+        }
       }
       refreshBoard();
       break;
@@ -1417,8 +1469,11 @@ function handle(m) {
    화면 전환
    ============================================================ */
 let myName = '';
+let liveSpawnGeneration = 0;
 
 function enterHome(msg) {
+  audioDirector.setScene('HOME');
+  $('audio-quick-toggle').classList.remove('hide');
   $('home-screen').classList.remove('hide');
   $('room-entry').classList.add('hide');
   $('lobby').classList.add('hide');
@@ -1467,6 +1522,8 @@ function closeRoomEntry() {
 }
 
 function enterLobby(msg) {
+  audioDirector.setScene('HOME');
+  $('audio-quick-toggle').classList.remove('hide');
   game.phase = 'lobby';
   game.frozen = true;
   closePauseMenu();
@@ -1485,6 +1542,8 @@ function enterLobby(msg) {
 }
 
 function enterRoomLobby(room, resultsPending = false) {
+  audioDirector.setScene('WAITING');
+  $('audio-quick-toggle').classList.remove('hide');
   $('home-screen').classList.add('hide');
   $('room-entry').classList.add('hide');
   game.phase = room.phase;
@@ -1537,6 +1596,8 @@ function enterRoomLobby(room, resultsPending = false) {
 }
 
 function enterFolding() {
+  audioDirector.setScene('FOLDING');
+  $('audio-quick-toggle').classList.remove('hide');
   closePauseMenu();
   releaseFlightPointerLock();
   $('home-screen').classList.add('hide');
@@ -1550,6 +1611,7 @@ function enterFolding() {
 }
 
 function enterGame() {
+  $('audio-quick-toggle').classList.add('hide');
   closePauseMenu();
   $('home-screen').classList.add('hide');
   $('room-entry').classList.add('hide');
@@ -1699,6 +1761,7 @@ $('refresh-rooms-btn').addEventListener('click', () => {
 });
 $('room-ready-btn').addEventListener('click', () => {
   if (!net.room || net.room.phase !== 'waiting') return;
+  audioDirector.play('ready');
   send({ t: 'ready', ready: !getLocalReady(net.room, net.id) });
 });
 $('room-start-btn').addEventListener('click', () => {
@@ -1747,6 +1810,47 @@ $('fold-leave-btn').addEventListener('click', () => {
 });
 $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(event.currentTarget.checked));
 $('mouse-invert-y-toggle').addEventListener('change', event => setMouseInvertY(event.currentTarget.checked));
+const audioSettings = audioDirector.getSettings();
+$('audio-muted').checked = Boolean(audioSettings.muted);
+$('audio-master').value = audioSettings.master ?? .8;
+$('audio-music').value = audioSettings.music ?? .55;
+$('audio-sfx').value = audioSettings.sfx ?? .8;
+$('audio-reduced').checked = Boolean(audioSettings.reducedAudio);
+function updateAudioQuickToggle() {
+  const muted = Boolean(audioDirector.getSettings().muted);
+  const button = $('audio-quick-toggle');
+  button.textContent = muted ? '🔇' : '🔊';
+  button.setAttribute('aria-pressed', String(muted));
+  button.setAttribute('aria-label', muted ? '오디오 켜기' : '전체 음소거');
+  button.title = muted ? '오디오 켜기' : '오디오 끄기';
+}
+function applyAudioControls() {
+  audioDirector.setSettings({
+    muted: $('audio-muted').checked,
+    master: Number($('audio-master').value),
+    music: Number($('audio-music').value),
+    sfx: Number($('audio-sfx').value),
+    reducedAudio: $('audio-reduced').checked
+  });
+  updateAudioQuickToggle();
+}
+for (const id of ['audio-muted', 'audio-master', 'audio-music', 'audio-sfx', 'audio-reduced']) {
+  $(id).addEventListener('input', applyAudioControls);
+  $(id).addEventListener('change', applyAudioControls);
+}
+$('audio-quick-toggle').addEventListener('click', () => {
+  const muted = !Boolean(audioDirector.getSettings().muted);
+  audioDirector.setSettings({ muted });
+  $('audio-muted').checked = muted;
+  updateAudioQuickToggle();
+});
+updateAudioQuickToggle();
+document.addEventListener('click', event => {
+  if (event.target.closest('button, [role="button"]')) audioDirector.play('uiClick');
+});
+document.addEventListener('pointerover', event => {
+  if (event.target.closest('button, [role="button"]')) audioDirector.play('uiHover');
+}, { passive: true });
 const graphicsControlIds = [
   'graphics-resolution', 'graphics-shadows', 'graphics-view-distance', 'graphics-csm',
   'graphics-gtao', 'graphics-bloom', 'graphics-anti-aliasing', 'graphics-fog-quality', 'graphics-shadow-softness'
@@ -2765,7 +2869,7 @@ function buildArena(seed) {
 /* ---- 공통 출발 연출: 모드별 스폰 지점의 옥상에서 달려 점프 ---- */
 const launchState = {
   active: false, startedAt: 0, duration: 4400, actors: [],
-  towerGroup: null, towerLayoutKey: ''
+  towerGroup: null, towerLayoutKey: '', audioCount: null
 };
 
 function arenaSpawnPoint(index, count, radius = 130) {
@@ -2856,6 +2960,7 @@ function clearLaunchActors() {
 
 function startLaunchSequence(phase) {
   clearLaunchActors();
+  launchState.audioCount = null;
   const count = Math.max(1, game.order.length);
   const localIndex = Math.max(0, game.order.indexOf(net.id));
   game.order.forEach((id, index) => {
@@ -2886,6 +2991,11 @@ function startLaunchSequence(phase) {
 function updateLaunch(now) {
   if (!launchState.active) return;
   const progress = THREE.MathUtils.clamp((now - launchState.startedAt) / launchState.duration, 0, 1);
+  const audioCount = progress < .18 ? 3 : progress < .39 ? 2 : progress < .66 ? 1 : null;
+  if (audioCount !== null && audioCount !== launchState.audioCount) {
+    launchState.audioCount = audioCount;
+    audioDirector.play('countdown', audioCount);
+  }
   const pose = getLaunchPose(progress);
   const runProgress = THREE.MathUtils.smoothstep(progress, .08, .67);
   const jumpProgress = THREE.MathUtils.smoothstep(progress, .65, .92);
@@ -2969,6 +3079,7 @@ function shoot() {
   const spent = consumeDartEnergy(me.energy);
   if (!spent.fired) return;
   me.energy = spent.energy;
+  audioDirector.play('fire');
   const dir = new THREE.Vector3(
     -Math.sin(me.yaw) * Math.cos(me.pitch),
      Math.sin(me.pitch),
@@ -2995,6 +3106,7 @@ function stepDarts(dt) {
       for (const [pid, pl] of net.players) {
         if (!pl.alive || !pl.remote.seen) continue;
         if (d.mesh.position.distanceTo(pl.remote.group.position) < 3.6) {
+          audioDirector.play('hit');
           send({ t: 'hit', id: pid, p: d.mesh.position.toArray().map(v => +v.toFixed(1)) });
           dead = true;
           break;
@@ -3014,6 +3126,7 @@ function stepDarts(dt) {
    아레나 드롭인 입장
    ============================================================ */
 function enterLiveArena(m) {
+  liveSpawnGeneration = 0;
   game.mode = 'ARENA';
   game.seed = Number(m.seed) || 0;
   game.order = Array.isArray(m.order) ? m.order : [];
@@ -3038,6 +3151,10 @@ function enterLiveArena(m) {
    페이즈 처리
    ============================================================ */
 function applyPhase(m) {
+  audioDirector.phaseSnapshot({
+    phase: m.phase, mode: m.mode || game.mode, seed: m.seed ?? game.seed,
+    showsResults: m.phase !== 'results' || shouldShowResults({ ...net.room, ...m }, net.id)
+  });
   if (m.phase === 'waiting' || m.phase === undefined && m.t === 'room' && m.phase === 'waiting') {
     game.phase = 'waiting';
     showCenter(null, '다른 조종사를 기다리는 중', null);
@@ -3216,6 +3333,7 @@ function spawnSelf() {
 
 function dieLocal(report = true) {
   if (!me.alive) return;
+  audioDirector.play('crash');
   me.alive = false;
   me.dashing = false;
   if (report) send({ t: 'crash' });
@@ -3266,6 +3384,8 @@ function escapeHtml(value) {
 }
 
 function showResults(results) {
+  audioDirector.setScene('RESULTS');
+  $('audio-quick-toggle').classList.remove('hide');
   clearFlightKeys();
   const unit = game.mode === 'ARENA' ? 's' : 'm';
   const readyButton = $('results-ready-btn');
@@ -3570,6 +3690,7 @@ const tmpV = new THREE.Vector3();
 let sendAcc = 0, roundClock = 0;
 
 function physics(dt) {
+  const wasDashing = me.dashing;
   let inTh = 0;
   for (const thermal of thermals) {
     const distance = Math.hypot(
@@ -3588,6 +3709,7 @@ function physics(dt) {
   );
   me.energy = energyStep.energy;
   me.dashing = energyStep.dashRatio > 0;
+  if (!wasDashing && me.dashing) audioDirector.play('dash');
   const dashSpeedDelta = dashAcceleration(me.speed) * dt * energyStep.dashRatio;
 
   if (rapierFlight) {
@@ -3698,6 +3820,7 @@ function physics(dt) {
     if (craft.position.distanceTo(ring.position) < RING_R) {
       ring.userData.taken = true;
       ring.visible = false;
+      audioDirector.play('pickup');
       if (game.mode === 'ARENA') me.energy = Math.min(MAX_ENERGY, me.energy + 35);
       else {
         me.speed += 6;
@@ -3840,9 +3963,13 @@ renderer.setAnimationLoop(timestamp => {
   $('energy-fill').style.width = `${me.energy}%`;
   $('energy').classList.toggle('dashing', me.dashing);
   $('energy').classList.toggle('low', me.energy < DART_ENERGY_COST);
+  audioDirector.setFlight({ speed: me.speed, dashing: me.dashing, alive: me.alive && game.phase === 'playing' });
 
   if (game.phase === 'playing' || game.phase === 'countdown' || game.phase === 'launch') {
     const left = Math.max(0, (game.ends - now) / 1000);
+    audioDirector.updateDeadline(left, {
+      enabled: game.phase === 'playing' && net.room?.phase !== 'live'
+    });
     const mm = String(Math.floor(left / 60)).padStart(2, '0');
     const ss = String(Math.floor(left % 60)).padStart(2, '0');
     $('timer').textContent = (game.phase === 'playing' || game.phase === 'launch') ? `${mm}:${ss}` : '--:--';

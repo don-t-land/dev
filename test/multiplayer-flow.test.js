@@ -65,6 +65,20 @@ test('room entry stays translucent over the home scene', () => {
   assert.match(flowCss, /backdrop-filter:\s*blur\(5px\)/);
 });
 
+test('room entry presents quick play, invite tools, and public rooms as distinct sections', () => {
+  assert.match(html, /class="room-entry-field entry-name-field"/);
+  assert.match(html, /id="entry-quick-btn"[\s\S]*entry-action-icon[\s\S]*참여 가능한 공개 전장/);
+  assert.match(html, /class="room-entry-tools"/);
+  assert.match(html, /class="entry-code-card"/);
+  assert.match(html, /PUBLIC ROOMS/);
+  assert.match(html, /id="entry-room-count"/);
+  assert.match(html, /function renderEntryRoomList\(rooms\)/);
+  assert.match(flowCss, /\.room-entry-card\s*\{[^}]*width:\s*min\(700px/s);
+  assert.match(flowCss, /\.room-entry-tools\s*\{[^}]*grid-template-columns:\s*\.9fr 1\.25fr/s);
+  assert.match(flowCss, /\.room-entry-action\.primary small\s*\{[^}]*rgba\(7,28,56,\.68\)/s);
+  assert.match(flowCss, /#entry-room-list\s*\{[^}]*max-height:\s*142px/s);
+});
+
 test('waiting room actors fit inside one horizontal row on mobile and stay layered in front', () => {
   const waiting3d = fs.readFileSync(path.join(publicDir, 'waiting-room-3d.js'), 'utf8');
   assert.match(html, /data-slot-index=/);

@@ -477,23 +477,33 @@
     <div id="entry-kicker" class="room-entry-kicker">UP TO 4 PLAYERS</div>
     <h2 id="entry-title">오래 날기</h2>
     <p id="entry-description">방을 만들거나 초대 코드로 친구의 방에 들어가세요.</p>
-    <div class="room-entry-field">
+    <div class="room-entry-field entry-name-field">
       <label for="entry-name">닉네임</label>
       <input id="entry-name" maxlength="12" placeholder="닉네임을 입력하세요" autocomplete="off">
     </div>
-    <button id="entry-quick-btn" class="room-entry-action primary" type="button" style="width:100%">빠른 참가<small>바로 참여 가능한 방으로 이동합니다</small></button>
-    <div class="room-entry-actions">
-      <button id="entry-create-btn" class="room-entry-action" type="button">방 만들기<small>내가 HOST가 됩니다</small></button>
-      <div class="room-entry-field" style="margin:0">
-        <label for="entry-code">방 입장</label>
+    <button id="entry-quick-btn" class="room-entry-action primary entry-quick-action" type="button">
+      <span class="entry-action-icon" aria-hidden="true">↗</span>
+      <span class="entry-action-copy"><b>빠른 참가</b><small>참여 가능한 공개 전장으로 바로 이동합니다</small></span>
+      <span class="entry-action-arrow" aria-hidden="true">→</span>
+    </button>
+    <div class="room-entry-tools">
+      <button id="entry-create-btn" class="room-entry-action entry-create-action" type="button">
+        <span class="entry-action-icon" aria-hidden="true">＋</span>
+        <span class="entry-action-copy"><b>새 방 만들기</b><small>HOST가 되어 친구를 초대하세요</small></span>
+      </button>
+      <div class="entry-code-card">
+        <label for="entry-code"><span>INVITE CODE</span> 초대 코드로 참가</label>
         <div class="room-entry-join">
           <input id="entry-code" maxlength="6" placeholder="6자리 코드" autocomplete="off">
-          <button id="entry-join-btn" type="button">입장</button>
+          <button id="entry-join-btn" type="button">참가</button>
         </div>
       </div>
     </div>
-    <div class="room-entry-field" style="margin-top:18px">
-      <label for="entry-room-list">빠른 참가</label>
+    <div class="entry-room-browser">
+      <div class="entry-room-browser-head">
+        <div><span>PUBLIC ROOMS</span><b>공개 전장</b></div>
+        <em id="entry-room-count">0개</em>
+      </div>
       <div id="entry-room-list" role="region" aria-label="참여 가능한 방 목록" aria-live="polite"><div class="room-empty">방 목록을 불러오는 중…</div></div>
     </div>
     <div id="entry-status" role="status"></div>
@@ -732,7 +742,7 @@
       </div>
     </div>
 
-    <div id="respawn-overlay" class="hide" role="dialog" aria-labelledby="respawn-title">
+    <div id="respawn-overlay" class="hide" role="dialog" aria-modal="true" aria-labelledby="respawn-title">
       <div class="respawn-card">
         <div class="fold-kicker">SHOT DOWN</div>
         <h2 id="respawn-title">격추되었습니다</h2>
@@ -740,6 +750,7 @@
         <div class="button-row">
           <button id="respawn-now-btn" class="action-btn primary">바로 부활</button>
           <button id="respawn-refold-btn" class="action-btn">다시 접기</button>
+          <button id="respawn-leave-btn" class="action-btn danger">로비로 나가기</button>
         </div>
         <div id="respawn-status" role="status"></div>
       </div>
@@ -1300,6 +1311,7 @@ function enterHome(msg) {
   $('lobby').classList.add('hide');
   $('room-lobby').classList.add('hide');
   $('hud').classList.add('hide');
+  $('respawn-overlay').classList.add('hide');
   $('results').classList.add('hide');
   window.paperFoldingStage?.leave();
   clearWorld();
@@ -1331,7 +1343,7 @@ function openRoomEntry(mode) {
   $('entry-code').value = '';
   $('entry-status').textContent = '';
   $('room-entry').classList.remove('hide');
-  $('entry-room-list').innerHTML = roomListHtml(net.rooms.filter(room => room.mode === entryMode));
+  renderEntryRoomList(net.rooms);
   connect();
   send({ t: 'list' });
   setTimeout(() => $('entry-name').focus(), 0);
@@ -1463,9 +1475,13 @@ function roomListHtml(rooms) {
 
 function renderRoomList(rooms) {
   $('room-list').innerHTML = roomListHtml(rooms);
-  if (!$('room-entry').classList.contains('hide')) {
-    $('entry-room-list').innerHTML = roomListHtml(rooms.filter(room => room.mode === entryMode));
-  }
+  if (!$('room-entry').classList.contains('hide')) renderEntryRoomList(rooms);
+}
+
+function renderEntryRoomList(rooms) {
+  const filtered = rooms.filter(room => room.mode === entryMode);
+  $('entry-room-list').innerHTML = roomListHtml(filtered);
+  $('entry-room-count').textContent = `${filtered.length}개`;
 }
 
 function joinByCode(code) {
@@ -1604,6 +1620,11 @@ $('respawn-refold-btn').addEventListener('click', () => {
       send({ t: 'fold_done', commands: fold.commands });
     }
   });
+});
+$('respawn-leave-btn').addEventListener('click', event => {
+  event.currentTarget.disabled = true;
+  $('respawn-status').textContent = '로비로 이동 중…';
+  send({ t: 'leave' });
 });
 $('leave-btn').addEventListener('click', () => send({ t: 'leave' }));
 $('fold-leave-btn').addEventListener('click', () => {
@@ -3067,12 +3088,15 @@ function dieLocal(report = true) {
 }
 
 function showRespawnOverlay(byName) {
+  clearFlightKeys();
   $('respawn-detail').textContent = byName
     ? `${byName} 님에게 격추 · 이번 생존 ${Math.floor(me.surv)}초`
     : `추락 · 이번 생존 ${Math.floor(me.surv)}초`;
   $('respawn-status').textContent = '';
   $('respawn-overlay').classList.remove('hide');
   $('respawn-now-btn').disabled = false;
+  $('respawn-leave-btn').disabled = false;
+  releaseFlightPointerLock();
   $('respawn-now-btn').focus();
 }
 
@@ -3267,13 +3291,16 @@ document.addEventListener('mousemove', event => {
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== $('c') &&
       (game.phase === 'playing' || game.phase === 'countdown') &&
+      $('respawn-overlay').classList.contains('hide') &&
       $('pause-menu').classList.contains('hide')) openPauseMenu();
 });
 
 addEventListener('keydown', e => {
-  if (trapModalFocus(e, $('pause-menu')) || trapModalFocus(e, $('results'))) return;
+  if (trapModalFocus(e, $('pause-menu')) || trapModalFocus(e, $('respawn-overlay')) ||
+      trapModalFocus(e, $('results'))) return;
 
   const pauseOpen = isPauseMenuOpen();
+  if (!$('respawn-overlay').classList.contains('hide')) return;
   if (e.code === 'Escape' && (game.phase === 'playing' || game.phase === 'countdown')) {
     if (!pauseOpen && isEditableTarget(e.target)) return;
     e.preventDefault();

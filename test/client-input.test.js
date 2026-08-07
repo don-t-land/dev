@@ -296,6 +296,7 @@ test('pause and result overlays isolate focus and suspend flight input', () => {
 test('result and mobile HUD layouts remain scrollable without overlap', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
+  assert.match(html, /#results,\s*\.modal-layer\s*\{[^}]*z-index:\s*60/s);
   assert.match(html, /#results\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(html, /#results \.box\s*\{[^}]*max-height:\s*calc\(100dvh/s);
   assert.match(html, /\.modal-layer\s*\{[^}]*overflow-y:\s*auto/s);

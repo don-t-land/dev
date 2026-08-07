@@ -31,6 +31,8 @@ test('both flight modes use one mode-aware room popup and four-slot waiting room
   assert.match(html, /function openRoomEntry\(mode\)/);
   assert.match(html, /querySelectorAll\('\[data-home-mode\]'\)[\s\S]*openRoomEntry\(button\.dataset\.homeMode\)/);
   assert.match(html, /t: 'create', mode: entryMode/);
+  assert.match(html, /entry-create-btn'[\s\S]{0,180}visibility: 'public'/);
+  assert.doesNotMatch(html, /entry-create-btn'[\s\S]{0,180}visibility: 'private'/);
   assert.match(html, /getWaitingSlots\(room, 4\)/);
   assert.match(html, /window\.waitingRoomStage\?\.update/);
   assert.match(flowCss, /grid-template-columns:\s*repeat\(4,1fr\)/);
@@ -162,6 +164,18 @@ test('fold-derived aerodynamic profile drives the actual flight loop and HUD', (
   assert.match(html, /aeroProfile\.rollBias/);
   assert.match(html, /aeroProfile\.pitchBias/);
   assert.match(html, /id="s-aero"/);
+});
+
+test('ARENA hides the round timer and renders a readable live ranking', () => {
+  assert.match(html, /const arena = game\.mode === 'ARENA';[\s\S]{0,160}timer'\)\.classList\.toggle\('hide', arena\)/);
+  assert.match(html, /id="board" aria-label="실시간 랭킹"/);
+  assert.match(html, /class="board-count" id="b-count"/);
+  assert.match(html, /class="rank"/);
+  assert.match(html, /비행 중/);
+  assert.match(html, /재출격 준비/);
+  assert.match(html, /<small>격추<\/small>/);
+  assert.match(html, /<small>초<\/small>/);
+  assert.match(html, /#board \.row\.me[^{]*\{[^}]*background:/s);
 });
 
 test('folded craft and server-timed rooftop launch sequence are connected to arena playing', () => {

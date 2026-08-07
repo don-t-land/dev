@@ -92,6 +92,20 @@ test('the client loads free-flight controls and exposes the ESC settings menu', 
   assert.doesNotMatch(html, /const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT/);
 });
 
+test('ARENA death releases the mouse and offers a direct lobby exit', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  const flowCss = fs.readFileSync(path.join(projectRoot, 'public/multiplayer-flow.css'), 'utf8');
+
+  assert.match(html, /id="respawn-overlay"[^>]*aria-modal="true"/);
+  assert.match(html, /id="respawn-leave-btn"[^>]*>로비로 나가기<\/button>/);
+  assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}send\(\{ t: 'leave' \}\)/);
+  assert.match(html, /function showRespawnOverlay\(byName\) \{[\s\S]*clearFlightKeys\(\);[\s\S]*releaseFlightPointerLock\(\);/);
+  assert.match(html, /pointerlockchange[\s\S]{0,280}respawn-overlay'\)\.classList\.contains\('hide'\)/);
+  assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,320}respawn-overlay'\)\.classList\.add\('hide'\)/);
+  assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);\s*if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*if \(e\.code === 'Escape'/);
+  assert.match(flowCss, /#respawn-leave-btn\s*\{[^}]*flex-basis:\s*100%/s);
+});
+
 test('pause and result overlays isolate focus and suspend flight input', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 

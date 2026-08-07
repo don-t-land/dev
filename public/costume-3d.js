@@ -10,6 +10,8 @@ const palette = Object.freeze({
   blackSoft: 0x262a38,
   gold: 0xf4c95d,
   silver: 0xaeb9c8,
+  jetDark: 0x303846,
+  jetGlow: 0xff8a2c,
   policeRed: 0xff304f,
   policeBlue: 0x2f7dff
 });
@@ -87,20 +89,71 @@ function makeRudolphNose() {
   return nose;
 }
 
+function makeJetEngine() {
+  const engine = new THREE.Group();
+  const shell = mesh(
+    new THREE.CylinderGeometry(.13, .16, .56, 18),
+    material(palette.silver, { metalness: .68, roughness: .26 })
+  );
+  shell.rotation.x = Math.PI / 2;
+  const intake = mesh(
+    new THREE.TorusGeometry(.13, .032, 8, 20),
+    material(palette.jetDark, { metalness: .72, roughness: .22 })
+  );
+  intake.position.z = -.28;
+  const nozzle = mesh(
+    new THREE.TorusGeometry(.15, .035, 8, 20),
+    material(palette.black, { metalness: .6, roughness: .3 })
+  );
+  nozzle.position.z = .28;
+  const flame = mesh(
+    new THREE.ConeGeometry(.1, .38, 16),
+    material(palette.jetGlow, {
+      emissive: palette.jetGlow, emissiveIntensity: 2.2, transparent: true, opacity: .9
+    })
+  );
+  flame.rotation.x = Math.PI / 2;
+  flame.position.z = .47;
+  flame.userData.costumeJetFlame = true;
+  engine.add(shell, intake, nozzle, flame);
+  return engine;
+}
+
+function makeTwinJetEngines(anchors) {
+  const pair = new THREE.Group();
+  for (const side of ['left', 'right']) {
+    const engine = makeJetEngine();
+    engine.name = `${side}JetEngine`;
+    engine.position.fromArray(anchors[side].position);
+    engine.scale.setScalar(anchors[side].scale);
+    pair.add(engine);
+  }
+  return pair;
+}
+
 const FLIGHT_ANCHORS = Object.freeze({
-  hat: Object.freeze({ position: [.79, .18, .47], scale: .72 }),
-  nose: Object.freeze({ position: [0, .02, -1.96], scale: 1 })
+  hat: Object.freeze({ position: [0, .22, -.72], scale: .72 }),
+  nose: Object.freeze({ position: [0, .02, -1.96], scale: 1 }),
+  wings: Object.freeze({
+    left: Object.freeze({ position: [-.76, -.06, .48], scale: 1 }),
+    right: Object.freeze({ position: [.76, -.06, .48], scale: 1 })
+  })
 });
 
 const STANDING_ANCHORS = Object.freeze({
-  hat: Object.freeze({ position: [1.24, -.33, .31], scale: .82 }),
-  nose: Object.freeze({ position: [0, 3.52, -.2], scale: 1.18 })
+  hat: Object.freeze({ position: [0, 3.02, -.15], scale: .82 }),
+  nose: Object.freeze({ position: [0, 3.52, -.2], scale: 1.18 }),
+  wings: Object.freeze({
+    left: Object.freeze({ position: [-1.16, .32, .24], scale: 1.12 }),
+    right: Object.freeze({ position: [1.16, .32, .24], scale: 1.12 })
+  })
 });
 
 function normalizeCostume(value) {
   return globalThis.costumeState?.normalize?.(value) || {
     hat: ['santa', 'magic', 'police'].includes(value?.hat) ? value.hat : 'none',
-    nose: value?.nose === 'rudolph' ? 'rudolph' : 'none'
+    nose: value?.nose === 'rudolph' ? 'rudolph' : 'none',
+    wings: value?.wings === 'twin-jets' ? 'twin-jets' : 'none'
   };
 }
 
@@ -128,6 +181,11 @@ function createCostumeGroup(value, layout = 'flight') {
     nose.scale.multiplyScalar(anchors.nose.scale);
     root.add(nose);
   }
+  if (costume.wings === 'twin-jets') {
+    const wings = makeTwinJetEngines(anchors.wings);
+    wings.name = 'wingCostume';
+    root.add(wings);
+  }
   return root;
 }
 
@@ -143,7 +201,7 @@ function disposeCostume(root) {
 function setCostumeOnObject(owner, value, layout = 'flight') {
   if (!owner) return null;
   const costume = normalizeCostume(value);
-  const key = `${layout}:${costume.hat}:${costume.nose}`;
+  const key = `${layout}:${costume.hat}:${costume.nose}:${costume.wings}`;
   const current = owner.getObjectByName(COSTUME_NAME);
   if (current?.userData.costumeKey === key) return current;
   disposeCostume(current);
@@ -156,6 +214,10 @@ function setCostumeOnObject(owner, value, layout = 'flight') {
 function animateCostumes(root, seconds) {
   const redOn = Math.floor(seconds * 3.5) % 2 === 0;
   root?.traverse?.(object => {
+    if (object.userData?.costumeJetFlame && object.material) {
+      object.material.emissiveIntensity = 1.7 + Math.sin(seconds * 15) * .5;
+      object.scale.z = .9 + Math.sin(seconds * 19) * .12;
+    }
     const beacon = object.userData?.costumeBeacon;
     if (!beacon || !object.material) return;
     const active = beacon === 'red' ? redOn : !redOn;

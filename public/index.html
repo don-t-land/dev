@@ -491,7 +491,7 @@
     <button class="costume-close" type="button" aria-label="닫기" data-costume-close>×</button>
     <div class="costume-kicker">PLANE CUSTOMIZE</div>
     <h2 id="costume-title">코스튬</h2>
-    <p class="costume-description">쇼룸에서 기체를 돌려 보며 두 부위의 장식을 조합하세요.</p>
+    <p class="costume-description">쇼룸에서 기체를 돌려 보며 머리·코·양쪽 날개 장식을 조합하세요.</p>
 
     <div class="costume-showroom-layout">
       <section class="costume-showroom-stage" aria-label="코스튬 3D 쇼룸. 드래그하여 기체를 회전할 수 있습니다.">
@@ -502,7 +502,7 @@
 
       <div class="costume-wardrobe">
         <fieldset class="costume-section">
-          <legend><span>01</span> 모자 <small>오른쪽 날개 뒤쪽 ⅔ 지점</small></legend>
+          <legend><span>01</span> 모자 <small>종이비행기 기수 위</small></legend>
           <div class="costume-options">
             <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="none">
               <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
@@ -527,6 +527,18 @@
             </button>
             <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="rudolph">
               <canvas class="costume-preview-3d" data-costume-preview="rudolph" aria-hidden="true"></canvas><b>루돌프 코</b>
+            </button>
+          </div>
+        </fieldset>
+
+        <fieldset class="costume-section">
+          <legend><span>03</span> 날개 장비 <small>양쪽 날개에 한 쌍</small></legend>
+          <div class="costume-options costume-options-wings">
+            <button class="costume-option" type="button" data-costume-slot="wings" data-costume-id="none">
+              <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
+            </button>
+            <button class="costume-option" type="button" data-costume-slot="wings" data-costume-id="twin-jets">
+              <canvas class="costume-preview-3d" data-costume-preview="twin-jets" aria-hidden="true"></canvas><b>쌍발 제트</b>
             </button>
           </div>
         </fieldset>
@@ -1909,9 +1921,9 @@ function detachObjectMaterials(object) {
 function setGameplayCostume(owner, value, layout = 'flight') {
   if (!owner) return null;
   const normalized = window.costumeState.normalize(value);
-  const key = `${layout}:${normalized.hat}:${normalized.nose}`;
+  const nextKey = `${layout}:${normalized.hat}:${normalized.nose}:${normalized.wings}`;
   const previous = owner.getObjectByName('planeCostume');
-  if (previous?.userData.costumeKey !== key) detachObjectMaterials(previous);
+  if (previous?.userData.costumeKey !== nextKey) detachObjectMaterials(previous);
   const current = setCostumeOnObject(owner, normalized, layout);
   registerObjectMaterials(current);
   return current;

@@ -81,6 +81,29 @@ test('the client loads free-flight controls and exposes the ESC settings menu', 
   assert.doesNotMatch(html, /const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT/);
 });
 
+test('the ESC menu exposes persisted runtime graphics settings', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /<script\s+src=['"]\.\/graphics-settings\.js['"]><\/script>/);
+  assert.match(html, /id="graphics-resolution"/);
+  assert.match(html, /id="graphics-shadows"/);
+  assert.match(html, /id="graphics-view-distance"/);
+  assert.match(html, /localStorage\.setItem\(['"]pp_graphics['"]/);
+  assert.match(html, /function applyGraphicsSettings\(/);
+  assert.match(html, /select:not\(:disabled\)/);
+});
+
+test('high graphics defaults extend shadows and view distance across environment meshes', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /resolveGraphicsSettings\(/);
+  assert.match(html, /renderer\.shadowMap\.type\s*=\s*THREE\.PCFShadowMap/);
+  assert.match(html, /wallMesh\.castShadow\s*=\s*true/);
+  assert.match(html, /wallMesh\.receiveShadow\s*=\s*true/);
+  assert.match(html, /spireMesh\.receiveShadow\s*=\s*true/);
+  assert.match(html, /rockMesh\.receiveShadow\s*=\s*true/);
+});
+
 test('pause and result overlays isolate focus and suspend flight input', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
@@ -89,6 +112,8 @@ test('pause and result overlays isolate focus and suspend flight input', () => {
   assert.match(html, /visibilitychange/);
   assert.match(html, /function hideResults\([\s\S]*resultsReturnFocus\s*!==\s*document\.body/);
   assert.match(html, /function trapModalFocus\(/);
+  assert.match(html, /querySelector\(['"]\.modal-card['"]\)\.scrollTop\s*=\s*0/);
+  assert.match(html, /\$\(['"]graphics-resolution['"]\)\.focus\(\)/);
   assert.match(html, /id="results"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="r-title"/);
   assert.match(html, /if\s*\(pauseOpen\)\s*return/);
 });

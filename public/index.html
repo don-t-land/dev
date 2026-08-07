@@ -267,6 +267,15 @@
   .setting-row b { font-size: 14px; }
   .setting-row small { margin-top: 4px; color: #9db2c5; font-size: 11px; }
   .setting-row input { width: 22px; height: 22px; accent-color: #0a8cff; }
+  .graphics-settings { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1); }
+  .graphics-settings h3 { color: #dcecff; font-size: 12px; letter-spacing: .08em; }
+  .graphics-settings .setting-row { margin-top: 10px; cursor: default; }
+  .setting-row select {
+    flex: 0 0 146px; min-height: 38px; padding: 7px 28px 7px 10px; border: 1px solid #46627d;
+    border-radius: 9px; color: #eff7ff; background: #18334d; font: inherit; font-size: 12px;
+  }
+  .setting-row select:focus-visible { outline: 2px solid #7cc5ff; outline-offset: 2px; }
+  #graphics-summary { display: block; margin-top: 10px; color: #9db2c5; font-size: 11px; line-height: 1.45; }
 
   @media (max-width: 840px) {
     #lobby { align-items: flex-start; }
@@ -280,6 +289,8 @@
     .create-strip > div:first-child { display: block; }
     .create-strip > div:first-child span { display: block; margin-top: 4px; }
     .button-row, .result-actions, .modal-actions { flex-wrap: wrap; }
+    .graphics-settings .setting-row { align-items: stretch; flex-direction: column; gap: 10px; }
+    .graphics-settings .setting-row select { width: 100%; flex-basis: auto; }
     #stats { top: 12px; left: 12px; transform: scale(.86); transform-origin: top left; }
     #board { top: 128px; left: 12px; right: 12px; min-width: 0; width: auto; transform: none; }
     #timer { top: 98px; font-size: 19px; }
@@ -435,6 +446,35 @@
         <div class="modal-kicker">FLIGHT SETTINGS</div>
         <h2 id="pause-title">비행 설정</h2>
         <p>온라인 경기는 메뉴를 연 동안에도 계속 진행됩니다.</p>
+        <section class="graphics-settings" aria-labelledby="graphics-title">
+          <h3 id="graphics-title">그래픽 설정</h3>
+          <label class="setting-row" for="graphics-resolution">
+            <span><b>렌더링 해상도</b><small>픽셀 선명도와 GPU 부하</small></span>
+            <select id="graphics-resolution">
+              <option value="performance">성능 · 75%</option>
+              <option value="native">기본 · 100%</option>
+              <option value="enhanced">향상 · 125%</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-shadows">
+            <span><b>광원 그림자</b><small>태양광 그림자 정밀도</small></span>
+            <select id="graphics-shadows">
+              <option value="off">끄기</option>
+              <option value="medium">보통 · 1024</option>
+              <option value="high">높음 · 2048</option>
+              <option value="ultra">울트라 · 4096</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-view-distance">
+            <span><b>시야 거리</b><small>카메라 범위와 원거리 안개</small></span>
+            <select id="graphics-view-distance">
+              <option value="standard">표준 · 3km</option>
+              <option value="far">장거리 · 5km</option>
+              <option value="ultra">울트라 · 7.5km</option>
+            </select>
+          </label>
+          <output id="graphics-summary" aria-live="polite"></output>
+        </section>
         <label class="setting-row" for="key-guide-toggle">
           <span><b>키 가이드</b><small>인게임 조작 안내 표시</small></span>
           <input id="key-guide-toggle" type="checkbox" checked>
@@ -475,12 +515,18 @@
 <script src="./input-policy.js"></script>
 <script src="./room-state.js"></script>
 <script src="./flight-controls.js"></script>
+<script src="./graphics-settings.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
+const {
+  normalizeGraphicsSettings, parseGraphicsSettings, serializeGraphicsSettings, resolveGraphicsSettings
+} = window.graphicsSettingsPolicy;
+let graphicsSettings = parseGraphicsSettings(localStorage.getItem('pp_graphics'));
+let resolvedGraphics = resolveGraphicsSettings(graphicsSettings, devicePixelRatio);
 
 /* ============================================================
    유틸
@@ -825,6 +871,13 @@ $('results-ready-btn').addEventListener('click', event => {
 });
 $('leave-btn').addEventListener('click', () => send({ t: 'leave' }));
 $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(event.currentTarget.checked));
+for (const id of ['graphics-resolution', 'graphics-shadows', 'graphics-view-distance']) {
+  $(id).addEventListener('change', () => applyGraphicsSettings({
+    resolution: $('graphics-resolution').value,
+    shadows: $('graphics-shadows').value,
+    viewDistance: $('graphics-view-distance').value
+  }));
+}
 $('copy-code-btn').addEventListener('click', async () => {
   const code = $('room-code-display').textContent;
   try {
@@ -839,18 +892,18 @@ $('copy-code-btn').addEventListener('click', async () => {
    Three.js 기본
    ============================================================ */
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(resolvedGraphics.pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = resolvedGraphics.shadow.enabled;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0xb8c9dd, 0.0026);
+scene.fog = new THREE.FogExp2(0xb8c9dd, resolvedGraphics.fogDensity);
 
-const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 3000);
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, resolvedGraphics.cameraFar);
 camera.position.set(0, 200, 100);
 
 /* 하늘 돔 */
@@ -878,22 +931,71 @@ scene.add(sky);
 
 scene.add(new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5));
 const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -140; sun.shadow.camera.right = 140;
-sun.shadow.camera.top = 140; sun.shadow.camera.bottom = -140;
-sun.shadow.camera.far = 400;
+sun.castShadow = resolvedGraphics.shadow.enabled;
+sun.shadow.mapSize.set(resolvedGraphics.shadow.mapSize, resolvedGraphics.shadow.mapSize);
+sun.shadow.camera.left = -resolvedGraphics.shadow.extent;
+sun.shadow.camera.right = resolvedGraphics.shadow.extent;
+sun.shadow.camera.top = resolvedGraphics.shadow.extent;
+sun.shadow.camera.bottom = -resolvedGraphics.shadow.extent;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = resolvedGraphics.shadow.far;
+sun.shadow.bias = -0.00035;
+sun.shadow.normalBias = 0.035;
 scene.add(sun, sun.target);
 
+function updateGraphicsSummary() {
+  const shadowText = resolvedGraphics.shadow.enabled ? `${resolvedGraphics.shadow.mapSize}px` : '꺼짐';
+  $('graphics-summary').textContent =
+    `렌더 ${resolvedGraphics.pixelRatio.toFixed(2)}× · 그림자 ${shadowText} · 시야 ${resolvedGraphics.cameraFar}m`;
+}
+
+function syncGraphicsControls() {
+  $('graphics-resolution').value = graphicsSettings.resolution;
+  $('graphics-shadows').value = graphicsSettings.shadows;
+  $('graphics-view-distance').value = graphicsSettings.viewDistance;
+  updateGraphicsSummary();
+}
+
+function applyGraphicsSettings(next, persist = true) {
+  graphicsSettings = normalizeGraphicsSettings(next);
+  resolvedGraphics = resolveGraphicsSettings(graphicsSettings, devicePixelRatio);
+
+  renderer.setPixelRatio(resolvedGraphics.pixelRatio);
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = resolvedGraphics.shadow.enabled;
+  sun.castShadow = resolvedGraphics.shadow.enabled;
+
+  if (resolvedGraphics.shadow.enabled) {
+    const sizeChanged = sun.shadow.mapSize.x !== resolvedGraphics.shadow.mapSize;
+    if (sizeChanged && sun.shadow.map) {
+      sun.shadow.map.dispose();
+      sun.shadow.map = null;
+    }
+    sun.shadow.mapSize.set(resolvedGraphics.shadow.mapSize, resolvedGraphics.shadow.mapSize);
+    const extent = resolvedGraphics.shadow.extent;
+    Object.assign(sun.shadow.camera, { left: -extent, right: extent, top: extent, bottom: -extent, far: resolvedGraphics.shadow.far });
+    sun.shadow.camera.updateProjectionMatrix();
+    renderer.shadowMap.needsUpdate = true;
+  }
+
+  camera.far = resolvedGraphics.cameraFar;
+  camera.updateProjectionMatrix();
+  scene.fog.density = resolvedGraphics.fogDensity;
+  if (persist) localStorage.setItem('pp_graphics', serializeGraphicsSettings(graphicsSettings));
+  syncGraphicsControls();
+}
+
+applyGraphicsSettings(graphicsSettings, false);
+
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(4000, 4000),
+  new THREE.PlaneGeometry(8000, 8000),
   new THREE.MeshStandardMaterial({ color: 0x5f7a4e, roughness: 1 })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const grid = new THREE.GridHelper(1600, 40, 0x7a9468, 0x6d8a5c);
+const grid = new THREE.GridHelper(3200, 80, 0x7a9468, 0x6d8a5c);
 grid.material.transparent = true;
 grid.material.opacity = 0.35;
 scene.add(grid);
@@ -912,6 +1014,7 @@ function makePlaneMesh(color) {
     color, roughness: 0.85, side: THREE.DoubleSide, flatShading: true
   }));
   mesh.castShadow = true;
+  mesh.receiveShadow = true;
   return mesh;
 }
 
@@ -1072,6 +1175,8 @@ function buildDistance(seed) {
   // 협곡 벽
   const step = 42, segs = Math.ceil(DIST_LEN / step);
   wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), segs * 2);
+  wallMesh.castShadow = true;
+  wallMesh.receiveShadow = true;
   let wi = 0;
   for (let side = -1; side <= 1; side += 2) {
     for (let i = 0; i < segs; i++) {
@@ -1088,6 +1193,7 @@ function buildDistance(seed) {
   const nSp = Math.floor(DIST_LEN / 1000 * 22);
   spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), nSp);
   spireMesh.castShadow = true;
+  spireMesh.receiveShadow = true;
   for (let i = 0; i < nSp; i++) {
     const h = 45 + rng() * 125, r = 6 + rng() * 8;
     const x = (rng() * 2 - 1) * (DIST_HALF - 20);
@@ -1104,6 +1210,7 @@ function buildDistance(seed) {
   const nRk = Math.floor(DIST_LEN / 1000 * 15);
   rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), nRk);
   rockMesh.castShadow = true;
+  rockMesh.receiveShadow = true;
   for (let i = 0; i < nRk; i++) {
     const r = 5 + rng() * 7;
     const x = (rng() * 2 - 1) * (DIST_HALF - 20);
@@ -1147,6 +1254,8 @@ function buildArena(seed) {
   // 외벽 바위 링
   const nWall = 56;
   wallMesh = new THREE.InstancedMesh(unitBox, rockLikeMat(0x74695b), nWall);
+  wallMesh.castShadow = true;
+  wallMesh.receiveShadow = true;
   for (let i = 0; i < nWall; i++) {
     const a = (i / nWall) * Math.PI * 2;
     const rr = ARENA_R + 22 + rng() * 14;
@@ -1162,6 +1271,7 @@ function buildArena(seed) {
   const nSp = 13;
   spireMesh = new THREE.InstancedMesh(unitCone, rockLikeMat(0x6e6357), nSp);
   spireMesh.castShadow = true;
+  spireMesh.receiveShadow = true;
   for (let i = 0; i < nSp; i++) {
     const h = 60 + rng() * 130, r = 7 + rng() * 9;
     const a = rng() * Math.PI * 2, d = 40 + rng() * (ARENA_R - 80);
@@ -1178,6 +1288,7 @@ function buildArena(seed) {
   const nRk = 18;
   rockMesh = new THREE.InstancedMesh(unitRock, rockLikeMat(0x7d7264), nRk);
   rockMesh.castShadow = true;
+  rockMesh.receiveShadow = true;
   for (let i = 0; i < nRk; i++) {
     const r = 5 + rng() * 7;
     const a = rng() * Math.PI * 2, d = rng() * (ARENA_R - 40);
@@ -1465,7 +1576,7 @@ function setUnderlyingGameUiInert(inert) {
 
 function trapModalFocus(event, layer) {
   if (event.code !== 'Tab' || layer.classList.contains('hide')) return false;
-  const focusable = [...layer.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+  const focusable = [...layer.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')];
   if (!focusable.length) return false;
   const first = focusable[0], last = focusable[focusable.length - 1];
   if (event.shiftKey && (document.activeElement === first || !layer.contains(document.activeElement))) {
@@ -1540,7 +1651,8 @@ function openPauseMenu() {
   $('pause-menu').classList.remove('hide');
   setUnderlyingGameUiInert(true);
   releaseFlightPointerLock();
-  $('resume-btn').focus();
+  $('pause-menu').querySelector('.modal-card').scrollTop = 0;
+  $('graphics-resolution').focus();
 }
 
 function resumeFlight() {
@@ -1796,8 +1908,7 @@ renderer.setAnimationLoop(() => {
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  applyGraphicsSettings(graphicsSettings, false);
 });
 
 /* 로비가 보이는 즉시 공개 방 목록을 요청합니다. 이름은 방 참가 시에만 전송합니다. */

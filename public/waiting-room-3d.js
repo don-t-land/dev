@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
 
-const ACTOR_BLOCK_GAP_PX = 80;
+const SLOT_EDGE_PADDING_PX = 10;
+const PLAYER_INFO_CLEARANCE_PX = 56;
+const MOBILE_PLAYER_INFO_CLEARANCE_PX = 72;
+const MOBILE_MAX_ACTOR_SCALE = .76;
+const DESKTOP_MAX_ACTOR_SCALE = .94;
 const actors = [];
 const raycaster = new THREE.Raycaster();
 const slotPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -35,9 +39,12 @@ function tintMascot(mascot, id) {
 
 function makeActor(index) {
   const mascot = makeStandingPlaneMascot();
-  mascot.scale.setScalar(.84);
   mascot.position.set(0, 0, 0);
-  const actor = { mascot, id: null, ready: false, host: false };
+  mascot.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(mascot);
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const actor = { mascot, bounds, size, center, id: null, ready: false, host: false };
   scene.add(mascot);
   return actor;
 }
@@ -54,21 +61,33 @@ function screenToWorldOnPlane(clientX, clientY) {
 
 function alignActorsToSlots() {
   if (!canvas || !camera) return;
+  const canvasBlock = canvas.getBoundingClientRect();
+  const mobile = canvasBlock.width < 760;
   const slots = document.querySelectorAll('.room-player-slot[data-slot-index]');
   slots.forEach(slot => {
     const index = Number(slot.dataset.slotIndex);
     const actor = actors[index];
     if (!actor) return;
     const block = slot.getBoundingClientRect();
-    const target = screenToWorldOnPlane(
-      block.left + block.width / 2,
-      block.top - ACTOR_BLOCK_GAP_PX
-    );
-    if (!target) return;
-    actor.mascot.position.x = target.x;
-    actor.mascot.position.y = target.y;
+    const centerX = block.left + block.width / 2;
+    const playerInfoClearance = mobile ? MOBILE_PLAYER_INFO_CLEARANCE_PX : PLAYER_INFO_CLEARANCE_PX;
+    const feetLineY = block.bottom - playerInfoClearance;
+    const fitTopY = mobile ? block.top + SLOT_EDGE_PADDING_PX : canvasBlock.top + SLOT_EDGE_PADDING_PX;
+    const left = screenToWorldOnPlane(block.left + SLOT_EDGE_PADDING_PX, feetLineY);
+    const right = screenToWorldOnPlane(block.right - SLOT_EDGE_PADDING_PX, feetLineY);
+    const top = screenToWorldOnPlane(centerX, fitTopY);
+    const bottom = screenToWorldOnPlane(centerX, feetLineY);
+    if (!left || !right || !top || !bottom) return;
+
+    const widthScale = Math.abs(right.x - left.x) / actor.size.x;
+    const heightScale = Math.abs(top.y - bottom.y) / actor.size.y;
+    const maxScale = mobile ? MOBILE_MAX_ACTOR_SCALE : DESKTOP_MAX_ACTOR_SCALE;
+    const scale = Math.min(maxScale, widthScale, heightScale);
+
+    actor.mascot.scale.setScalar(scale);
+    actor.mascot.position.x = bottom.x - actor.center.x * scale;
+    actor.mascot.position.y = bottom.y - actor.bounds.min.y * scale;
     actor.mascot.position.z = 0;
-    actor.mascot.scale.setScalar(THREE.MathUtils.clamp(block.width / 210, .6, .94));
   });
 }
 

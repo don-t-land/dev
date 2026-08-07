@@ -8,6 +8,7 @@ const path = require('node:path');
 const publicDir = path.join(__dirname, '..', 'public');
 const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
 const visuals = fs.readFileSync(path.join(publicDir, 'biome-visuals.js'), 'utf8');
+const biomeHelpers = fs.readFileSync(path.join(publicDir, 'biomes', 'helpers.js'), 'utf8');
 const physics = fs.readFileSync(path.join(publicDir, 'flight-physics-rapier.mjs'), 'utf8');
 
 test('browser loads pure biome recipes before the registry and renderer module', () => {
@@ -38,6 +39,16 @@ test('environment renderer uses layered instancing for every requested asset fam
   assert.match(visuals, /wind-gate/);
   assert.match(visuals, /post-office/);
   assert.match(visuals, /white-needle/);
+});
+
+test('curved segmented silhouettes and spatial repacking are wired into production', () => {
+  assert.match(visuals, /function spirePoseAt/);
+  assert.match(visuals, /function spireSegmentEntries/);
+  assert.match(visuals, /function alignSpireSegment/);
+  assert.match(visuals, /forkItems/);
+  assert.match(biomeHelpers, /function createSpatialHash/);
+  assert.match(biomeHelpers, /function resolveLayoutOverlaps/);
+  assert.match(biomeHelpers, /goldenAngle/);
 });
 
 test('floating platforms are collidable in both fallback and Rapier paths', () => {

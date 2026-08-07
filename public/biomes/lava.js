@@ -18,7 +18,8 @@
       bendYaw: yaw + (rng() - .5) * 1.2,
       kink: (rng() - .5) * .045,
       taper: .14 + rng() * .18,
-      bulge: .04 + rng() * .12
+      bulge: .04 + rng() * .12,
+      layoutPattern: arena ? 'radial-fissure' : 'edge-chain'
     });
   }
 

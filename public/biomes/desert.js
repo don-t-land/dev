@@ -65,6 +65,7 @@
     for (let i = 0; i < h.arenaCount(ctx, 15); i++) {
       const p = h.clusterPoint(rng, clusters[i % clusters.length], 56, 8);
       addSpire(out, p.x, p.z, 55 + rng() * 125, 6 + rng() * 8, rng);
+      out.spires[out.spires.length - 1].layoutPattern = 'desert-cluster';
     }
     for (let i = 0; i < h.arenaCount(ctx, 18); i++) {
       const p = h.clusterPoint(rng, clusters[i % clusters.length], 82, 16);

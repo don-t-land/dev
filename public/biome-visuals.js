@@ -134,9 +134,55 @@ function addWalls(root, groups, biomes, materials) {
 function spireGeometry(biome) {
   if (biome === 1) return weatheredPillarGeometry();
   if (biome === 2) return new THREE.ConeGeometry(1, 1, 5, 2);
-  if (biome === 3) return new THREE.CylinderGeometry(.58, 1, 1, 8, 4, true);
-  if (biome === 4) return new THREE.CylinderGeometry(.08, .88, 1, 7, 3);
-  return new THREE.CylinderGeometry(.12, 1, 1, 7, 3);
+  if (biome === 3) return new THREE.CylinderGeometry(.72, 1, 1, 8, 3, true);
+  if (biome === 4) return new THREE.CylinderGeometry(.42, .88, 1, 7, 2);
+  return new THREE.CylinderGeometry(.62, 1, 1, 7, 2);
+}
+
+function spirePoseAt(spire, t, biome) {
+  const fallbackCurve = [0.035, .1, 0, .045, .05][biome] || 0;
+  const curve = spire.curve ?? fallbackCurve;
+  const bendYaw = spire.bendYaw ?? ((spire.yaw || 0) + ((spire.variant || 0) - 1.5) * .42);
+  const bend = curve * spire.h * Math.pow(t, 1.58);
+  const lean = Math.tan(spire.lean || 0) * spire.h * t;
+  const wave = (spire.kink || 0) * spire.h * Math.sin(t * Math.PI * 1.7);
+  return new THREE.Vector3(
+    spire.x + Math.cos(bendYaw) * (bend + lean) + Math.cos(bendYaw + Math.PI / 2) * wave,
+    spire.h * t,
+    spire.z + Math.sin(bendYaw) * (bend + lean) + Math.sin(bendYaw + Math.PI / 2) * wave
+  );
+}
+
+function spireRadiusAt(spire, t, biome) {
+  const fallbackTaper = biome === 1 ? .34 : biome === 3 ? .18 : .72;
+  const taper = spire.taper ?? fallbackTaper;
+  const bulge = spire.bulge ?? (biome === 1 ? .12 : .04);
+  return Math.max(.16, 1 - taper * t + Math.sin(t * Math.PI) * bulge);
+}
+
+function spireSegmentEntries(items, biome) {
+  return items.flatMap((spire, index) => {
+    const fallback = biome === 2 ? 1 : biome === 1 ? 4 : 3;
+    const count = Math.max(1, Math.min(7, spire.segments || fallback));
+    return Array.from({ length: count }, (_, segment) => ({
+      spire, index, segment, count,
+      t0: segment / count,
+      t1: (segment + 1) / count
+    }));
+  });
+}
+
+function alignSpireSegment(object, entry, biome, radiusFactor = 1) {
+  const p0 = spirePoseAt(entry.spire, entry.t0, biome);
+  const p1 = spirePoseAt(entry.spire, entry.t1, biome);
+  const direction = p1.clone().sub(p0);
+  const length = Math.max(.01, direction.length());
+  const mid = (entry.t0 + entry.t1) * .5;
+  const radius = entry.spire.r * spireRadiusAt(entry.spire, mid, biome) * radiusFactor;
+  object.position.copy(p0);
+  object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  object.rotateY((entry.spire.yaw || 0) + entry.segment * .11);
+  object.scale.set(radius, length * 1.035, radius);
 }
 
 function addSpires(root, groups, biomes, materials) {
@@ -150,16 +196,13 @@ function addSpires(root, groups, biomes, materials) {
     materials.push(baseMat, accentMat);
     const primary = spireGeometry(biomeIndex);
     if (biomeIndex !== 1) primary.translate(0, .5, 0);
-    createMesh(root, primary, baseMat, items, (o, spire) => {
-      o.position.set(spire.x, 0, spire.z);
-      o.rotation.set(spire.lean || 0, spire.yaw || 0, (spire.lean || 0) * .62);
-      o.scale.set(spire.r, spire.h, spire.r);
-    });
+    const segments = spireSegmentEntries(items, biomeIndex);
+    createMesh(root, primary, baseMat, segments, (o, entry) => alignSpireSegment(o, entry, biomeIndex));
 
     if (biomeIndex === 1) {
       const crown = new THREE.CylinderGeometry(.38, .72, .2, 6, 1);
       createMesh(root, crown, accentMat, items, (o, s) => {
-        o.position.set(s.x, s.h * .91, s.z);
+        o.position.copy(spirePoseAt(s, .91, biomeIndex));
         o.rotation.y = s.yaw || 0;
         o.scale.set(s.r * 1.05, s.h * .32, s.r * 1.05);
       });
@@ -170,7 +213,7 @@ function addSpires(root, groups, biomes, materials) {
       const collar = new THREE.TorusGeometry(1, .085, 5, 7); collar.rotateX(Math.PI / 2);
       createMesh(root, collar, accentMat, collars, (o, s) => {
         const taper = 1 - s.level * .34;
-        o.position.set(s.x, s.h * s.level, s.z);
+        o.position.copy(spirePoseAt(s, s.level, biomeIndex));
         o.rotation.y = s.yaw || 0;
         o.scale.set(s.r * taper, s.r * taper, s.r * taper);
       });
@@ -181,6 +224,19 @@ function addSpires(root, groups, biomes, materials) {
         o.position.set(s.x + Math.cos(angle) * s.r * .68, 0, s.z + Math.sin(angle) * s.r * .68);
         o.rotation.set(Math.cos(angle) * .18, angle, -Math.sin(angle) * .18);
         o.scale.set(s.r * .38, s.h * (.12 + s.side * .018), s.r * .38);
+      });
+      const forkItems = items.filter(s => s.fork);
+      const fork = new THREE.CylinderGeometry(.24, .68, 1, 6, 2); fork.translate(0, .5, 0);
+      createMesh(root, fork, baseMat, forkItems, (o, s, index) => {
+        const base = spirePoseAt(s, .43 + (index % 3) * .07, biomeIndex);
+        const angle = (s.bendYaw || s.yaw || 0) + (s.forkSide || 1) * (1.05 + (index % 2) * .22);
+        const length = s.h * (.19 + (index % 3) * .025);
+        const end = base.clone().add(new THREE.Vector3(Math.cos(angle) * length * .62, length * .78, Math.sin(angle) * length * .62));
+        const direction = end.sub(base);
+        o.position.copy(base);
+        o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+        o.rotateY(s.yaw || 0);
+        o.scale.set(s.r * .52, direction.length(), s.r * .52);
       });
     } else if (biomeIndex === 2) {
       const shard = new THREE.ConeGeometry(1, 1, 5, 1); shard.translate(0, .5, 0);
@@ -195,20 +251,18 @@ function addSpires(root, groups, biomes, materials) {
       });
     } else if (biomeIndex === 3) {
       const glow = new THREE.CylinderGeometry(.34, .58, 1, 8, 1); glow.translate(0, .5, 0);
-      createMesh(root, glow, accentMat, items, (o, s) => {
-        o.position.set(s.x, s.h * .03, s.z);
-        o.scale.set(s.r * .52, s.h * .9, s.r * .52);
-      }, false);
+      createMesh(root, glow, accentMat, segments, (o, entry) => alignSpireSegment(o, entry, biomeIndex, .52), false);
       const rim = new THREE.TorusGeometry(1, .18, 6, 10); rim.rotateX(Math.PI / 2);
       createMesh(root, rim, baseMat, items, (o, s) => {
-        o.position.set(s.x, s.h * .96, s.z);
+        o.position.copy(spirePoseAt(s, .96, biomeIndex));
         o.rotation.y = s.yaw || 0;
         o.scale.set(s.r * .72, s.r * .72, s.r * .72);
       });
     } else {
       const collar = new THREE.TorusGeometry(1, .1, 5, 9); collar.rotateX(Math.PI / 2);
       createMesh(root, collar, accentMat, items, (o, s, index) => {
-        o.position.set(s.x, s.h * (biomeIndex === 4 ? .68 : .52 + (index % 2) * .12), s.z);
+        const level = biomeIndex === 4 ? .68 : .52 + (index % 2) * .12;
+        o.position.copy(spirePoseAt(s, level, biomeIndex));
         o.scale.set(s.r * (biomeIndex === 4 ? .56 : .72), s.r * .56, s.r * (biomeIndex === 4 ? .56 : .72));
       });
     }
@@ -251,7 +305,7 @@ function addPlatforms(root, items, biome, materials) {
   const shelf = new THREE.CylinderGeometry(1, .72, 1, 9, 2);
   createMesh(root, shelf, stone, items, (o, island) => {
     o.position.set(island.x, island.y, island.z);
-    o.rotation.y = island.rotation || 0;
+    o.rotation.set((island.shelfSkew || 0) * .32, island.rotation || 0, island.shelfSkew || 0);
     o.scale.set(island.w * .5, island.h, island.d * .5);
   });
   const cap = new THREE.CylinderGeometry(1, 1, .12, 9, 1);
@@ -262,9 +316,9 @@ function addPlatforms(root, items, biome, materials) {
   });
   const underside = new THREE.ConeGeometry(1, 1, 9, 3); underside.rotateZ(Math.PI);
   createMesh(root, underside, stone, items, (o, island) => {
-    const depth = Math.max(18, Math.min(52, island.w * .62));
+    const depth = Math.max(18, Math.min(62, island.w * (island.undersideDepth || .62)));
     o.position.set(island.x, island.y - island.h * .55 - depth * .42, island.z);
-    o.rotation.y = island.rotation || 0;
+    o.rotation.set(0, island.rotation || 0, (island.shelfSkew || 0) * .22);
     o.scale.set(island.w * .43, depth, island.d * .43);
   });
   const terraceItems = items.flatMap(island => Array.from({ length: island.terraces || 2 }, (_, tier) => ({ island, tier })));

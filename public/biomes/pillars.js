@@ -24,7 +24,8 @@
       taper: .22 + rng() * .24,
       bulge: .08 + rng() * .18,
       fork: rng() > .76,
-      forkSide: rng() > .5 ? 1 : -1
+      forkSide: rng() > .5 ? 1 : -1,
+      layoutPattern: arena ? 'golden-spiral' : 'alternating-slalom'
     });
   }
 

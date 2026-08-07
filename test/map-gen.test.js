@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const mapGen = require('../public/map-gen.js');
+const biomeHelpers = require('../public/biomes/helpers.js');
 
 const {
   DIST_LEN,
@@ -180,6 +181,33 @@ test('arena object density follows the 3x perimeter and 9x playable area', () =>
       }
     }
   }
+});
+
+test('solid biome assets are deterministically repacked without visual overlaps', () => {
+  for (let seed = 0; seed < 40; seed++) {
+    const layout = buildArenaLayout(seed);
+    const overlaps = biomeHelpers.findSolidOverlaps(layout);
+    assert.equal(overlaps.length, 0, `seed ${seed}: ${JSON.stringify(overlaps[0])}`);
+  }
+});
+
+test('each arena biome carries a distinct silhouette and placement grammar', () => {
+  const seen = new Map();
+  for (let seed = 0; seed < 500 && seen.size < BIOMES.length; seed++) {
+    seen.set(arenaTheme(seed).id, seed);
+  }
+  const layouts = Object.fromEntries([...seen].map(([id, seed]) => [id, buildArenaLayout(seed)]));
+  assert.ok(layouts.desert.spires.every(item => item.silhouette === 'sand-needle' && item.layoutPattern === 'desert-cluster'));
+  assert.ok(layouts.pillars.spires.every(item => item.silhouette === 'bent-column' && item.layoutPattern === 'golden-spiral'));
+  assert.ok(layouts.glacier.spires.every(item => item.silhouette === 'crystal-fan' && item.layoutPattern === 'crystal-grove'));
+  assert.ok(layouts.lava.spires.every(item => item.silhouette === 'crooked-chimney' && item.layoutPattern === 'radial-fissure'));
+  assert.ok(layouts.floating.platforms.every(item => item.silhouette === 'terraced-island' && item.layoutPattern === 'archipelago'));
+
+  const pillars = layouts.pillars.spires;
+  assert.ok(Math.max(...pillars.map(item => item.h)) - Math.min(...pillars.map(item => item.h)) > 190);
+  assert.ok(new Set(pillars.map(item => item.segments)).size >= 4);
+  assert.ok(pillars.some(item => item.fork));
+  assert.ok(pillars.every(item => item.curve >= .045 && item.curve <= .19));
 });
 
 test('arena themes cover all five identities and floating arena has no wall mesh', () => {

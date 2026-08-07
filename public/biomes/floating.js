@@ -47,7 +47,8 @@
         yaw, lean: (rng() - .5) * .08, variant: i % 4, floatingNeedle: true,
         silhouette: 'sky-needle', segments: 2 + Math.floor(rng() * 3),
         curve: .025 + rng() * .07, bendYaw: yaw + (rng() - .5) * 1.5,
-        taper: .72 + rng() * .18, bulge: .03 + rng() * .09
+        taper: .72 + rng() * .18, bulge: .03 + rng() * .09,
+        layoutPattern: 'sky-lane'
       });
     }
     for (let i = 0; i < h.distanceCount(ctx, 18); i++) {
@@ -75,26 +76,28 @@
 
   function arena(ctx, rng) {
     const out = h.emptyLayout();
-    const archipelagos = h.arenaClusterCenters(ctx, rng, 5, 90, 120).map(center => ({
+    const archipelagos = h.arenaClusterCenters(ctx, rng, 5, 90, 150).map(center => ({
       ...center,
       y: 72 + rng() * 112
     }));
     for (let i = 0; i < h.arenaCount(ctx, 5); i++) {
       const center = archipelagos[i % archipelagos.length];
-      const p = h.clusterPoint(rng, center, 58, 12);
+      const p = h.clusterPoint(rng, center, 78, 14);
       const yaw = rng() * Math.PI * 2;
       out.spires.push({
         x: p.x, z: p.z, h: 125 + rng() * 215, r: 10 + rng() * 12,
         yaw, lean: (rng() - .5) * .09, variant: i % 4, floatingNeedle: true,
         silhouette: 'sky-needle', segments: 2 + Math.floor(rng() * 3),
         curve: .025 + rng() * .07, bendYaw: yaw + (rng() - .5) * 1.5,
-        taper: .72 + rng() * .18, bulge: .03 + rng() * .09
+        taper: .72 + rng() * .18, bulge: .03 + rng() * .09,
+        layoutPattern: 'archipelago'
       });
     }
     for (let i = 0; i < h.arenaCount(ctx, 20); i++) {
       const center = archipelagos[i % archipelagos.length];
-      const p = h.clusterPoint(rng, center, 86, 9);
-      platform(out, p.x, center.y + (rng() - .5) * 64, p.z, i, rng, .76 + rng() * .42);
+      const p = h.clusterPoint(rng, center, 125, 16);
+      platform(out, p.x, center.y + (rng() - .5) * 64, p.z, i, rng, .58 + rng() * .32);
+      out.platforms[out.platforms.length - 1].layoutPattern = 'archipelago';
     }
     for (let i = 0; i < h.arenaCount(ctx, 24); i++) addDebris(out, out.platforms[i % out.platforms.length], i, rng);
     for (let i = 0; i < h.arenaCount(ctx, 9); i++) { const p = h.arenaPoint(rng, ctx.radius, 48, 72); out.thermals.push({ x: p.x, z: p.z, strength: 1.3 }); }

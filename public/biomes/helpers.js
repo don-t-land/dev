@@ -72,7 +72,18 @@
   function solidBounds(item, key) {
     if (!item || !Number.isFinite(item.x) || !Number.isFinite(item.z)) return null;
     if (key === 'spires') {
-      return { x: item.x, z: item.z, radius: Math.max(2, item.r * 1.08), yMin: 0, yMax: item.h };
+      const curveEnvelope = item.h * (
+        Math.abs(item.curve || 0) +
+        Math.abs(item.kink || 0) +
+        Math.abs(Math.tan(item.lean || 0))
+      ) * .32;
+      return {
+        x: item.x,
+        z: item.z,
+        radius: Math.max(2, item.r * 1.08 + Math.min(item.h * .2, curveEnvelope)),
+        yMin: 0,
+        yMax: item.h
+      };
     }
     if (key === 'rocks') {
       const horizontal = item.r * Math.max(item.sx || 1, item.sz || 1);
@@ -97,7 +108,9 @@
       return { x: item.x, z: item.z, radius: 10, yMin: item.y - 10, yMax: item.y + 10 };
     }
     if (key === 'thermals') {
-      return { x: item.x, z: item.z, radius: 27, yMin: 0, yMax: 340 };
+      // The visible thermal core is much narrower than its translucent haze.
+      // Keep the core clear of terrain without treating the whole effect as a wall.
+      return { x: item.x, z: item.z, radius: 20, yMin: 0, yMax: 340 };
     }
     return null;
   }
@@ -158,7 +171,7 @@
   function resolveLayoutOverlaps(layout, ctx, seed = 0) {
     const out = Object.fromEntries(KEYS.map(key => [key, (layout[key] || []).map(item => ({ ...item }))]));
     const hash = createSpatialHash();
-    const solidOrder = ['landmarks', 'platforms', 'spires', 'rocks'];
+    const solidOrder = ['landmarks', 'spires', 'platforms', 'rocks'];
     const goldenAngle = Math.PI * (3 - Math.sqrt(5));
 
     function place(item, key, index, insert = true) {
@@ -166,11 +179,13 @@
       const originalZ = item.z;
       const salt = hashPlacement(seed, key, index);
       const startAngle = salt / 4294967296 * Math.PI * 2;
-      for (let attempt = 0; attempt <= 96; attempt++) {
+      const maxAttempts = insert ? 240 : 360;
+      const clearance = insert ? 5 : 1;
+      for (let attempt = 0; attempt <= maxAttempts; attempt++) {
         if (attempt) {
           const ring = 1 + Math.floor((attempt - 1) / 12);
           const base = solidBounds(item, key)?.radius || 12;
-          const distance = ring * Math.max(9, base * .72);
+          const distance = ring * Math.max(12, base * 1.08);
           const angle = startAngle + attempt * goldenAngle;
           item.x = originalX + Math.cos(angle) * distance;
           item.z = originalZ + Math.sin(angle) * distance;
@@ -178,8 +193,8 @@
         const bounds = solidBounds(item, key);
         if (!bounds || !fitsCourse(bounds, ctx)) continue;
         let blocked = false;
-        for (const other of hash.query(bounds)) {
-          if (boundsOverlap(bounds, other.bounds)) { blocked = true; break; }
+        for (const other of hash.query({ ...bounds, radius: bounds.radius + clearance })) {
+          if (boundsOverlap(bounds, other.bounds, clearance)) { blocked = true; break; }
         }
         if (blocked) continue;
         item.placementShift = Math.hypot(item.x - originalX, item.z - originalZ);

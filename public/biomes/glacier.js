@@ -14,7 +14,8 @@
       cluster: true, silhouette: 'crystal-fan', segments: 1,
       fanYaw: yaw + (rng() - .5) * .9,
       taper: .8 + rng() * .16,
-      bulge: 0
+      bulge: 0,
+      layoutPattern: arena ? 'crystal-grove' : 'crevasse-edge'
     });
   }
 

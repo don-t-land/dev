@@ -288,7 +288,23 @@
         [[-43, 10, 53, -.04], [42, 8, 39, .06]]
       ];
       spireSets[biome].forEach(([x, r, h, lean], index) => {
-        layout.spires.push({ biome, x, z: index ? -2 : 5, r, h, lean, yaw: index * .7 - .24 });
+        const yaw = index * .7 - .24;
+        const spire = { biome, x, z: index ? -2 : 5, r, h, lean, yaw, variant: index };
+        if (biome === 0) Object.assign(spire, { segments: 3 + index, curve: .07 + index * .025, bendYaw: yaw + .4, taper: .76, bulge: .06 });
+        if (biome === 1) Object.assign(spire, {
+          segments: index ? 4 : 6,
+          curve: index ? .12 : .22,
+          bendYaw: index ? -.9 : .42,
+          kink: index ? -.035 : .06,
+          taper: .31,
+          bulge: .17,
+          fork: index === 0,
+          forkSide: 1
+        });
+        if (biome === 2) Object.assign(spire, { segments: 1, fanYaw: yaw + .2, taper: .9 });
+        if (biome === 3) Object.assign(spire, { segments: 3 + index, curve: .055 + index * .025, bendYaw: yaw - .5, kink: .025, taper: .22, bulge: .1 });
+        if (biome === 4) Object.assign(spire, { segments: 3 + index, curve: .08 + index * .02, bendYaw: yaw + .8, taper: .78, bulge: .07 });
+        layout.spires.push(spire);
       });
 
       const rocks = biome === 4
@@ -351,7 +367,7 @@
 
       const canvas = card.querySelector('canvas');
       const viewport = card.querySelector('.viewport');
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.shadowMap.enabled = true;

@@ -42,6 +42,26 @@ test('dash and darts share one energy HUD instead of rechargeable ammo pips', ()
   assert.doesNotMatch(html, /id="ammo"|me\.ammo|me\.ammoT/);
 });
 
+test('ARENA minimap is mode-gated, world-backed, and responsive', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /<script\s+src=['"]\.\/arena-minimap\.js['"]><\/script>/);
+  assert.match(html, /<figure\s+id="arena-minimap"[^>]*aria-label="ARENA 미니맵"[^>]*class="hide"/);
+  assert.match(html, /<canvas\s+id="arena-minimap-canvas"[^>]*width="256"[^>]*height="256"/);
+  assert.match(html, /#arena-minimap\s*\{[^}]*top:\s*18px[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*auto[^}]*right:\s*8px[^}]*width:\s*104px[^}]*transform:\s*none/s);
+  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(max-height:\s*440px\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*auto[^}]*right:\s*8px[^}]*width:\s*70px[^}]*transform:\s*none/s);
+  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(max-height:\s*400px\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#arena-minimap\s*\{[^}]*width:\s*60px/s);
+  assert.match(html, /const\s+\{\s*createArenaMinimapFrame,\s*drawArenaMinimap\s*\}\s*=\s*window\.arenaMinimap/);
+  assert.match(html, /function enterGame\(\)[\s\S]*\$\('hud'\)\.classList\.toggle\('arena-mode', arena\)[\s\S]*\$\('arena-minimap'\)\.classList\.toggle\('hide', !arena\)/);
+  assert.match(html, /function updateArenaMinimap\(\)[\s\S]*mode:\s*game\.mode[\s\S]*arenaRadius:\s*ARENA_R[\s\S]*craft\.position[\s\S]*net\.players[\s\S]*ringsArr[\s\S]*thermals[\s\S]*drawArenaMinimap/);
+  assert.match(html, /@media\s*\(min-width:\s*561px\)\s*and\s*\(max-width:\s*889px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*32px[^}]*left:\s*auto[^}]*right:\s*132px[^}]*width:\s*120px[^}]*transform:\s*none[\s\S]*#board\.arena\s*\{[^}]*padding-top:\s*160px[^}]*max-height:\s*calc\(100dvh\s*-\s*210px\)[^}]*overflow-y:\s*auto/s);
+  assert.match(html, /@media\s*\(min-width:\s*561px\)\s*and\s*\(max-width:\s*889px\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*440px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*28px[^}]*right:\s*152px[^}]*width:\s*80px[^}]*[\s\S]*#board\.arena\s*\{[^}]*padding-top:\s*105px[^}]*max-height:\s*calc\(100dvh\s*-\s*180px\)[\s\S]*#hud\.arena-mode\s+#keys\s*,\s*#hud\.arena-mode\s+#game-leave-btn\s*\{[^}]*display:\s*none/s);
+  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*440px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*auto[^}]*right:\s*8px[^}]*width:\s*60px[^}]*height:\s*60px[^}]*transform:\s*none/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*96px[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(html, /minimapAcc\s*>=\s*1\s*\/\s*15[\s\S]*minimapAcc\s*%=\s*1\s*\/\s*15[\s\S]*updateArenaMinimap\(\)/);
+});
+
 test('coarse-pointer gameplay exposes a complete accessible touch keypad overlay', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 

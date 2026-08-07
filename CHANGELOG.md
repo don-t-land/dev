@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 - 2026-08-07
+
+### Added
+
+- ESC 그래픽 설정에 런타임 전환 가능한 안티에일리어싱 옵션을 추가했습니다.
+- 성능 우선 `FXAA`, 선명도 우선 `SMAA`, 비활성화 모드를 제공하며 선택 상태를 브라우저에 저장합니다.
+
+### Fixed
+
+- 카메라가 열기류 geometry와 겹쳐 view vector 길이가 0이 되어도 Bloom 입력에 `NaN`이 발생하지 않도록 epsilon-guarded 정규화를 적용했습니다.
+- FXAA가 해상도 배율과 창 크기 변경 후에도 올바른 물리 픽셀 크기를 사용하도록 uniform을 동기화합니다.
+- 안티에일리어싱 모드 변경 시 이전 post-processing pass의 GPU resource를 해제합니다.
+
 ## 1.4.1 - 2026-08-07
 
 ### Added

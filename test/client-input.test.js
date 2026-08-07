@@ -112,6 +112,7 @@ test('the ESC menu exposes persisted runtime graphics settings', () => {
   assert.match(html, /id="graphics-csm"/);
   assert.match(html, /id="graphics-gtao"/);
   assert.match(html, /id="graphics-bloom"/);
+  assert.match(html, /id="graphics-anti-aliasing"/);
   assert.match(html, /id="graphics-fog-quality"/);
   assert.match(html, /id="graphics-shadow-softness"/);
   assert.match(html, /localStorage\.setItem\(['"]pp_graphics['"]/);
@@ -132,6 +133,9 @@ test('high graphics defaults extend shadows and view distance across biome envir
   assert.match(html, /from ['"]three\/addons\/csm\/CSM\.js['"]/);
   assert.match(html, /from ['"]three\/addons\/postprocessing\/GTAOPass\.js['"]/);
   assert.match(html, /from ['"]three\/addons\/postprocessing\/UnrealBloomPass\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/postprocessing\/SMAAPass\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/postprocessing\/ShaderPass\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/shaders\/FXAAShader\.js['"]/);
   assert.match(html, /function rebuildShadowSystem\(/);
   assert.match(html, /function configurePostProcessing\(/);
   assert.match(html, /buildBiomeEnvironment\(/);
@@ -145,15 +149,33 @@ test('high graphics defaults extend shadows and view distance across biome envir
   assert.match(biomeVisuals, /mesh\.receiveShadow\s*=\s*true/);
 });
 
-test('thermal shader keeps bloom inputs finite across GPU implementations', () => {
+test('runtime anti-aliasing rebuilds and disposes FXAA or SMAA before output', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
-  assert.match(html, /float bandBase=clamp\([\s\S]*float band=pow\(bandBase,2\.2\)/);
-  assert.match(html, /float ndv=clamp\(abs\(dot\(normalize\(vN\),normalize\(vV\)\)\),0\.,1\.\)/);
-  assert.match(html, /float edge=pow\(max\(0\.,1\.-ndv\),1\.6\)/);
-  assert.match(html, /float fade=\(1\.-smoothstep\(\.35,1\.,vUv\.y\)\)\*smoothstep\(0\.,\.08,vUv\.y\)/);
-  assert.doesNotMatch(html, /pow\(1\.-abs\(dot\(/);
-  assert.doesNotMatch(html, /smoothstep\(1\.,\.35,vUv\.y\)/);
+  assert.match(html, /postEffectSignature[\s\S]*resolvedGraphics\.antiAliasing\.mode/);
+  assert.match(html, /if \(resolvedGraphics\.antiAliasing\.mode === 'fxaa'\)[\s\S]*new ShaderPass\(FXAAShader\)/);
+  assert.match(html, /else if \(resolvedGraphics\.antiAliasing\.mode === 'smaa'\)[\s\S]*new SMAAPass\(\)/);
+  assert.match(html, /composer\.addPass\(aaPass\)[\s\S]*composer\.addPass\(new OutputPass\(\)\)/);
+  assert.match(html, /aaPass\?\.material\?\.uniforms\?\.resolution\?\.value\.set\([\s\S]*resolvedGraphics\.pixelRatio/);
+  assert.match(html, /composer = gtaoPass = bloomPass = aaPass = null/);
+});
+
+test('thermal shader keeps bloom inputs finite across GPU implementations', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  const thermalShader = html.match(/const thermalMat = new THREE\.ShaderMaterial\(\{[\s\S]*?\n\}\);/)?.[0] || '';
+
+  assert.match(thermalShader, /vN=normalMatrix\*normal; vV=-mv\.xyz/);
+  assert.match(thermalShader, /float nLen2=max\(dot\(vN,vN\),1e-8\)/);
+  assert.match(thermalShader, /float vLen2=max\(dot\(vV,vV\),1e-8\)/);
+  assert.match(thermalShader, /vec3 safeN=vN\*inversesqrt\(nLen2\)/);
+  assert.match(thermalShader, /vec3 safeV=vV\*inversesqrt\(vLen2\)/);
+  assert.match(thermalShader, /float bandBase=clamp\([\s\S]*float band=pow\(bandBase,2\.2\)/);
+  assert.match(thermalShader, /float ndv=clamp\(abs\(dot\(safeN,safeV\)\),0\.,1\.\)/);
+  assert.match(thermalShader, /float edge=pow\(max\(0\.,1\.-ndv\),1\.6\)/);
+  assert.match(thermalShader, /float fade=\(1\.-smoothstep\(\.35,1\.,vUv\.y\)\)\*smoothstep\(0\.,\.08,vUv\.y\)/);
+  assert.doesNotMatch(thermalShader, /normalize\(/);
+  assert.doesNotMatch(thermalShader, /pow\(1\.-abs\(dot\(/);
+  assert.doesNotMatch(thermalShader, /smoothstep\(1\.,\.35,vUv\.y\)/);
 });
 
 test('graphics teardown releases CSM, remote-player, and GTAO resources', () => {

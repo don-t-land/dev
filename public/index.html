@@ -713,6 +713,14 @@
               <option value="ultra">울트라</option>
             </select>
           </label>
+          <label class="setting-row" for="graphics-anti-aliasing">
+            <span><b>안티에일리어싱</b><small>계단 현상을 줄이는 화면 후처리</small></span>
+            <select id="graphics-anti-aliasing">
+              <option value="off">끄기 · 최고 성능</option>
+              <option value="fxaa">FXAA · 빠름</option>
+              <option value="smaa">SMAA · 선명함</option>
+            </select>
+          </label>
           <label class="setting-row" for="graphics-fog-quality">
             <span><b>안개 품질</b><small>고도와 태양빛을 반영한 대기 원근감</small></span>
             <select id="graphics-fog-quality">
@@ -857,7 +865,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
@@ -1640,7 +1651,7 @@ $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(eve
 $('mouse-invert-y-toggle').addEventListener('change', event => setMouseInvertY(event.currentTarget.checked));
 const graphicsControlIds = [
   'graphics-resolution', 'graphics-shadows', 'graphics-view-distance', 'graphics-csm',
-  'graphics-gtao', 'graphics-bloom', 'graphics-fog-quality', 'graphics-shadow-softness'
+  'graphics-gtao', 'graphics-bloom', 'graphics-anti-aliasing', 'graphics-fog-quality', 'graphics-shadow-softness'
 ];
 for (const id of graphicsControlIds) {
   $(id).addEventListener('change', () => applyGraphicsSettings({
@@ -1650,6 +1661,7 @@ for (const id of graphicsControlIds) {
     csm: $('graphics-csm').value,
     gtao: $('graphics-gtao').value,
     bloom: $('graphics-bloom').value,
+    antiAliasing: $('graphics-anti-aliasing').value,
     fogQuality: $('graphics-fog-quality').value,
     shadowSoftness: $('graphics-shadow-softness').value
   }));
@@ -1715,6 +1727,7 @@ let shadowSystemSignature = '';
 let composer = null;
 let gtaoPass = null;
 let bloomPass = null;
+let aaPass = null;
 let postEffectSignature = '';
 
 function registerLitMaterial(material) {
@@ -1901,7 +1914,7 @@ function disposePostProcessing() {
   gtaoPass?.blendMaterial?.dispose?.();
   for (const pass of composer.passes) pass.dispose?.();
   composer.dispose();
-  composer = gtaoPass = bloomPass = null;
+  composer = gtaoPass = bloomPass = aaPass = null;
 }
 
 function excludeTransparentObjectsFromGtao(pass) {
@@ -1922,7 +1935,7 @@ function excludeTransparentObjectsFromGtao(pass) {
 }
 
 function configurePostProcessing() {
-  const signature = `${resolvedGraphics.gtao.enabled}:${resolvedGraphics.bloom.enabled}`;
+  const signature = `${resolvedGraphics.gtao.enabled}:${resolvedGraphics.bloom.enabled}:${resolvedGraphics.antiAliasing.mode}`;
 
   if (!composer || signature !== postEffectSignature) {
     disposePostProcessing();
@@ -1942,6 +1955,13 @@ function configurePostProcessing() {
         resolvedGraphics.bloom.threshold
       );
       composer.addPass(bloomPass);
+    }
+    if (resolvedGraphics.antiAliasing.mode === 'fxaa') {
+      aaPass = new ShaderPass(FXAAShader);
+      composer.addPass(aaPass);
+    } else if (resolvedGraphics.antiAliasing.mode === 'smaa') {
+      aaPass = new SMAAPass();
+      composer.addPass(aaPass);
     }
     composer.addPass(new OutputPass());
     postEffectSignature = signature;
@@ -1970,6 +1990,10 @@ function configurePostProcessing() {
   }
   composer.setPixelRatio(resolvedGraphics.pixelRatio);
   composer.setSize(innerWidth, innerHeight);
+  aaPass?.material?.uniforms?.resolution?.value.set(
+    1 / Math.max(1, innerWidth * resolvedGraphics.pixelRatio),
+    1 / Math.max(1, innerHeight * resolvedGraphics.pixelRatio)
+  );
   if (gtaoPass) {
     const gtaoWidth = Math.max(1, Math.floor(innerWidth * resolvedGraphics.pixelRatio * resolvedGraphics.gtao.resolutionScale));
     const gtaoHeight = Math.max(1, Math.floor(innerHeight * resolvedGraphics.pixelRatio * resolvedGraphics.gtao.resolutionScale));
@@ -1997,7 +2021,8 @@ function renderScene(dt) {
 function updateGraphicsSummary() {
   const shadowText = resolvedGraphics.shadow.enabled ? `${resolvedGraphics.shadow.mapSize}px` : '꺼짐';
   const csmText = resolvedGraphics.csm.enabled && resolvedGraphics.shadow.enabled ? `${resolvedGraphics.csm.cascades} CSM` : '단일';
-  const effects = [resolvedGraphics.gtao.enabled ? 'GTAO' : null, resolvedGraphics.bloom.enabled ? 'Bloom' : null].filter(Boolean).join('+') || '후처리 꺼짐';
+  const aaText = { off: 'AA 꺼짐', fxaa: 'FXAA', smaa: 'SMAA' }[resolvedGraphics.antiAliasing.mode];
+  const effects = [resolvedGraphics.gtao.enabled ? 'GTAO' : null, resolvedGraphics.bloom.enabled ? 'Bloom' : null, aaText].filter(Boolean).join('+');
   $('graphics-summary').textContent =
     `렌더 ${resolvedGraphics.pixelRatio.toFixed(2)}× · 그림자 ${shadowText}/${csmText} · 시야 ${resolvedGraphics.cameraFar}m · ${effects}`;
 }
@@ -2009,6 +2034,7 @@ function syncGraphicsControls() {
   $('graphics-csm').value = graphicsSettings.csm;
   $('graphics-gtao').value = graphicsSettings.gtao;
   $('graphics-bloom').value = graphicsSettings.bloom;
+  $('graphics-anti-aliasing').value = graphicsSettings.antiAliasing;
   $('graphics-fog-quality').value = graphicsSettings.fogQuality;
   $('graphics-shadow-softness').value = graphicsSettings.shadowSoftness;
   updateGraphicsSummary();
@@ -2503,7 +2529,7 @@ const thermalMat = new THREE.ShaderMaterial({
     void main(){
       vUv=uv;
       vec4 mv=modelViewMatrix*vec4(position,1.);
-      vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz);
+      vN=normalMatrix*normal; vV=-mv.xyz;
       gl_Position=projectionMatrix*mv;
     }`,
   fragmentShader: `
@@ -2511,7 +2537,11 @@ const thermalMat = new THREE.ShaderMaterial({
     void main(){
       float bandBase=clamp(sin(vUv.y*26.-uTime*2.6)*.5+.5,0.,1.);
       float band=pow(bandBase,2.2);
-      float ndv=clamp(abs(dot(normalize(vN),normalize(vV))),0.,1.);
+      float nLen2=max(dot(vN,vN),1e-8);
+      float vLen2=max(dot(vV,vV),1e-8);
+      vec3 safeN=vN*inversesqrt(nLen2);
+      vec3 safeV=vV*inversesqrt(vLen2);
+      float ndv=clamp(abs(dot(safeN,safeV)),0.,1.);
       float edge=pow(max(0.,1.-ndv),1.6);
       float fade=(1.-smoothstep(.35,1.,vUv.y))*smoothstep(0.,.08,vUv.y);
       vec3 col=mix(vec3(.25,.85,.62),vec3(1.,.94,.6),band);

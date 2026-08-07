@@ -108,5 +108,19 @@
     };
   }
 
-  return { CONTROL_CODES, createCombinedKeyState, createTouchKeyState, createTouchLookState };
+  function shortPortraitBoardMaxHeight(viewportHeight, safeAreaBottom = 0) {
+    const height = Number(viewportHeight);
+    const inset = Number(safeAreaBottom);
+    const safeHeight = Number.isFinite(height) ? Math.max(0, height) : 0;
+    const safeInset = Number.isFinite(inset) ? Math.max(0, inset) : 0;
+    return Math.min(116, Math.max(0, safeHeight - safeInset - 452));
+  }
+
+  return {
+    CONTROL_CODES,
+    createCombinedKeyState,
+    createTouchKeyState,
+    createTouchLookState,
+    shortPortraitBoardMaxHeight
+  };
 });

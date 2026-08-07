@@ -97,7 +97,7 @@ test('portrait touch HUD separates stats, timer, leaderboard, meters, and contro
 test('short portrait touch HUD keeps the leaderboard clear of compact gauges', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
-  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*640px\)[\s\S]*#board\s*\{[^}]*top:\s*138px[^}]*max-height:\s*clamp\(0px,\s*calc\(100vh\s*-\s*452px\),\s*116px\)/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*640px\)[\s\S]*#board\s*\{[^}]*top:\s*138px[^}]*max-height:\s*clamp\(0px,\s*calc\(100vh\s*-\s*env\(safe-area-inset-bottom\)\s*-\s*452px\),\s*116px\)[^}]*max-height:\s*clamp\(0px,\s*calc\(100dvh\s*-\s*env\(safe-area-inset-bottom\)\s*-\s*452px\),\s*116px\)[^}]*padding-block:\s*0[^}]*border-block-width:\s*0/s);
   assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*500px\)[\s\S]*#board\s*\{[^}]*display:\s*none/s);
   assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*440px\)[\s\S]*#gauge,\s*#energy\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)[^}]*transform:\s*none/s);
 });

@@ -885,13 +885,13 @@
 
 <section id="folding-screen" class="hide" aria-labelledby="fold-title">
   <header class="fold-top">
-    <div><div class="fold-kicker">BUILD YOUR GLIDER</div><h2 id="fold-title">나만의 종이비행기를 접어!</h2></div>
+    <div><div class="fold-kicker">CHOOSE YOUR GLIDER</div><h2 id="fold-title">종이비행기를 선택하세요</h2></div>
     <div id="fold-timer" class="fold-timer">01:00</div>
   </header>
   <main class="fold-stage">
     <canvas id="fold-paper-canvas"></canvas>
     <div class="fold-preview-title"><span id="fold-plane-name">Basic Dart</span><small>천천히 회전</small></div>
-    <div class="fold-showroom-plaque" aria-hidden="true"><span>AIRFRAME GALLERY</span><strong>01 / SELECT &amp; FOLD</strong><small>PAPER FIBER · BIOME SERIES</small></div>
+    <div class="fold-showroom-plaque" aria-hidden="true"><span>AIRFRAME GALLERY</span><strong>01 / SELECT &amp; VIEW</strong><small>PAPER FIBER · BIOME SERIES</small></div>
     <div class="fold-showroom-lights" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="fold-platform" aria-hidden="true"></div>
     <aside class="fold-presets" aria-labelledby="fold-preset-title">
@@ -902,16 +902,15 @@
       <div class="fold-panel-heading"><span>FLIGHT PROFILE</span><strong>능력치</strong></div>
       <div id="fold-stats" class="fold-stats" aria-live="polite"></div>
     </aside>
-    <div class="fold-hint">종이에 선을 그어 직접 접기 · 빈 공간을 드래그해 돌리기 · 금색 힌지를 잡아 각도 조절</div>
+    <div class="fold-hint">비행기를 드래그해 모든 방향에서 확인하고 왼쪽 목록에서 기체를 선택하세요</div>
   </main>
   <footer class="fold-controls">
     <div class="fold-direction">
-      <div class="fold-help">돌리기: 빈 공간 드래그 · 접기: 종이에 선을 긋고 위아래로 드래그</div>
+      <div class="fold-help">돌리기: 드래그 · 확대/축소: 휠</div>
       <button id="fold-leave-btn" class="fold-btn" type="button">로비로 나가기</button>
     </div>
-    <div id="fold-status" role="status">0/10번 접음</div>
+    <div id="fold-status" role="status">비행기를 선택하세요</div>
     <div>
-      <button id="fold-undo-btn" class="fold-btn" type="button">한 번 펴기</button>
       <button id="fold-complete-btn" class="fold-btn finish" type="button">비행기 완성</button>
     </div>
   </footer>
@@ -1731,7 +1730,7 @@ $('respawn-refold-btn').addEventListener('click', () => {
     initialCommands: net.lastFoldCommands || '[]',
     initialPreset: selectedPlaneName(),
     onComplete: fold => {
-      net.lastFoldCommands = fold.commands;
+      setSelectedPlaneCommands(fold.commands, fold.preset || 'custom');
       send({ t: 'fold_done', commands: fold.commands });
     }
   });
@@ -2475,12 +2474,9 @@ function setFoldedCraftVisual(owner, baseVisual, model, tint, commandKey = '[]')
   owner.userData.foldCommandKey = cacheKey;
 }
 
-/* ---- 접기 화면 3D 편집기: 종이에 직접 선을 긋고 각도를 정한다 ---- */
+/* ---- 종이비행기 선택 화면 3D 뷰어: 회전과 확대/축소만 허용한다 ---- */
 const foldEditor = createFoldEditor({
-  canvas: document.getElementById('fold-paper-canvas'),
-  onCommitFold: (start, end, angle) => window.paperFoldingStage?.handleFoldCommit(start, end, angle),
-  onAdjustHinge: (foldIndex, angle) => window.paperFoldingStage?.handleHingeAdjust(foldIndex, angle),
-  onCancel: () => window.paperFoldingStage?.handleFoldCancel()
+  canvas: document.getElementById('fold-paper-canvas')
 });
 window.paperFoldingStage?.attachEditor(foldEditor);
 

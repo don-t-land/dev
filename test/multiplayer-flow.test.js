@@ -8,6 +8,7 @@ const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
 const homeCss = fs.readFileSync(path.join(publicDir, 'home-screen.css'), 'utf8');
 const flowCss = fs.readFileSync(path.join(publicDir, 'multiplayer-flow.css'), 'utf8');
 const foldUi = fs.readFileSync(path.join(publicDir, 'paper-fold-ui.js'), 'utf8');
+const foldEditor = fs.readFileSync(path.join(publicDir, 'fold-editor-3d.mjs'), 'utf8');
 
 function hasId(id) {
   return new RegExp(`id=["']${id}["']`).test(html);
@@ -102,10 +103,10 @@ test('waiting room actors fit inside one horizontal row on mobile and stay layer
   assert.match(flowCss, /\.room-player-info\s*\{[^}]*z-index:\s*3/s);
 });
 
-test('folding UI exposes the 3d editor, unfold, completion and synchronized progress', () => {
+test('paper-plane selection is a movable 3d viewer without manual crease drawing', () => {
   for (const id of [
     'folding-screen', 'fold-timer', 'fold-paper-canvas', 'fold-leave-btn',
-    'fold-undo-btn', 'fold-complete-btn', 'fold-preset-list'
+    'fold-complete-btn', 'fold-preset-list'
   ]) assert.equal(hasId(id), true, `missing #${id}`);
   // 프리셋은 좌측 목록으로 고른다 — 단일 프리셋 버튼은 사라졌다.
   assert.doesNotMatch(html, /fold-preset-btn/);
@@ -115,16 +116,22 @@ test('folding UI exposes the 3d editor, unfold, completion and synchronized prog
   assert.match(flowCss, /\.fold-presets \{ position:absolute; inset:18px auto 18px 18px;/);
   assert.match(html, /import \{ createFoldEditor \} from '\.\/fold-editor-3d\.mjs'/);
   assert.match(html, /attachEditor\(foldEditor\)/);
-  assert.match(html, /class="fold-help">돌리기: 빈 공간 드래그/);
+  assert.match(html, /class="fold-help">돌리기: 드래그 · 확대\/축소: 휠/);
   assert.doesNotMatch(html, /fold-dir-valley|fold-dir-mountain|fold-preview-canvas|foldPreview/);
-  assert.match(foldUi, /api\.applyFold\(model, start, end, angle\)/);
+  assert.match(foldUi, /editor\.setViewOnly\(true\)/);
+  assert.match(foldEditor, /if \(viewOnly\) \{[\s\S]*startOrbit\(event\)[\s\S]*return;[\s\S]*\}/);
+  assert.match(foldEditor, /const viewPointers = new Map\(\)/);
+  assert.match(foldEditor, /mode = 'pinching'/);
+  assert.match(foldEditor, /orbit\.distance = clamp\([\s\S]*pinch/);
+  assert.match(foldEditor, /return \{[\s\S]*setViewOnly/);
+  assert.match(html, /respawn-refold-btn[\s\S]*onComplete: fold => \{[\s\S]*setSelectedPlaneCommands\(fold\.commands, fold\.preset \|\| 'custom'\)/);
+  assert.doesNotMatch(foldUi, /api\.applyFold\(model, start, end, angle\)/);
   assert.match(foldUi, /attachEditor/);
-  // 확정된 힌지 재조절: 편집기 onAdjustHinge → 컨트롤러 setFoldAngle 경로.
-  assert.match(html, /onAdjustHinge: \(foldIndex, angle\) => window\.paperFoldingStage\?\.handleHingeAdjust\(foldIndex, angle\)/);
-  assert.match(foldUi, /api\.setFoldAngle\(model, foldIndex, angle\)/);
+  assert.doesNotMatch(foldUi, /api\.setFoldAngle\(model, foldIndex, angle\)/);
   assert.doesNotMatch(foldUi, /THREE|getContext\('2d'\)/);
-  assert.match(html, /종이에 선을 그어 직접 접기/);
-  assert.match(foldUi, /model = api\.undoFold\(model\)/);
+  assert.doesNotMatch(html, /종이에 선을 그어 직접 접기|선을 긋고|접을 쪽을 잡아/);
+  assert.equal(hasId('fold-undo-btn'), false);
+  assert.doesNotMatch(foldUi, /model = api\.undoFold\(model\)/);
   assert.match(foldUi, /setRoomProgress\(done, total\)/);
   assert.match(html, /onComplete: fold => \{[\s\S]*setSelectedPlaneCommands\(fold\.commands, fold\.preset \|\| 'custom'\)[\s\S]*t: 'fold_done'/);
   assert.match(flowCss, /\.fold-angle-badge/);

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.6.1 - 2026-08-07
+
+### Added
+
+- 오래 날기(ARENA) 모드에 북쪽 고정 원형 미니맵을 추가했습니다. 경기장 경계, 내 기체 방향, 생존 상대, 에너지 링, 상승기류를 표시합니다.
+- 미니맵의 월드 좌표 정규화·경계 클램프·상태 필터링·Canvas 렌더링을 독립 회귀 테스트로 검증합니다.
+
+### Changed
+
+- 중간 폭에서는 미니맵을 leaderboard의 예약 영역에 통합하고, 모바일 portrait·landscape에서는 compact 배치를 사용해 기존 HUD와 겹치지 않도록 했습니다.
+- 미니맵은 15Hz로 갱신하며 멀리 날기(DIST) 모드에서는 렌더링하지 않습니다.
+- 운영의 3D 코스튬 body-slot 배치와 view-only 종이비행기 선택 화면을 베타에 동기화했습니다.
+- 베타 전용 양력 `0.70×`, 항력 `0.45×`, 비행 상한 `420m` cloud band와 loopback-only origin binding을 유지했습니다.
+- 변경된 biome helper, map generator, arena minimap의 Cloudflare cache key를 앱 버전 `1.6.1`과 일치시켰습니다.
+
 ## 1.5.8 - 2026-08-07
 
 ### Changed

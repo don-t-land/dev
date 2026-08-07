@@ -92,6 +92,22 @@
   }
   #timer.low { color: #ff8b7e; }
 
+  #arena-minimap {
+    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+    width: 150px; margin: 0; padding: 8px; border: 1px solid rgba(174,215,255,.24);
+    border-radius: 18px; color: #dcecff; background: rgba(5,16,29,.72);
+    box-shadow: 0 10px 30px rgba(0,0,0,.22); backdrop-filter: blur(10px);
+    pointer-events: none;
+  }
+  #arena-minimap figcaption { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 8px; font-weight: 800; letter-spacing: .12em; }
+  #arena-minimap canvas { width: 100%; height: auto; aspect-ratio: 1; }
+  .minimap-legend { display: flex; justify-content: center; gap: 7px; margin-top: 3px; color: #a9bed1; font-size: 7px; white-space: nowrap; }
+  .minimap-legend i { display: inline-block; width: 6px; height: 6px; margin-right: 2px; border-radius: 50%; }
+  .minimap-self { background: #7ce8ff; }
+  .minimap-player { background: #ff7368; }
+  .minimap-ring { background: #ffc861; }
+  .minimap-thermal { background: #6ee7b7; }
+
   #board {
     position: absolute; top: 20px; right: 22px; width: min(340px, calc(100vw - 44px));
     padding: 13px; background: rgba(7,16,28,.86); border: 1px solid rgba(174,215,255,.2);
@@ -345,6 +361,15 @@
     .lobby-plane { opacity: .5; right: -20px; top: 4%; }
     #lobby #room-list { height: 260px; }
   }
+  @media (min-width: 561px) and (max-width: 889px) {
+    #arena-minimap { top: 32px; left: auto; right: 132px; width: 120px; transform: none; }
+    #board.arena {
+      padding-top: 160px;
+      max-height: calc(100vh - 210px);
+      max-height: calc(100dvh - 210px);
+      overflow-y: auto;
+    }
+  }
   @media (max-width: 560px) {
     #lobby .modes { grid-template-columns: 1fr; }
     .create-strip > div:first-child { display: block; }
@@ -355,6 +380,9 @@
     #stats { top: 12px; left: 12px; transform: scale(.86); transform-origin: top left; }
     #board { top: 128px; left: 12px; right: 12px; width: auto; transform: none; }
     #timer { top: 98px; font-size: 19px; }
+    #arena-minimap { top: 8px; left: auto; right: 8px; width: 104px; padding: 7px; border-radius: 14px; transform: none; }
+    #arena-minimap figcaption { font-size: 7px; margin-bottom: 3px; }
+    .minimap-legend { gap: 4px; font-size: 6px; }
     #gauge { left: 12px; right: 12px; bottom: 12px; width: auto; }
     #energy { left: 12px; right: 12px; bottom: 92px; width: auto; }
     #keys { left: 12px; right: 12px; bottom: 164px; max-width: none; text-align: center; font-size: 11px; line-height: 1.8; }
@@ -402,7 +430,35 @@
   @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 440px) {
     #gauge, #energy { left: auto; right: max(8px, env(safe-area-inset-right)); transform: none; }
   }
+  @media (max-width: 560px) and (max-height: 440px) and (orientation: portrait) {
+    #arena-minimap { top: 8px; left: auto; right: 8px; width: 70px; height: 70px; padding: 4px; transform: none; }
+    #arena-minimap figcaption, #arena-minimap .minimap-legend { display: none; }
+    #arena-minimap canvas { height: 100%; }
+  }
+  @media (max-width: 560px) and (max-height: 400px) and (orientation: portrait) {
+    #arena-minimap { width: 60px; height: 60px; }
+  }
+  @media (min-width: 561px) and (max-width: 889px) and (orientation: landscape) and (max-height: 440px) {
+    #arena-minimap { top: 28px; left: auto; right: 152px; width: 80px; padding: 6px; transform: none; }
+    #arena-minimap figcaption { font-size: 7px; margin-bottom: 3px; }
+    #arena-minimap .minimap-legend { display: none; }
+    #board.arena {
+      padding-top: 105px;
+      max-height: calc(100vh - 180px);
+      max-height: calc(100dvh - 180px);
+    }
+    #hud.arena-mode #keys, #hud.arena-mode #game-leave-btn { display: none; }
+  }
+  @media (max-width: 560px) and (orientation: landscape) and (max-height: 440px) {
+    #arena-minimap { top: 8px; left: auto; right: 8px; width: 60px; height: 60px; padding: 4px; transform: none; }
+    #arena-minimap figcaption, #arena-minimap .minimap-legend { display: none; }
+    #arena-minimap canvas { height: 100%; }
+  }
   @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+    #arena-minimap { top: 8px; left: 50%; right: auto; width: 96px; padding: 6px; transform: translateX(-50%); }
+    #arena-minimap figcaption { display: flex; font-size: 7px; margin-bottom: 3px; }
+    #arena-minimap .minimap-legend { display: none; }
+    #arena-minimap canvas { height: auto; }
     #touch-controls { left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); }
     .touch-dpad { grid-template: repeat(3, 56px) / repeat(3, 56px); gap: 3px; }
     .touch-control { min-width: 56px; min-height: 56px; border-radius: 18px; }
@@ -412,6 +468,7 @@
     #energy { left: 50%; right: auto; bottom: calc(42px + env(safe-area-inset-bottom)); width: min(170px, 28vw); padding: 5px 8px; transform: translateX(-50%); }
     #stats { top: 8px; left: max(8px, env(safe-area-inset-left)); transform: scale(.68); transform-origin: top left; }
     #board { top: 8px; left: auto; right: max(8px, env(safe-area-inset-right)); width: min(260px, 31vw); max-height: 88px; overflow-y: auto; padding: 6px 8px; }
+    #board.arena { max-height: 88px; padding: 6px 8px; }
     #board .state { display: none; }
     #timer { top: 8px; left: 50%; right: auto; transform: translateX(-50%); font-size: 17px; }
   }
@@ -491,7 +548,7 @@
     <button class="costume-close" type="button" aria-label="닫기" data-costume-close>×</button>
     <div class="costume-kicker">PLANE CUSTOMIZE</div>
     <h2 id="costume-title">코스튬</h2>
-    <p class="costume-description">쇼룸에서 기체를 돌려 보며 두 부위의 장식을 조합하세요.</p>
+    <p class="costume-description">쇼룸에서 기체를 돌려 보며 머리·코·양쪽 날개 장식을 조합하세요.</p>
 
     <div class="costume-showroom-layout">
       <section class="costume-showroom-stage" aria-label="코스튬 3D 쇼룸. 드래그하여 기체를 회전할 수 있습니다.">
@@ -502,7 +559,7 @@
 
       <div class="costume-wardrobe">
         <fieldset class="costume-section">
-          <legend><span>01</span> 모자 <small>오른쪽 날개 뒤쪽 ⅔ 지점</small></legend>
+          <legend><span>01</span> 모자 <small>종이비행기 기수 위</small></legend>
           <div class="costume-options">
             <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="none">
               <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
@@ -527,6 +584,18 @@
             </button>
             <button class="costume-option" type="button" data-costume-slot="nose" data-costume-id="rudolph">
               <canvas class="costume-preview-3d" data-costume-preview="rudolph" aria-hidden="true"></canvas><b>루돌프 코</b>
+            </button>
+          </div>
+        </fieldset>
+
+        <fieldset class="costume-section">
+          <legend><span>03</span> 날개 장비 <small>양쪽 날개에 한 쌍</small></legend>
+          <div class="costume-options costume-options-wings">
+            <button class="costume-option" type="button" data-costume-slot="wings" data-costume-id="none">
+              <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
+            </button>
+            <button class="costume-option" type="button" data-costume-slot="wings" data-costume-id="twin-jets">
+              <canvas class="costume-preview-3d" data-costume-preview="twin-jets" aria-hidden="true"></canvas><b>쌍발 제트</b>
             </button>
           </div>
         </fieldset>
@@ -692,6 +761,15 @@
     </div>
 
     <div id="timer">--:--</div>
+
+    <figure id="arena-minimap" aria-label="ARENA 미니맵" class="hide">
+      <figcaption><span>ARENA MAP</span><span>북 ↑</span></figcaption>
+      <canvas id="arena-minimap-canvas" width="256" height="256" aria-hidden="true"></canvas>
+      <div class="minimap-legend" aria-hidden="true">
+        <span><i class="minimap-self"></i>나</span><span><i class="minimap-player"></i>상대</span>
+        <span><i class="minimap-ring"></i>링</span><span><i class="minimap-thermal"></i>상승</span>
+      </div>
+    </figure>
 
     <div id="board" aria-label="실시간 랭킹">
       <div class="board-head"><div class="h" id="b-title">실시간 랭킹</div><div class="board-count" id="b-count"></div></div>
@@ -873,13 +951,13 @@
 
 <section id="folding-screen" class="hide" aria-labelledby="fold-title">
   <header class="fold-top">
-    <div><div class="fold-kicker">BUILD YOUR GLIDER</div><h2 id="fold-title">나만의 종이비행기를 접어!</h2></div>
+    <div><div class="fold-kicker">CHOOSE YOUR GLIDER</div><h2 id="fold-title">종이비행기를 선택하세요</h2></div>
     <div id="fold-timer" class="fold-timer">01:00</div>
   </header>
   <main class="fold-stage">
     <canvas id="fold-paper-canvas"></canvas>
     <div class="fold-preview-title"><span id="fold-plane-name">Basic Dart</span><small>천천히 회전</small></div>
-    <div class="fold-showroom-plaque" aria-hidden="true"><span>AIRFRAME GALLERY</span><strong>01 / SELECT &amp; FOLD</strong><small>PAPER FIBER · BIOME SERIES</small></div>
+    <div class="fold-showroom-plaque" aria-hidden="true"><span>AIRFRAME GALLERY</span><strong>01 / SELECT &amp; VIEW</strong><small>PAPER FIBER · BIOME SERIES</small></div>
     <div class="fold-showroom-lights" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="fold-platform" aria-hidden="true"></div>
     <aside class="fold-presets" aria-labelledby="fold-preset-title">
@@ -890,16 +968,15 @@
       <div class="fold-panel-heading"><span>FLIGHT PROFILE</span><strong>능력치</strong></div>
       <div id="fold-stats" class="fold-stats" aria-live="polite"></div>
     </aside>
-    <div class="fold-hint">종이에 선을 그어 직접 접기 · 빈 공간을 드래그해 돌리기 · 금색 힌지를 잡아 각도 조절</div>
+    <div class="fold-hint">비행기를 드래그해 모든 방향에서 확인하고 왼쪽 목록에서 기체를 선택하세요</div>
   </main>
   <footer class="fold-controls">
     <div class="fold-direction">
-      <div class="fold-help">돌리기: 빈 공간 드래그 · 접기: 종이에 선을 긋고 위아래로 드래그</div>
+      <div class="fold-help">돌리기: 드래그 · 확대/축소: 휠</div>
       <button id="fold-leave-btn" class="fold-btn" type="button">로비로 나가기</button>
     </div>
-    <div id="fold-status" role="status">0/10번 접음</div>
+    <div id="fold-status" role="status">비행기를 선택하세요</div>
     <div>
-      <button id="fold-undo-btn" class="fold-btn" type="button">한 번 펴기</button>
       <button id="fold-complete-btn" class="fold-btn finish" type="button">비행기 완성</button>
     </div>
   </footer>
@@ -915,6 +992,7 @@
 </script>
 <script src="./input-policy.js"></script>
 <script src="./mobile-controls.js"></script>
+<script src="./arena-minimap.js?v=1.6.1"></script>
 <script src="./room-state.js"></script>
 <script src="./flight-controls.js"></script>
 <script src="./costume-state.js"></script>
@@ -925,13 +1003,13 @@
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
-<script src="./biomes/helpers.js?v=1.5.8"></script>
+<script src="./biomes/helpers.js?v=1.6.1"></script>
 <script src="./biomes/desert.js"></script>
 <script src="./biomes/pillars.js"></script>
 <script src="./biomes/glacier.js"></script>
 <script src="./biomes/lava.js"></script>
 <script src="./biomes/floating.js"></script>
-<script src="./map-gen.js?v=1.5.8"></script>
+<script src="./map-gen.js?v=1.6.1"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./costume-showroom-3d.js"></script>
@@ -956,6 +1034,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { createCombinedKeyState, createTouchKeyState, createTouchLookState } = window.mobileControls;
+const { createArenaMinimapFrame, drawArenaMinimap } = window.arenaMinimap;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
   updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage,
@@ -1547,6 +1626,8 @@ function enterGame() {
   $('hud').classList.remove('hide');
   const arena = game.mode === 'ARENA';
   $('timer').classList.toggle('hide', arena);
+  $('hud').classList.toggle('arena-mode', arena);
+  $('arena-minimap').classList.toggle('hide', !arena);
   $('board').classList.toggle('arena', arena);
   $('s-cap').textContent = arena ? '생존 시간' : '직선 거리';
   $('s-unit').textContent = arena ? 's' : 'm';
@@ -1719,7 +1800,7 @@ $('respawn-refold-btn').addEventListener('click', () => {
     initialCommands: net.lastFoldCommands || '[]',
     initialPreset: selectedPlaneName(),
     onComplete: fold => {
-      net.lastFoldCommands = fold.commands;
+      setSelectedPlaneCommands(fold.commands, fold.preset || 'custom');
       send({ t: 'fold_done', commands: fold.commands });
     }
   });
@@ -1909,9 +1990,9 @@ function detachObjectMaterials(object) {
 function setGameplayCostume(owner, value, layout = 'flight') {
   if (!owner) return null;
   const normalized = window.costumeState.normalize(value);
-  const key = `${layout}:${normalized.hat}:${normalized.nose}`;
+  const nextKey = `${layout}:${normalized.hat}:${normalized.nose}:${normalized.wings}`;
   const previous = owner.getObjectByName('planeCostume');
-  if (previous?.userData.costumeKey !== key) detachObjectMaterials(previous);
+  if (previous?.userData.costumeKey !== nextKey) detachObjectMaterials(previous);
   const current = setCostumeOnObject(owner, normalized, layout);
   registerObjectMaterials(current);
   return current;
@@ -2463,12 +2544,9 @@ function setFoldedCraftVisual(owner, baseVisual, model, tint, commandKey = '[]')
   owner.userData.foldCommandKey = cacheKey;
 }
 
-/* ---- 접기 화면 3D 편집기: 종이에 직접 선을 긋고 각도를 정한다 ---- */
+/* ---- 종이비행기 선택 화면 3D 뷰어: 회전과 확대/축소만 허용한다 ---- */
 const foldEditor = createFoldEditor({
-  canvas: document.getElementById('fold-paper-canvas'),
-  onCommitFold: (start, end, angle) => window.paperFoldingStage?.handleFoldCommit(start, end, angle),
-  onAdjustHinge: (foldIndex, angle) => window.paperFoldingStage?.handleHingeAdjust(foldIndex, angle),
-  onCancel: () => window.paperFoldingStage?.handleFoldCancel()
+  canvas: document.getElementById('fold-paper-canvas')
 });
 window.paperFoldingStage?.attachEditor(foldEditor);
 
@@ -2612,6 +2690,36 @@ scene.add(world);
 let spires = [], rocks = [], platforms = [], terrainColliders = [], thermals = [], ringsArr = [];
 let biomeEnvironment = null;
 let distanceWidthNoise = null;
+
+function updateArenaMinimap() {
+  const frame = createArenaMinimapFrame({
+    mode: game.mode,
+    arenaRadius: ARENA_R,
+    local: me.alive ? {
+      x: craft.position.x, z: craft.position.z, yaw: me.yaw, alive: true
+    } : null,
+    players: [...net.players.entries()].map(([id, player]) => ({
+      id,
+      x: player.remote.group.position.x,
+      z: player.remote.group.position.z,
+      alive: player.alive,
+      seen: player.remote.seen
+    })),
+    rings: ringsArr.map(ring => ({
+      x: ring.position.x, z: ring.position.z, taken: ring.userData.taken
+    })),
+    thermals: thermals.map(thermal => ({
+      x: thermal.position.x, z: thermal.position.z
+    }))
+  });
+  const drawn = drawArenaMinimap($('arena-minimap-canvas'), frame);
+  if (drawn) {
+    $('arena-minimap').setAttribute(
+      'aria-label',
+      `ARENA 미니맵. 생존 상대 ${frame.players.length}명, 에너지 링 ${frame.rings.length}개, 상승기류 ${frame.thermals.length}개`
+    );
+  }
+}
 
 const thermalMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide,
@@ -3559,7 +3667,7 @@ const camPos = new THREE.Vector3();
 const lookAt = new THREE.Vector3();
 const tmpV = new THREE.Vector3();
 
-let sendAcc = 0, roundClock = 0;
+let sendAcc = 0, roundClock = 0, minimapAcc = 0;
 
 function physics(dt) {
   let inTh = 0;
@@ -3742,6 +3850,12 @@ renderer.setAnimationLoop(timestamp => {
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
     r.group.rotation.y += dy * Math.min(1, 10 * dt);
+  }
+
+  minimapAcc += dt;
+  if (minimapAcc >= 1 / 15) {
+    minimapAcc %= 1 / 15;
+    updateArenaMinimap();
   }
 
   craft.rotation.set(me.pitch, me.yaw, me.roll);

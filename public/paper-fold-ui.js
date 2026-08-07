@@ -122,14 +122,6 @@
     emitModelChange(model);
   }
 
-  /* 손으로 접거나 펴면 더는 프리셋 그대로가 아니므로 하이라이트를 지운다. */
-  function clearPresetSelection() {
-    if (selectedPreset === null) return;
-    selectedPreset = null;
-    editor?.setAutoRotate(false);
-    editor?.setPresetVisual(null);
-    refreshPresetList();
-  }
 
   function renderStats() {
     const host = $('fold-stats');
@@ -165,11 +157,8 @@
         ? `완성 · ${progress} · 다른 플레이어를 기다리는 중${peers}`
         : `완성 · ${progress} · 활공을 시작합니다${peers}`)
       : editorFailed
-        ? `3D 편집기를 열 수 없어요 — 왼쪽 목록에서 비행기 프리셋을 골라 주세요${peers}`
-        : (timed
-          ? `${progress} · 선을 긋고 접을 쪽을 잡아 당기세요${peers}`
-          : `${progress} · 완성 버튼을 누르면 바로 출격합니다${peers}`);
-    $('fold-undo-btn').disabled = locked || !count;
+        ? `3D 뷰어를 열 수 없어요 — 왼쪽 목록에서 비행기 프리셋을 골라 주세요${peers}`
+        : `${progress} · 드래그해 둘러보고 비행기를 선택하세요${peers}`;
     renderStats();
   }
 
@@ -233,6 +222,7 @@
     editorFailed = false;
     if (editor) {
       editor.setModel(model);
+      editor.setViewOnly(true);
       editor.setInteractive(true);
       editor.setPresetVisual(selectedPreset);
       editor.setAutoRotate(Boolean(selectedPreset));
@@ -256,55 +246,12 @@
     editor = nextEditor || null;
   }
 
-  /* 편집기의 onCommitFold — 실제 모델 갱신은 여기서만 일어난다. */
-  function handleFoldCommit(start, end, angle) {
-    if (!active || locked || !model) return;
-    const next = api.applyFold(model, start, end, angle);
-    if (next === model) {
-      $('fold-status').textContent = '이 선으로는 접을 수 없어요 — 접힌 날개를 가로지르지 않게 그어 주세요';
-      return;
-    }
-    model = next;
-    clearPresetSelection();
-    updateStats();
-    editor?.setModel(model);
-    emitModelChange(model);
-  }
-
-  /* 편집기의 onAdjustHinge — 확정된 접는선(힌지)의 각도를 다시 정한다. */
-  function handleHingeAdjust(foldIndex, angle) {
-    if (!active || locked || !model) return;
-    const next = api.setFoldAngle(model, foldIndex, angle);
-    if (next === model) {
-      $('fold-status').textContent = '힌지를 조절할 수 없어요';
-      return;
-    }
-    model = next;
-    clearPresetSelection();
-    updateStats();
-    editor?.setModel(model);
-    emitModelChange(model);
-  }
-
-  /* 편집기의 onCancel — 거부 문구가 남아 있으면 기본 상태 문구로 되돌린다. */
-  function handleFoldCancel() {
-    if (!active || locked) return;
-    updateStats();
-  }
 
   function init() {
     if (!api) return;
     $('fold-preset-list').addEventListener('click', event => {
       const card = event.target.closest('.fold-preset-card');
       if (card && !card.disabled) applyPreset(card.dataset.preset);
-    });
-    $('fold-undo-btn').addEventListener('click', () => {
-      if (locked) return;
-      model = api.undoFold(model);
-      clearPresetSelection();
-      updateStats();
-      editor?.setModel(model);
-      emitModelChange(model);
     });
     $('fold-complete-btn').addEventListener('click', () => lock());
   }
@@ -316,9 +263,6 @@
     enter,
     leave,
     attachEditor,
-    handleFoldCommit,
-    handleFoldCancel,
-    handleHingeAdjust,
     getModel: () => model,
     getCommands: () => model ? api.serializeFoldCommands(model) : '[]',
     isLocked: () => locked,

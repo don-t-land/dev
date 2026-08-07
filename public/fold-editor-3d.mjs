@@ -96,6 +96,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
   let frame = 0;
   let started = false;
   let interactive = true;
+  let viewOnly = false;
   let autoRotate = false;
   let lastFrameTime = 0;
   let disposed = false;
@@ -106,8 +107,10 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
 
   const orbit = { yaw: 0.5, pitch: 0.95, distance: 4.2 };
   const orbitTarget = new THREE.Vector3(0, 0.35, 0);
+  const viewPointers = new Map();
+  let pinchDistance = 0;
 
-  let mode = 'idle'; // idle | orbiting | drawing | angleAdjust | angleDrag | hingeAdjust
+  let mode = 'idle'; // idle | orbiting | pinching | drawing | angleAdjust | angleDrag | hingeAdjust
   let orbitDrag = null;
   let drawState = null;
   let pending = null;
@@ -943,6 +946,8 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
     const hadHingeSelection = Boolean(hingeAdjustDrag);
     mode = 'idle';
     orbitDrag = null;
+    viewPointers.clear();
+    pinchDistance = 0;
     drawState = null;
     angleDrag = null;
     pending = null;
@@ -1029,12 +1034,31 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
 
   /* ---------- 포인터 상태기계 ---------- */
 
+  function startOrbit(event) {
+    mode = 'orbiting';
+    orbitDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    setOrbiting(true);
+  }
+
   function onPointerDown(event) {
     if (!started || !renderer) return;
     if (typeof event.button === 'number' && event.button !== 0) return;
-    setAutoRotate(false);
-    if (presetVisualName) setPresetVisual(null);
     canvas.setPointerCapture?.(event.pointerId);
+    setAutoRotate(false);
+    if (viewOnly) {
+      viewPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (viewPointers.size === 1) {
+        startOrbit(event);
+      } else {
+        const [first, second] = [...viewPointers.values()];
+        pinchDistance = Math.hypot(second.x - first.x, second.y - first.y);
+        mode = 'pinching';
+        orbitDrag = null;
+        setOrbiting(true);
+      }
+      return;
+    }
+    if (presetVisualName) setPresetVisual(null);
 
     if (mode === 'angleAdjust') {
       if (!interactive) { cancelInteraction(true); return; }
@@ -1108,13 +1132,23 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
       }
     }
 
-    mode = 'orbiting';
-    orbitDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-    setOrbiting(true);
+    startOrbit(event);
   }
 
   function onPointerMove(event) {
     if (!started || !renderer) return;
+
+    if (viewOnly && viewPointers.has(event.pointerId)) {
+      viewPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (mode === 'pinching' && viewPointers.size >= 2) {
+        const [first, second] = [...viewPointers.values()];
+        const nextPinchDistance = Math.hypot(second.x - first.x, second.y - first.y);
+        const pinchDelta = nextPinchDistance - pinchDistance;
+        orbit.distance = clamp(orbit.distance - pinchDelta * 0.012, MIN_DISTANCE, MAX_DISTANCE);
+        pinchDistance = nextPinchDistance;
+        return;
+      }
+    }
 
     // idle에서 힌지 위에 올리면 포인터 커서로 "집을 수 있음"을 알린다.
     if (mode === 'idle') {
@@ -1173,6 +1207,20 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
 
   function onPointerUp(event) {
     if (!started || !renderer) return;
+
+    if (viewOnly && viewPointers.has(event.pointerId)) {
+      viewPointers.delete(event.pointerId);
+      if (viewPointers.size === 1) {
+        const [pointerId, point] = viewPointers.entries().next().value;
+        startOrbit({ pointerId, clientX: point.x, clientY: point.y });
+      } else if (viewPointers.size === 0) {
+        mode = 'idle';
+        orbitDrag = null;
+        pinchDistance = 0;
+        setOrbiting(false);
+      }
+      return;
+    }
 
     if (mode === 'hingeAdjust' && hingeAdjustDrag && event.pointerId === hingeAdjustDrag.pointerId) {
       const foldIndex = hingeAdjustDrag.foldIndex;
@@ -1251,8 +1299,12 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
     }
   }
 
-  function onPointerCancel() {
+  function onPointerCancel(event) {
     if (!started) return;
+    if (viewOnly) {
+      onPointerUp(event);
+      return;
+    }
     cancelInteraction(true);
   }
 
@@ -1322,6 +1374,11 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
     if (!interactive && (mode === 'drawing' || mode === 'angleAdjust' || mode === 'angleDrag' || mode === 'hingeAdjust')) {
       cancelInteraction(false);
     }
+  }
+
+  function setViewOnly(value) {
+    viewOnly = Boolean(value);
+    if (viewOnly) resetInteraction();
   }
 
   function setAutoRotate(value) {
@@ -1401,5 +1458,5 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
     }
   }
 
-  return { setModel, setInteractive, setAutoRotate, setPresetVisual, start, stop, dispose };
+  return { setModel, setInteractive, setViewOnly, setAutoRotate, setPresetVisual, start, stop, dispose };
 }

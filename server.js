@@ -679,10 +679,11 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    /* -- 코스튬은 허용된 모자/코 ID만 보존하고 방 전체에 즉시 반영합니다 -- */
+    /* -- 코스튬은 허용된 머리/코/날개 ID만 보존하고 방 전체에 즉시 반영합니다 -- */
     if (m.t === 'costume') {
       const next = normalizeCostume(m.costume);
-      if (next.hat === me.costume?.hat && next.nose === me.costume?.nose) return;
+      if (next.hat === me.costume?.hat && next.nose === me.costume?.nose &&
+          next.wings === me.costume?.wings) return;
       me.costume = next;
       if (room) bcast(room, snapshot(room));
       return;

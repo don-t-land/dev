@@ -847,6 +847,15 @@ function handle(m) {
             (m.players || []).filter(player => player.foldDone).length,
             (m.order || []).length || (m.players || []).length
           );
+        } else if (m.phase === 'launch') {
+          const nextOrder = Array.isArray(m.order) ? m.order : game.order;
+          const nextLayoutKey = getLaunchLayoutKey(m.mode, m.seed, nextOrder);
+          if (launchState.towerLayoutKey !== nextLayoutKey) {
+            game.order = nextOrder;
+            applyPhase(m);
+          }
+        } else if (m.phase === 'playing') {
+          game.order = Array.isArray(m.order) ? m.order : game.order;
         }
         refreshBoard();
         break;

@@ -94,6 +94,13 @@ test('active room snapshots are idempotent and launch is server-authoritative', 
   assert.doesNotMatch(html, /setCraftFromFoldModel\(foldedModel\);\s*startLaunchSequence\(\)/s);
 });
 
+test('a room snapshot arriving mid-launch resyncs order and rebuilds stale launch towers', () => {
+  assert.match(
+    html,
+    /if \(sameRoundPhase\) \{[\s\S]*else if \(m\.phase === 'launch'\) \{[\s\S]*getLaunchLayoutKey\(m\.mode, m\.seed, nextOrder\)[\s\S]*launchState\.towerLayoutKey !== nextLayoutKey[\s\S]*applyPhase\(m\)[\s\S]*\} else if \(m\.phase === 'playing'\) \{[\s\S]*game\.order = Array\.isArray\(m\.order\) \? m\.order : game\.order;[\s\S]*\}[\s\S]*refreshBoard\(\);[\s\S]*break;\s*\}/
+  );
+});
+
 test('remote and launch Three.js resources are explicitly disposed', () => {
   assert.match(html, /function disposeObject3D\(object\)/);
   assert.match(html, /disposeObject3D\(actor\.group \|\| actor\.mascot\)/);

@@ -25,15 +25,25 @@ test('launch motion advances across the roof with an active running stride', () 
   assert.equal(jumping.stride, 0);
 });
 
-test('launch camera frames the whole roof from a fixed elevated three-quarter view', () => {
-  const plan = getLaunchCameraPlan(
-    { x: 0, y: 150, z: 16 },
-    { x: 0, y: 150, z: 3 }
+test('launch camera looks forward from behind the runner instead of straight down', () => {
+  const start = { x: 0, y: 150, z: 16 };
+  const edge = { x: 0, y: 150, z: 3 };
+  const plan = getLaunchCameraPlan(start, edge);
+  const dir = { x: 0, z: -1 };
+  const cameraAlongRoute =
+    (plan.position.x - start.x) * dir.x + (plan.position.z - start.z) * dir.z;
+  const targetAlongRoute =
+    (plan.target.x - start.x) * dir.x + (plan.target.z - start.z) * dir.z;
+  const verticalDrop = plan.position.y - plan.target.y;
+  const horizontalDistance = Math.hypot(
+    plan.position.x - plan.target.x,
+    plan.position.z - plan.target.z
   );
 
-  assert.deepEqual(plan.target, { x: 0, y: 152.5, z: 9.5 });
-  assert.ok(plan.position.y - plan.target.y >= 30);
-  assert.ok(Math.hypot(plan.position.x - plan.target.x, plan.position.z - plan.target.z) >= 7);
+  assert.ok(cameraAlongRoute < 0, 'camera must sit behind the rooftop starting line');
+  assert.ok(targetAlongRoute > plan.pathLength * 0.6, 'camera must look ahead along the run');
+  assert.ok(verticalDrop >= 8 && verticalDrop <= 14, 'camera should be elevated, not overhead');
+  assert.ok(horizontalDistance > verticalDrop, 'forward view must be more horizontal than vertical');
   assert.equal(plan.pathLength, 13);
 });
 test('launch keeps full-size legs visible until the rooftop drop', () => {

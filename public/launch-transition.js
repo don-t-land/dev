@@ -57,16 +57,16 @@
     const sideX = -dirZ;
     const sideZ = dirX;
     const target = {
-      x: (sx + ex) / 2,
-      y: (sy + ey) / 2 + 2.5,
-      z: (sz + ez) / 2
+      x: (sx + ex) / 2 + dirX * 2.5,
+      y: (sy + ey) / 2 + 2,
+      z: (sz + ez) / 2 + dirZ * 2.5
     };
     return {
       target,
       position: {
-        x: target.x - dirX * 4 + sideX * 6,
-        y: target.y + 32,
-        z: target.z - dirZ * 4 + sideZ * 6
+        x: sx - dirX * 4.5 + sideX * 3.8,
+        y: target.y + 10.5,
+        z: sz - dirZ * 4.5 + sideZ * 3.8
       },
       pathLength
     };

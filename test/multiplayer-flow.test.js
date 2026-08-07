@@ -199,7 +199,7 @@ test('folded craft and server-timed rooftop launch sequence are connected to are
 });
 
 test('rooftop launch poofs away full-size legs at the drop without folding them', () => {
-  assert.match(html, /<script src="\.\/launch-transition\.js\?v=launch-camera-running-1"><\/script>/);
+  assert.match(html, /<script src="\.\/launch-transition\.js\?v=launch-direction-camera-2"><\/script>/);
   assert.match(html, /const snapshots = new Map\(\(phase\?\.crafts/);
   assert.match(html, /replayFoldCommands\(snapshot\?\.commands/);
   assert.match(html, /makeFoldedCraftVisual\(model, tint\)/);
@@ -219,8 +219,8 @@ test('rooftop launch poofs away full-size legs at the drop without folding them'
   assert.doesNotMatch(html, /if \(progress >= \.88\) craft\.visible = true/);
 });
 
-test('rooftop launch uses a fixed elevated camera so the actor visibly crosses the roof', () => {
-  assert.match(html, /<script src="\.\/launch-transition\.js\?v=launch-camera-running-1"><\/script>/);
+test('rooftop launch uses a forward-tilted camera so the actor runs away toward the roof edge', () => {
+  assert.match(html, /<script src="\.\/launch-transition\.js\?v=launch-direction-camera-2"><\/script>/);
   assert.match(html, /const \{ getLaunchPose, getLaunchMotion, getLaunchCameraPlan,/);
   assert.match(html, /const motion = getLaunchMotion\(progress\)/);
   assert.match(html, /const position = pathStart\.clone\(\)\.lerp\(roofEdge, motion\.runProgress\)/);

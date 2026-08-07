@@ -59,7 +59,7 @@
       : editorFailed
         ? `3D 편집기를 열 수 없어요 — 기본 비행기 프리셋을 사용해 주세요${peers}`
         : (timed
-          ? `${count}/10번 접음 · 그은 선의 왼쪽 면이 접힙니다${peers}`
+          ? `${count}/10번 접음 · 선을 긋고 접을 쪽을 잡아 당기세요${peers}`
           : `${count}/10번 접음 · 완성 버튼을 누르면 바로 출격합니다${peers}`);
     $('fold-undo-btn').disabled = locked || !count;
     renderStats();

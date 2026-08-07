@@ -80,7 +80,7 @@ test('folding UI exposes the 3d editor, unfold, completion and synchronized prog
   assert.match(html, /onAdjustHinge: \(foldIndex, angle\) => window\.paperFoldingStage\?\.handleHingeAdjust\(foldIndex, angle\)/);
   assert.match(foldUi, /api\.setFoldAngle\(model, foldIndex, angle\)/);
   assert.doesNotMatch(foldUi, /THREE|getContext\('2d'\)/);
-  assert.match(html, /선을 그은 방향의 왼쪽 면/);
+  assert.match(html, /접을 쪽을 잡아 당겨 접으세요/);
   assert.match(foldUi, /model = api\.undoFold\(model\)/);
   assert.match(foldUi, /setRoomProgress\(done, total\)/);
   assert.match(html, /onComplete: fold => send\(\{ t: 'fold_done', commands: fold\.commands \}\)/);

@@ -7,6 +7,7 @@
 
   const KEYS = ['walls', 'spires', 'rocks', 'thermals', 'rings', 'platforms', 'clouds', 'landmarks'];
   const BASE_ARENA_RADIUS = 240;
+  const FLIGHT_CEILING = 420;
 
   function emptyLayout() {
     return Object.fromEntries(KEYS.map(key => [key, []]));
@@ -387,12 +388,21 @@
         x = (rng() * 2 - 1) * (ctx.halfWidthAt(z) + 85);
       }
       const width = (options.minW || 42) + rng() * ((options.maxW || 92) - (options.minW || 42));
+      const verticalT = rng();
+      const height = width * (.22 + rng() * .16);
+      const lowY = (options.minY || 110) + verticalT * ((options.maxY || 320) - (options.minY || 110));
+      // Keep one quarter of every cloud field crossing the playable ceiling. This preserves
+      // the original low/mid layers while preventing an empty sky when pilots climb and pitch up.
+      const highLayer = options.highLayer !== false && i % 4 === 0;
+      const y = highLayer
+        ? FLIGHT_CEILING + height * (.15 + verticalT * .2)
+        : lowY;
       out.clouds.push({
         x,
-        y: (options.minY || 110) + rng() * ((options.maxY || 320) - (options.minY || 110)),
+        y,
         z,
         w: width,
-        h: width * (.22 + rng() * .16),
+        h: height,
         d: width * (.42 + rng() * .28),
         yaw: rng() * Math.PI * 2,
         variant: Math.floor(rng() * 4),
@@ -403,6 +413,7 @@
 
   return {
     KEYS,
+    FLIGHT_CEILING,
     emptyLayout,
     featherWeight,
     keepAt,

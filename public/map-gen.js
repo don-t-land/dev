@@ -21,6 +21,7 @@
   const DIST_HALF = 155;
   // 오래 날기 경기장은 기존 240m 반경의 3배 크기다.
   const ARENA_R = 720;
+  const FLIGHT_CEILING = helpers.FLIGHT_CEILING;
   const BAND_SIZE = DIST_LEN / 5;
   const BLEND_HALF = 150;
   const LAYOUT_KEYS = ['walls', 'spires', 'rocks', 'thermals', 'rings', 'platforms', 'clouds', 'landmarks'];
@@ -164,7 +165,7 @@
   }
 
   return {
-    DIST_LEN, DIST_HALF, ARENA_R, BAND_SIZE, BLEND_HALF, LAYOUT_KEYS,
+    DIST_LEN, DIST_HALF, ARENA_R, FLIGHT_CEILING, BAND_SIZE, BLEND_HALF, LAYOUT_KEYS,
     BIOMES, mulberry32, sampleBiome, makeNoise1d, widthScaleAt,
     buildDistanceLayout, buildArenaLayout, arenaTheme,
     findArenaSpawn,

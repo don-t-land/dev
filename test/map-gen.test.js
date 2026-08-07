@@ -144,6 +144,34 @@ test('distance render budget remains bounded despite layered visual dressing', (
   }
 });
 
+function crossesFlightCeiling(cloud, ceiling) {
+  return cloud.y - cloud.h / 2 < ceiling && cloud.y + cloud.h / 2 > ceiling;
+}
+
+test('cloud layers overlap the flight ceiling in every distance and arena biome', () => {
+  assert.equal(mapGen.FLIGHT_CEILING, 420);
+
+  const distance = buildDistanceLayout(4312);
+  for (let biome = 0; biome < BIOMES.length; biome++) {
+    assert.ok(
+      inBiome(distance.clouds, biome).some(cloud => crossesFlightCeiling(cloud, mapGen.FLIGHT_CEILING)),
+      `${BIOMES[biome].id} distance clouds stop below the flight ceiling`
+    );
+  }
+
+  const seen = new Map();
+  for (let seed = 0; seed < 500 && seen.size < BIOMES.length; seed++) {
+    seen.set(arenaTheme(seed).id, seed);
+  }
+  for (const [id, seed] of seen) {
+    const arena = buildArenaLayout(seed);
+    assert.ok(
+      arena.clouds.some(cloud => crossesFlightCeiling(cloud, mapGen.FLIGHT_CEILING)),
+      `${id} arena clouds stop below the flight ceiling`
+    );
+  }
+});
+
 test('arena layouts are deterministic, single-biome and reuse the selected recipe', () => {
   assert.equal(ARENA_R, 720, '오래 날기 경기장 반경은 기존 240m의 3배여야 한다');
   for (const seed of [0, 1, 4, 10, 18, 33]) {

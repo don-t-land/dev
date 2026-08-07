@@ -2404,7 +2404,7 @@ function applyCraftSnapshots(crafts) {
   }
 }
 
-const GRAVITY = 21, DRAG = 0.0038, MAX_ALT = 420;
+const GRAVITY = 21, DRAG = 0.0038, MAX_ALT = window.mapGen.FLIGHT_CEILING;
 const me = {
   yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false,
   dist: 0, surv: 0, energy: MAX_ENERGY, dashing: false, lifeStartedAt: 0

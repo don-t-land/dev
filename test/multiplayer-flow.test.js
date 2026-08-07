@@ -81,7 +81,7 @@ test('active room snapshots are idempotent and launch is server-authoritative', 
   assert.match(html, /case 'room':[\s\S]*isSameRoundPhase\(m\)/);
   assert.match(html, /m\.phase === 'launch'/);
   assert.match(html, /case 'phase':[\s\S]*m\.phase === 'launch'/);
-  assert.match(html, /m\.t === 'room' && !world\.children\.length[\s\S]*buildLaunchTowers\(\);[\s\S]*spawnSelf\(\)/);
+  assert.match(html, /const needsWorld = m\.t === 'room' && !world\.children\.length;[\s\S]*ensureLaunchTowers\(\);[\s\S]*if \(needsWorld\) spawnSelf\(\)/);
   assert.doesNotMatch(html, /setCraftFromFoldModel\(foldedModel\);\s*startLaunchSequence\(\)/s);
 });
 

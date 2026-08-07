@@ -639,6 +639,7 @@
 <script src="./paper-aero-profile.js"></script>
 <script src="./fold-stats-view.js"></script>
 <script src="./paper-fold-ui.js"></script>
+<script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
 <script src="./map-gen.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
@@ -648,6 +649,7 @@
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
 import { createFoldEditor } from './fold-editor-3d.mjs';
+const { getLaunchPose, localDeadline, getLaunchLayoutKey } = window.launchTransition;
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
@@ -1723,7 +1725,10 @@ const unitRock = new THREE.IcosahedronGeometry(1, 0);
 const dummy = new THREE.Object3D();
 
 function clearWorld() {
-  if (typeof launchState !== 'undefined') clearLaunchActors();
+  if (typeof launchState !== 'undefined') {
+    clearLaunchActors();
+    clearLaunchTowers();
+  }
   world.traverse(o => {
     if (o.isMesh && o.geometry !== unitBox && o.geometry !== unitCone && o.geometry !== unitRock)
       o.geometry.dispose?.();
@@ -1937,7 +1942,10 @@ function buildArena(seed) {
 }
 
 /* ---- 공통 출발 연출: 모드별 스폰 지점의 옥상에서 달려 점프 ---- */
-const launchState = { active: false, startedAt: 0, duration: 4400, actors: [] };
+const launchState = {
+  active: false, startedAt: 0, duration: 4400, actors: [],
+  towerGroup: null, towerLayoutKey: ''
+};
 
 function arenaSpawnPoint(index, count, radius = 130) {
   const angle = (index / Math.max(1, count)) * Math.PI * 2;
@@ -1954,9 +1962,12 @@ function launchSpawnPoint(index, count, stage = 'end') {
 }
 
 function buildLaunchTowers() {
+  clearLaunchTowers();
   const arena = game.mode === 'ARENA';
   const count = Math.max(1, game.order.length);
   const rng = mulberry32((game.seed ^ 0x51f15e) >>> 0);
+  const towerGroup = new THREE.Group();
+  towerGroup.name = 'launchTowerGroup';
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2;
     const height = arena ? 128 : 148;
@@ -1995,8 +2006,24 @@ function buildLaunchTowers() {
     } else {
       tower.position.set((index - (count - 1) / 2) * 10, 0, 16);
     }
-    world.add(tower);
+    towerGroup.add(tower);
   }
+  world.add(towerGroup);
+  launchState.towerGroup = towerGroup;
+  launchState.towerLayoutKey = getLaunchLayoutKey(game.mode, game.seed, game.order);
+}
+
+function clearLaunchTowers() {
+  if (!launchState.towerGroup) return;
+  disposeObject3D(launchState.towerGroup);
+  launchState.towerGroup = null;
+  launchState.towerLayoutKey = '';
+}
+
+function ensureLaunchTowers() {
+  const layoutKey = getLaunchLayoutKey(game.mode, game.seed, game.order);
+  if (launchState.towerGroup?.parent === world && launchState.towerLayoutKey === layoutKey) return;
+  buildLaunchTowers();
 }
 
 function clearLaunchActors() {
@@ -2021,7 +2048,7 @@ function startLaunchSequence(phase) {
     launchState.actors.push({ id, group: mascot, mascot, start, end, direction });
   });
   launchState.duration = Math.max(1, Number(phase?.duration) || 4400);
-  const elapsed = Math.max(0, launchState.duration - Math.max(0, Number(phase?.ends) - Date.now()));
+  const elapsed = Math.max(0, launchState.duration - Math.max(0, game.ends - Date.now()));
   launchState.startedAt = performance.now() - elapsed;
   launchState.active = true;
   game.phase = 'launch';
@@ -2036,6 +2063,7 @@ function startLaunchSequence(phase) {
 function updateLaunch(now) {
   if (!launchState.active) return;
   const progress = THREE.MathUtils.clamp((now - launchState.startedAt) / launchState.duration, 0, 1);
+  const pose = getLaunchPose(progress);
   const runProgress = THREE.MathUtils.smoothstep(progress, .08, .67);
   const jumpProgress = THREE.MathUtils.smoothstep(progress, .65, .92);
   const stride = Math.sin(progress * Math.PI * 20);
@@ -2055,25 +2083,26 @@ function updateLaunch(now) {
     const right = rightLeg.userData;
     const bounce = progress < .67 ? Math.abs(stride) * .18 : 0;
     actor.mascot.position.copy(position).add(new THREE.Vector3(0, 3.05 + bounce, 0));
-    body.rotation.x = progress > .67 ? -.22 * jumpProgress : .04 * stride;
+    body.rotation.x = pose.bodyPitch + (progress < .65 ? .04 * stride : 0);
     left.hip.rotation.x = stride * .58;
     right.hip.rotation.x = -stride * .58;
     left.knee.rotation.x = .18 + Math.max(0, -stride) * .65;
     right.knee.rotation.x = .18 + Math.max(0, stride) * .65;
     left.shoe.rotation.x = -.08 - Math.max(0, -stride) * .18;
     right.shoe.rotation.x = -.08 - Math.max(0, stride) * .18;
-    const fade = THREE.MathUtils.smoothstep(progress, .86, .96);
-    actor.mascot.scale.setScalar(.92 * (1 - fade * .7));
-    actor.mascot.visible = progress < .96;
+    leftLeg.visible = pose.legsVisible;
+    rightLeg.visible = pose.legsVisible;
+    actor.mascot.visible = !pose.showFlightCraft;
     if (index === localIndex) craft.position.copy(position);
   });
 
   if (progress < .18) showCenter(3, '준비', null);
   else if (progress < .39) showCenter(2, '달릴 준비', null);
   else if (progress < .66) showCenter(1, '달려!', null);
-  else if (progress < .92) showCenter(null, '점프!', '접은 종이비행기를 펼쳐 날아오릅니다');
+  else if (progress < .68) showCenter(null, '점프!', '옥상 끝에서 뛰어내립니다');
+  else if (progress < .92) showCenter(null, '펑!', '접은 종이비행기를 펼쳐 날아오릅니다');
 
-  if (progress >= .88) craft.visible = true;
+  if (pose.showFlightCraft) craft.visible = true;
   if (progress >= 1) {
     launchState.active = false;
     launchState.actors.forEach(actor => { actor.mascot.visible = false; });
@@ -2183,7 +2212,7 @@ function applyPhase(m) {
     game.phase = 'countdown';
     net.leaderboard = [];
     game.seed = m.seed;
-    game.ends = m.ends;
+    game.ends = localDeadline(m.ends, m.serverNow, Date.now(), 4_000);
     game.order = m.order || [];
     hideResults();
 
@@ -2203,7 +2232,7 @@ function applyPhase(m) {
     game.frozen = true;
     net.leaderboard = [];
     game.seed = Number(m.seed) || 0;
-    game.ends = Number(m.ends) || Date.now() + 60000;
+    game.ends = localDeadline(m.ends, m.serverNow, Date.now(), 120_000);
     game.order = Array.isArray(m.order) ? m.order : [];
     $('results').classList.add('hide');
     (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
@@ -2239,13 +2268,12 @@ function applyPhase(m) {
   if (m.phase === 'launch') {
     window.paperFoldingStage?.leave();
     game.seed = Number(m.seed) || game.seed;
-    game.ends = Number(m.ends) || Date.now() + 4400;
+    game.ends = localDeadline(m.ends, m.serverNow, Date.now(), 4_400);
     game.order = Array.isArray(m.order) ? m.order : game.order;
-    if (m.t === 'room' && !world.children.length) {
-      (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
-      buildLaunchTowers();
-      spawnSelf();
-    }
+    const needsWorld = m.t === 'room' && !world.children.length;
+    if (needsWorld) (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
+    ensureLaunchTowers();
+    if (needsWorld) spawnSelf();
     applyCraftSnapshots(m.crafts);
     startLaunchSequence(m);
     return;
@@ -2256,7 +2284,12 @@ function applyPhase(m) {
     window.paperFoldingStage?.leave();
     game.seed = Number(m.seed) || game.seed;
     game.order = Array.isArray(m.order) ? m.order : game.order;
-    game.ends = m.ends;
+    game.ends = localDeadline(
+      m.ends,
+      m.serverNow,
+      Date.now(),
+      (game.mode === 'ARENA' ? 180 : 150) * 1000
+    );
     applyCraftSnapshots(m.crafts);
     game.frozen = false;
     const role = m.t === 'room'
@@ -2276,6 +2309,7 @@ function applyPhase(m) {
       showCenter('비행 종료', '관전 중', '다음 라운드를 기다리세요');
     } else if (wasLaunch) {
       clearLaunchActors();
+      clearLaunchTowers();
       game.phase = 'playing';
       me.alive = true;
       craft.visible = true;
@@ -2297,9 +2331,10 @@ function applyPhase(m) {
     };
     net.room = resultRoom;
     clearLaunchActors();
+    clearLaunchTowers();
     window.paperFoldingStage?.leave();
     game.phase = 'results';
-    game.ends = m.ends;
+    game.ends = localDeadline(m.ends, m.serverNow, Date.now(), 0);
     game.frozen = true;
     closePauseMenu();
     releaseFlightPointerLock();

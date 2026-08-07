@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const WebSocket = require('ws');
 const { getPresetCommands } = require('../public/paper-fold-model.js');
+const { ARENA_R, buildArenaLayout } = require('../public/map-gen.js');
+const { isArenaSpawnSafe } = require('../public/biomes/helpers.js');
 const { httpServer, wss } = require('../server');
 
 const DART_COMMANDS = JSON.stringify(getPresetCommands('dart'));
@@ -184,8 +186,10 @@ test('room 목록에서 ARENA live 방은 인원 미만이면 joinable이다', a
   }
 });
 
-function spawnPosition(angle) {
-  return [Math.cos(angle) * 130, 130, Math.sin(angle) * 130];
+function spawnPosition(message) {
+  return Array.isArray(message.position)
+    ? message.position
+    : [Math.cos(message.angle) * 130, 130, Math.sin(message.angle) * 130];
 }
 
 async function createAndJoinLiveArena(hostName, guestName) {
@@ -198,11 +202,11 @@ async function createAndJoinLiveArena(hostName, guestName) {
   guest.send({ t: 'join', code: created.code });
   await guest.next(message => message.t === 'room' && message.players.length === 2);
   await host.next(message => message.t === 'room' && message.players.length === 2);
-  return { host, guest, hostHello, guestHello };
+  return { host, guest, hostHello, guestHello, seed: created.seed };
 }
 
-test('live 방 접기 → fold_ok → spawn → spawned 브로드캐스트', async () => {
-  const { host, guest, guestHello } = await createAndJoinLiveArena('방장', '손님');
+test('live 방 접기 → fold_ok → 안전한 랜덤 위치 spawn → spawned 브로드캐스트', async () => {
+  const { host, guest, guestHello, seed } = await createAndJoinLiveArena('방장', '손님');
   try {
     guest.send({ t: 'fold_done', commands: DART_COMMANDS });
     const foldOk = await guest.next(message => message.t === 'fold_ok');
@@ -215,6 +219,13 @@ test('live 방 접기 → fold_ok → spawn → spawned 브로드캐스트', asy
     ]);
     assert.equal(hostSpawned.name, '손님');
     assert.equal(typeof hostSpawned.angle, 'number');
+    assert.equal(hostSpawned.position.length, 3);
+    assert.ok(hostSpawned.position.every(Number.isFinite));
+    assert.ok(isArenaSpawnSafe(
+      buildArenaLayout(seed),
+      { x: hostSpawned.position[0], y: hostSpawned.position[1], z: hostSpawned.position[2] },
+      { radius: ARENA_R }
+    ));
     assert.equal(typeof hostSpawned.profile, 'object');
     assert.equal(typeof hostSpawned.commands, 'string');
     assert.equal(hostSpawned.kills, 0);
@@ -269,8 +280,8 @@ test('격추 시 killer의 kills가 증가하고 리더보드가 kills/생존초
     const guestSpawned = await guest.next(message => message.t === 'spawned' && message.id === guestHello.id);
     await host.next(message => message.t === 'spawned' && message.id === guestHello.id);
 
-    const shooterPos = spawnPosition(hostSpawned.angle);
-    const targetPos = spawnPosition(guestSpawned.angle);
+    const shooterPos = spawnPosition(hostSpawned);
+    const targetPos = spawnPosition(guestSpawned);
     host.send({ t: 's', p: shooterPos, r: [0, 0, 0] });
     guest.send({ t: 's', p: targetPos, r: [0, 0, 0] });
     await new Promise(resolve => setTimeout(resolve, 50));

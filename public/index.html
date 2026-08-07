@@ -1035,7 +1035,11 @@ function handle(m) {
         enterGame();
         game.phase = 'playing';
         const angle = Number(m.angle) || 0;
-        craft.position.set(Math.cos(angle) * 130, 130, Math.sin(angle) * 130);
+        const spawnPosition = Array.isArray(m.position) && m.position.length === 3 &&
+          m.position.every(value => Number.isFinite(value))
+          ? m.position
+          : [Math.cos(angle) * 130, 130, Math.sin(angle) * 130];
+        craft.position.fromArray(spawnPosition);
         const center = craft.position.clone().multiplyScalar(-1).normalize();
         me.yaw = Math.atan2(-center.x, -center.z);
         me.pitch = -0.05; me.roll = 0; me.speed = 22;

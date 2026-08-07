@@ -66,7 +66,7 @@
     const count = h.arenaCount(ctx, 42);
     for (let i = 0; i < count; i++) {
       const angle = i * 2.399963 + (rng() - .5) * .12;
-      const d = 42 + Math.sqrt((i + 1) / count) * (ctx.radius - 88);
+      const d = 18 + Math.sqrt((i + .25) / count) * (ctx.radius - 72);
       addPillar(out, Math.cos(angle) * d, Math.sin(angle) * d, i, rng, true);
       if (i % 5 === 2) out.rings.push({ x: Math.cos(angle + .22) * d * .82, y: 55 + rng() * 130, z: Math.sin(angle + .22) * d * .82 });
     }

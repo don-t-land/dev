@@ -54,8 +54,12 @@
   }
 
   function arenaClusterCenters(ctx, rng, baseCount, inner = 50, outerMargin = 70) {
-    return Array.from({ length: arenaCount(ctx, baseCount, 1) }, () =>
-      arenaPoint(rng, ctx.radius, inner, outerMargin));
+    const count = arenaCount(ctx, baseCount, 1);
+    const centralCount = Math.max(1, Math.round(count * .14));
+    const centralRadius = Math.min(ctx.radius * .15, Math.max(60, inner * 1.15));
+    return Array.from({ length: count }, (_, index) => index < centralCount
+      ? arenaPoint(rng, centralRadius, 0, 8)
+      : arenaPoint(rng, ctx.radius, inner, outerMargin));
   }
 
   function clusterPoint(rng, center, spread, minDistance = 0) {
@@ -103,6 +107,22 @@
       const radius = item.type === 'wind-gate' ? 29 : item.type === 'post-office' ? 22 : 11;
       const height = item.type === 'white-needle' ? 98 : item.type === 'wind-gate' ? 52 : 35;
       return { x: item.x, z: item.z, radius: radius * scale, yMin: item.y || 0, yMax: (item.y || 0) + height * scale };
+    }
+    if (key === 'walls') {
+      return {
+        x: item.x, z: item.z,
+        radius: Math.hypot(item.w || 0, item.d || 0) * .55,
+        yMin: 0,
+        yMax: item.h || 0
+      };
+    }
+    if (key === 'clouds') {
+      return {
+        x: item.x, z: item.z,
+        radius: Math.max(item.w || 0, item.d || 0) * .55,
+        yMin: item.y - (item.h || 0) * .65,
+        yMax: item.y + (item.h || 0) * .65
+      };
     }
     if (key === 'rings') {
       return { x: item.x, z: item.z, radius: 10, yMin: item.y - 10, yMax: item.y + 10 };
@@ -233,6 +253,66 @@
     return overlaps;
   }
 
+  function isArenaSpawnSafe(layout, point, options = {}) {
+    if (!point || ![point.x, point.y, point.z].every(Number.isFinite)) return false;
+    const radius = options.radius || BASE_ARENA_RADIUS;
+    const boundaryMargin = options.boundaryMargin ?? 54;
+    if (Math.hypot(point.x, point.z) > radius - boundaryMargin) return false;
+    const craftRadius = options.craftRadius ?? 10;
+    const halfHeight = options.halfHeight ?? 6;
+    const clearance = options.clearance ?? 9;
+    const candidate = {
+      x: point.x, z: point.z, radius: craftRadius,
+      yMin: point.y - halfHeight,
+      yMax: point.y + halfHeight
+    };
+    for (const key of ['walls', 'landmarks', 'spires', 'platforms', 'rocks', 'thermals', 'rings', 'clouds']) {
+      for (const item of layout[key] || []) {
+        const bounds = solidBounds(item, key);
+        if (bounds && boundsOverlap(candidate, bounds, clearance)) return false;
+      }
+    }
+    for (const occupied of options.occupied || []) {
+      if (!Array.isArray(occupied) || occupied.length !== 3) continue;
+      const dx = point.x - occupied[0];
+      const dy = point.y - occupied[1];
+      const dz = point.z - occupied[2];
+      if (dx * dx + dy * dy + dz * dz < 34 * 34) return false;
+    }
+    return true;
+  }
+
+  function findArenaSpawn(layout, ctx, rng, occupied = []) {
+    const options = { radius: ctx.radius, occupied };
+    const maxDistance = ctx.radius - 62;
+    for (let attempt = 0; attempt < 640; attempt++) {
+      const angle = rng() * Math.PI * 2;
+      const distance = Math.sqrt(rng()) * maxDistance;
+      const point = {
+        x: Math.cos(angle) * distance,
+        y: 96 + rng() * 142,
+        z: Math.sin(angle) * distance
+      };
+      if (isArenaSpawnSafe(layout, point, options)) {
+        return { ...point, angle };
+      }
+    }
+    // 매우 조밀한 시드에서도 실패하지 않도록 높이층을 바꿔가며 황금각으로 전수 탐색한다.
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    for (let index = 0; index < 1600; index++) {
+      const t = (index + .5) / 1600;
+      const angle = index * goldenAngle;
+      const distance = Math.sqrt(t) * maxDistance;
+      const point = {
+        x: Math.cos(angle) * distance,
+        y: 104 + (index % 7) * 22,
+        z: Math.sin(angle) * distance
+      };
+      if (isArenaSpawnSafe(layout, point, options)) return { ...point, angle };
+    }
+    throw new Error('unable to find a collision-free arena spawn');
+  }
+
   function addDistanceWalls(out, ctx, rng, options) {
     const step = options.step;
     const length = Math.abs(ctx.zEnd - ctx.zStart);
@@ -337,6 +417,8 @@
     solidBounds,
     resolveLayoutOverlaps,
     findSolidOverlaps,
+    isArenaSpawnSafe,
+    findArenaSpawn,
     addDistanceWalls,
     addArenaWalls,
     addClouds

@@ -154,10 +154,20 @@
     return BIOMES[arenaThemeIndex(seed)];
   }
 
+  function findArenaSpawn(layout, seed, occupied = []) {
+    return helpers.findArenaSpawn(
+      layout,
+      { mode: 'ARENA', radius: ARENA_R },
+      mulberry32(seed >>> 0),
+      occupied
+    );
+  }
+
   return {
     DIST_LEN, DIST_HALF, ARENA_R, BAND_SIZE, BLEND_HALF, LAYOUT_KEYS,
     BIOMES, mulberry32, sampleBiome, makeNoise1d, widthScaleAt,
     buildDistanceLayout, buildArenaLayout, arenaTheme,
+    findArenaSpawn,
     resolveLayoutOverlaps: helpers.resolveLayoutOverlaps
   };
 });

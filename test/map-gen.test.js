@@ -15,6 +15,7 @@ const {
   makeNoise1d,
   buildDistanceLayout,
   buildArenaLayout,
+  findArenaSpawn,
   arenaTheme,
   widthScaleAt
 } = mapGen;
@@ -188,6 +189,38 @@ test('solid biome assets are deterministically repacked without visual overlaps'
     const layout = buildArenaLayout(seed);
     const overlaps = biomeHelpers.findSolidOverlaps(layout);
     assert.equal(overlaps.length, 0, `seed ${seed}: ${JSON.stringify(overlaps[0])}`);
+  }
+});
+
+test('every arena biome keeps a readable asset field through the map center', () => {
+  const minimumByBiome = new Map();
+  for (let seed = 0; seed < 80; seed++) {
+    const layout = buildArenaLayout(seed);
+    const id = BIOMES[layout.biome].id;
+    const centralAssets = [
+      ...layout.landmarks,
+      ...layout.spires,
+      ...layout.platforms,
+      ...layout.rocks
+    ].filter(item => Math.hypot(item.x, item.z) < 120).length;
+    minimumByBiome.set(id, Math.min(minimumByBiome.get(id) ?? Infinity, centralAssets));
+  }
+  assert.deepEqual([...minimumByBiome.keys()].sort(), BIOMES.map(biome => biome.id).sort());
+  for (const [id, count] of minimumByBiome) assert.ok(count >= 9, `${id} center only has ${count} assets`);
+});
+
+test('random arena spawns avoid every visual asset and other active pilots', () => {
+  for (let seed = 0; seed < 40; seed++) {
+    const layout = buildArenaLayout(seed);
+    const occupied = [];
+    for (let index = 0; index < 8; index++) {
+      const spawn = findArenaSpawn(layout, seed * 97 + index, occupied);
+      assert.ok(
+        biomeHelpers.isArenaSpawnSafe(layout, spawn, { radius: ARENA_R, occupied }),
+        `unsafe spawn for seed ${seed}: ${JSON.stringify(spawn)}`
+      );
+      occupied.push([spawn.x, spawn.y, spawn.z]);
+    }
   }
 });
 

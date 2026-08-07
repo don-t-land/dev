@@ -21,6 +21,10 @@ const {
 } = require('./public/paper-fold-model.js');
 const { deriveAerodynamicProfile } = require('./public/paper-aero-profile.js');
 const { normalize: normalizeCostume } = require('./public/costume-state.js');
+const {
+  buildArenaLayout,
+  findArenaSpawn
+} = require('./public/map-gen.js');
 
 const DEFAULT_AERO_PROFILE = deriveAerodynamicProfile(createPaperModel());
 
@@ -136,6 +140,7 @@ function makeRoom(mode, visibility = 'public') {
   if (mode === 'ARENA') {
     room.phase = 'live';
     room.seed = crypto.randomInt(2 ** 31);
+    room.arenaLayout = buildArenaLayout(room.seed);
     room.startedAt = Date.now();
   }
   rooms.set(room.id, room);
@@ -189,6 +194,7 @@ function vecDistanceSquared(a, b) {
 function expectedSpawn(room, playerId) {
   if (room.mode === 'ARENA' && room.phase === 'live') {
     const player = room.players.get(playerId);
+    if (player && finiteVec3(player.spawnPosition, 10000)) return player.spawnPosition;
     if (player && player.spawnAngle !== null) {
       return [Math.cos(player.spawnAngle) * 130, 130, Math.sin(player.spawnAngle) * 130];
     }
@@ -334,6 +340,7 @@ function resetPlayerForRoom(player) {
   player.lifeStartedAt = 0;
   player.diedAt = 0;
   player.spawnAngle = null;
+  player.spawnPosition = null;
   player.state = null;
   player.stateAt = 0;
   player.movementBudget = 40;
@@ -637,6 +644,7 @@ wss.on('connection', (ws) => {
         lifeStartedAt: 0,
         diedAt: 0,
         spawnAngle: null,
+        spawnPosition: null,
         state: null,
         stateAt: 0,
         movementBudget: 40,
@@ -816,7 +824,17 @@ wss.on('connection', (ws) => {
         sendJson(ws, { t: 'error', code: 'RESPAWN_COOLDOWN', message: '잠시 후 다시 시도해 주세요' });
         return;
       }
-      me.spawnAngle = Math.random() * Math.PI * 2;
+      const occupiedSpawns = [...room.players.values()]
+        .filter(player => player.id !== me.id && player.alive)
+        .map(player => player.state?.p || player.spawnPosition)
+        .filter(position => finiteVec3(position, 10000));
+      const spawn = findArenaSpawn(
+        room.arenaLayout || (room.arenaLayout = buildArenaLayout(room.seed)),
+        crypto.randomInt(2 ** 31),
+        occupiedSpawns
+      );
+      me.spawnAngle = Math.atan2(spawn.z, spawn.x);
+      me.spawnPosition = [spawn.x, spawn.y, spawn.z];
       me.alive = true;
       me.lifeStartedAt = spawnNow;
       me.state = null;
@@ -828,6 +846,7 @@ wss.on('connection', (ws) => {
       if (!room.order.includes(me.id)) room.order.push(me.id);
       bcast(room, {
         t: 'spawned', id: me.id, name: me.name, angle: me.spawnAngle,
+        position: me.spawnPosition,
         profile: me.aeroProfile, commands: me.foldCommands, kills: me.kills,
         costume: normalizeCostume(me.costume)
       });

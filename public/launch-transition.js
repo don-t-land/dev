@@ -29,6 +29,49 @@
     };
   }
 
+  function getLaunchMotion(progress) {
+    const value = clamp01(progress);
+    const runStart = 0.08;
+    const runEnd = 0.67;
+    const running = value >= runStart && value < runEnd;
+    const runProgress = smoothstep(value, runStart, runEnd);
+    const stridePhase = (value - runStart) / (runEnd - runStart);
+    return {
+      runProgress,
+      stride: running ? Math.sin(stridePhase * Math.PI * 8) : 0
+    };
+  }
+
+  function getLaunchCameraPlan(start, edge) {
+    const sx = Number(start?.x) || 0;
+    const sy = Number(start?.y) || 0;
+    const sz = Number(start?.z) || 0;
+    const ex = Number(edge?.x) || 0;
+    const ey = Number(edge?.y) || 0;
+    const ez = Number(edge?.z) || 0;
+    const dx = ex - sx;
+    const dz = ez - sz;
+    const pathLength = Math.hypot(dx, dz);
+    const dirX = pathLength > 0 ? dx / pathLength : 0;
+    const dirZ = pathLength > 0 ? dz / pathLength : -1;
+    const sideX = -dirZ;
+    const sideZ = dirX;
+    const target = {
+      x: (sx + ex) / 2,
+      y: (sy + ey) / 2 + 2.5,
+      z: (sz + ez) / 2
+    };
+    return {
+      target,
+      position: {
+        x: target.x - dirX * 4 + sideX * 6,
+        y: target.y + 32,
+        z: target.z - dirZ * 4 + sideZ * 6
+      },
+      pathLength
+    };
+  }
+
   function localDeadline(serverEnds, serverNow, localNow = Date.now(), fallbackDuration = 0) {
     const end = Number(serverEnds);
     const sent = Number(serverNow);
@@ -48,5 +91,12 @@
     return `${mode === 'ARENA' ? 'ARENA' : 'DIST'}:${Number(seed) || 0}:${count}`;
   }
 
-  return { getLaunchPose, localDeadline, shouldReuseFoldedVisual, getLaunchLayoutKey };
+  return {
+    getLaunchPose,
+    getLaunchMotion,
+    getLaunchCameraPlan,
+    localDeadline,
+    shouldReuseFoldedVisual,
+    getLaunchLayoutKey
+  };
 });

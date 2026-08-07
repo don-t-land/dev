@@ -56,12 +56,15 @@ test('arena presentation frames the authored island and gives landmarks readable
   assert.match(html, /sign\.name = 'post-office-envelope-sign'/);
   assert.match(html, /ridgeCrowns\.name = 'whitewind-ridge-crowns'/);
   assert.match(html, /edge\.name = `\$\{terrace\.id\}-retaining-edge`/);
-  assert.match(html, /const cameraLookHeight = game\.phase === 'launch'\s*\? 1\.2\s*:\s*game\.mode === 'ARENA' \? -5\.5 : 1\.2/);
+  assert.match(html, /if \(game\.phase === 'launch' && launchState\.actors\.length\)/);
+  assert.match(html, /const launchCameraPlan = getLaunchCameraPlan\(localActor\.start, roofEdge\)/);
+  assert.match(html, /lookAt\.y \+= game\.mode === 'ARENA' \? -5\.5 : 1\.2/);
   assert.match(html, /ground\.position\.set\(0, game\.mode === 'ARENA' \? -6 : 0, 0\)/);
   assert.match(html, /grid\.visible = game\.mode === 'DIST'/);
 });
 
 test('thermal columns taper upward without additive walls obscuring the arena', () => {
+  assert.match(html, /uniforms: THREE\.UniformsUtils\.merge\(\[THREE\.UniformsLib\.fog, \{ uTime: \{ value: 0 \} \}\]\)/);
   assert.match(html, /blending: THREE\.NormalBlending, fog: true/);
   assert.match(html, /vec4 mvPosition=modelViewMatrix/);
   assert.match(html, /new THREE\.CylinderGeometry\(THERMAL_R \* 0\.32, THERMAL_R, 220/);

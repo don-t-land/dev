@@ -623,7 +623,7 @@
 <script src="./paper-aero-profile.js"></script>
 <script src="./paper-fold-viewport.js"></script>
 <script src="./paper-fold-ui.js"></script>
-<script src="./launch-transition.js"></script>
+<script src="./launch-transition.js?v=launch-camera-running-1"></script>
 <script src="./home-screen.js"></script>
 <script src="./endurance-map.js"></script>
 <script type="module" src="./home-plane-3d.js"></script>
@@ -632,7 +632,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { makeStandingPlaneMascot } from './home-plane-3d.js';
-const { getLaunchPose, localDeadline, shouldReuseFoldedVisual, getLaunchLayoutKey } = window.launchTransition;
+const { getLaunchPose, getLaunchMotion, getLaunchCameraPlan, localDeadline, shouldReuseFoldedVisual, getLaunchLayoutKey } = window.launchTransition;
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const { updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage } = window.flightControls;
@@ -1485,7 +1485,7 @@ let spireMesh = null, rockMesh = null, wallMesh = null;
 const thermalMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide,
   blending: THREE.NormalBlending, fog: true,
-  uniforms: { uTime: { value: 0 } },
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 } }]),
   vertexShader: `
     #include <fog_pars_vertex>
     varying vec2 vUv; varying vec3 vN; varying vec3 vV;
@@ -2204,16 +2204,16 @@ function updateLaunch(now) {
   if (!launchState.active) return;
   const progress = THREE.MathUtils.clamp((now - launchState.startedAt) / launchState.duration, 0, 1);
   const pose = getLaunchPose(progress);
-  const runProgress = THREE.MathUtils.smoothstep(progress, .08, .67);
+  const motion = getLaunchMotion(progress);
   const jumpProgress = THREE.MathUtils.smoothstep(progress, .65, .92);
-  const stride = Math.sin(progress * Math.PI * 20);
+  const stride = motion.stride;
   const count = Math.max(1, game.order.length);
   const localIndex = Math.max(0, game.order.indexOf(net.id));
 
   launchState.actors.forEach((actor, index) => {
     const pathStart = launchSpawnPoint(index, count, 'start');
     const roofEdge = launchSpawnPoint(index, count, 'edge');
-    const position = pathStart.clone().lerp(roofEdge, runProgress);
+    const position = pathStart.clone().lerp(roofEdge, motion.runProgress);
     if (progress > .65) {
       position.lerp(actor.end, jumpProgress);
       position.y += Math.sin(jumpProgress * Math.PI) * 8;
@@ -2906,23 +2906,40 @@ renderer.setAnimationLoop(() => {
     }
   }
 
-  fwdH.set(-Math.sin(followYaw), 0, -Math.cos(followYaw));
-  const orbitYaw = followYaw + freeLook.yaw;
-  const orbitRadius = 16;
-  const orbitHorizontal = Math.cos(freeLook.pitch) * orbitRadius;
-  camPos.set(
-    followPos.x + Math.sin(orbitYaw) * orbitHorizontal,
-    followPos.y + 4.8 + Math.sin(freeLook.pitch) * orbitRadius,
-    followPos.z + Math.cos(orbitYaw) * orbitHorizontal
-  );
-  camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
-  camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
-    lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
-    const cameraLookHeight = game.phase === 'launch'
-      ? 1.2
-      : game.mode === 'ARENA' ? -5.5 : 1.2;
-    lookAt.y += cameraLookHeight;
+  if (game.phase === 'launch' && launchState.actors.length) {
+    const localIndex = Math.max(0, game.order.indexOf(net.id));
+    const localActor = launchState.actors[localIndex] || launchState.actors[0];
+    const roofEdge = launchSpawnPoint(localIndex, Math.max(1, game.order.length), 'edge');
+    const launchCameraPlan = getLaunchCameraPlan(localActor.start, roofEdge);
+    camPos.set(
+      launchCameraPlan.position.x,
+      launchCameraPlan.position.y,
+      launchCameraPlan.position.z
+    );
+    camera.position.lerp(camPos, 1 - Math.pow(0.000001, dt));
+    camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.000001, dt));
+    lookAt.set(
+      launchCameraPlan.target.x,
+      launchCameraPlan.target.y,
+      launchCameraPlan.target.z
+    );
     camera.lookAt(lookAt);
+  } else {
+    fwdH.set(-Math.sin(followYaw), 0, -Math.cos(followYaw));
+    const orbitYaw = followYaw + freeLook.yaw;
+    const orbitRadius = 16;
+    const orbitHorizontal = Math.cos(freeLook.pitch) * orbitRadius;
+    camPos.set(
+      followPos.x + Math.sin(orbitYaw) * orbitHorizontal,
+      followPos.y + 4.8 + Math.sin(freeLook.pitch) * orbitRadius,
+      followPos.z + Math.cos(orbitYaw) * orbitHorizontal
+    );
+    camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
+    camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
+    lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
+    lookAt.y += game.mode === 'ARENA' ? -5.5 : 1.2;
+    camera.lookAt(lookAt);
+  }
 
     /* ---- 배경 추적 ---- */
     sky.position.copy(camera.position);

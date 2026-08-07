@@ -3,10 +3,39 @@ const { test } = require('node:test');
 
 const {
   getLaunchPose,
+  getLaunchMotion,
+  getLaunchCameraPlan,
   localDeadline,
   shouldReuseFoldedVisual,
   getLaunchLayoutKey
 } = require('../public/launch-transition.js');
+
+test('launch motion advances across the roof with an active running stride', () => {
+  const waiting = getLaunchMotion(0.04);
+  const earlyRun = getLaunchMotion(0.22);
+  const lateRun = getLaunchMotion(0.54);
+  const jumping = getLaunchMotion(0.72);
+
+  assert.equal(waiting.runProgress, 0);
+  assert.equal(waiting.stride, 0);
+  assert.ok(earlyRun.runProgress > 0 && earlyRun.runProgress < lateRun.runProgress);
+  assert.ok(lateRun.runProgress < 1);
+  assert.ok(Math.abs(earlyRun.stride) > 0.2);
+  assert.equal(jumping.runProgress, 1);
+  assert.equal(jumping.stride, 0);
+});
+
+test('launch camera frames the whole roof from a fixed elevated three-quarter view', () => {
+  const plan = getLaunchCameraPlan(
+    { x: 0, y: 150, z: 16 },
+    { x: 0, y: 150, z: 3 }
+  );
+
+  assert.deepEqual(plan.target, { x: 0, y: 152.5, z: 9.5 });
+  assert.ok(plan.position.y - plan.target.y >= 30);
+  assert.ok(Math.hypot(plan.position.x - plan.target.x, plan.position.z - plan.target.z) >= 7);
+  assert.equal(plan.pathLength, 13);
+});
 test('launch keeps full-size legs visible until the rooftop drop', () => {
   const pose = getLaunchPose(0.66);
   assert.equal(pose.legsVisible, true);

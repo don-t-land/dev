@@ -14,6 +14,10 @@ if (!paperFoldModel && typeof process !== 'undefined' && process.versions?.node)
 
 export const FIXED_HZ = 120;
 export const FIXED_DT = 1 / FIXED_HZ;
+export const BETA_AERO_TUNING = Object.freeze({
+  liftMultiplier: .7,
+  dragMultiplier: .45
+});
 const GRAVITY = 21;
 const BASE_SPEED = 22;
 const REQUIRED_PROFILE_FIELDS = [
@@ -95,6 +99,18 @@ function sanitizeProfile(profile) {
     pitchBias: clamp(profile.pitchBias, -.8, .8),
     span: clamp(profile.span, .1, 4),
     chord: clamp(profile.chord, .1, 4)
+  };
+}
+
+export function calculateAerodynamicMagnitudes(speed, profile) {
+  const stallRatio = clamp(speed / profile.stallSpeed, 0, 1);
+  return {
+    liftMagnitude: GRAVITY * profile.liftScale
+      * Math.pow(speed / BASE_SPEED, 2)
+      * (.18 + .82 * stallRatio * stallRatio)
+      * BETA_AERO_TUNING.liftMultiplier,
+    dragMagnitude: .0038 * profile.dragScale * speed * speed
+      * BETA_AERO_TUNING.dragMultiplier
   };
 }
 
@@ -262,11 +278,7 @@ export class PaperFlightPhysics {
     const right = rotateVector({ x: 1, y: 0, z: 0 }, rotation);
     const forward = rotateVector({ x: 0, y: 0, z: -1 }, rotation);
     const liftDirection = normalize(add(wingUp, scale(velocityDirection, -dot(wingUp, velocityDirection))));
-    const stallRatio = clamp(speed / this.profile.stallSpeed, 0, 1);
-    const liftMagnitude = GRAVITY * this.profile.liftScale
-      * Math.pow(speed / BASE_SPEED, 2)
-      * (.18 + .82 * stallRatio * stallRatio);
-    const dragMagnitude = .0038 * this.profile.dragScale * speed * speed;
+    const { liftMagnitude, dragMagnitude } = calculateAerodynamicMagnitudes(speed, this.profile);
     const thermalForce = Math.max(0, Number(input.thermalLift) || 0);
     const force = add(
       add(scale(liftDirection, liftMagnitude), scale(velocityDirection, -dragMagnitude)),

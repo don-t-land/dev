@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
+  BETA_AERO_TUNING,
   FIXED_DT,
+  calculateAerodynamicMagnitudes,
   createPaperFlightPhysics,
   makeColliderVertices
 } from '../public/flight-physics-rapier.mjs';
@@ -33,6 +35,21 @@ function snapshotRounded(state) {
     v: Object.values(state.velocity).map(value => value.toFixed(5))
   });
 }
+
+test('beta aerodynamics reduce lift by 30% and drag by 55% for every profile', () => {
+  assert.deepEqual(BETA_AERO_TUNING, {
+    liftMultiplier: .7,
+    dragMultiplier: .45
+  });
+
+  const forces = calculateAerodynamicMagnitudes(22, {
+    liftScale: 1,
+    dragScale: 1,
+    stallSpeed: 10
+  });
+  assert.equal(forces.liftMagnitude, 14.7);
+  assert.equal(forces.dragMagnitude, .82764);
+});
 
 test('square paper produces a non-degenerate folded-shape collider hull', () => {
   const vertices = makeColliderVertices(createPaperModel());

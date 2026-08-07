@@ -115,7 +115,7 @@ test('Basic Dart는 최초 소스 기본 메시의 실루엣 비율을 재현한
   });
 });
 
-test('게임 공력은 공식 레퍼런스의 거리·체공 순위를 같은 투척 조건에서 재현한다', async () => {
+test('beta 공력은 저양력·저항력 설정의 거리·체공 순위를 재현한다', async () => {
   const { createPaperFlightPhysics, makeColliderVertices } = await import('../public/flight-physics-rapier.mjs');
   const outcomes = {};
   for (const name of ALL_PRESETS) {
@@ -137,9 +137,9 @@ test('게임 공력은 공식 레퍼런스의 거리·체공 순위를 같은 �
     physics.free();
   }
 
-  assert.ok(outcomes.dart.distance > outcomes.stealth.distance);
-  assert.ok(outcomes.stealth.distance > outcomes.jet.distance);
-  assert.ok(outcomes.jet.distance > outcomes.stable.distance);
+  assert.ok(outcomes.jet.distance > outcomes.stealth.distance);
+  assert.ok(outcomes.stealth.distance > outcomes.stable.distance);
+  assert.ok(outcomes.stable.distance > outcomes.dart.distance);
   assert.ok(outcomes.stealth.time > outcomes.dart.time);
   assert.ok(outcomes.stealth.time > outcomes.stable.time);
   assert.ok(outcomes.stable.time > outcomes.jet.time);

@@ -165,8 +165,8 @@ test('thermal shader keeps bloom inputs finite across GPU implementations', () =
   const thermalShader = html.match(/const thermalMat = new THREE\.ShaderMaterial\(\{[\s\S]*?\n\}\);/)?.[0] || '';
 
   assert.match(thermalShader, /vN=normalMatrix\*normal; vV=-mv\.xyz/);
-  assert.match(thermalShader, /float nLen2=max\(dot\(vN,vN\),1e-8\)/);
-  assert.match(thermalShader, /float vLen2=max\(dot\(vV,vV\),1e-8\)/);
+  assert.match(thermalShader, /float nLen2=max\(dot\(vN,vN\),1e-4\)/);
+  assert.match(thermalShader, /float vLen2=max\(dot\(vV,vV\),1e-4\)/);
   assert.match(thermalShader, /vec3 safeN=vN\*inversesqrt\(nLen2\)/);
   assert.match(thermalShader, /vec3 safeV=vV\*inversesqrt\(vLen2\)/);
   assert.match(thermalShader, /float bandBase=clamp\([\s\S]*float band=pow\(bandBase,2\.2\)/);

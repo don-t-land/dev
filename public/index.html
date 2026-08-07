@@ -2537,8 +2537,8 @@ const thermalMat = new THREE.ShaderMaterial({
     void main(){
       float bandBase=clamp(sin(vUv.y*26.-uTime*2.6)*.5+.5,0.,1.);
       float band=pow(bandBase,2.2);
-      float nLen2=max(dot(vN,vN),1e-8);
-      float vLen2=max(dot(vV,vV),1e-8);
+      float nLen2=max(dot(vN,vN),1e-4);
+      float vLen2=max(dot(vV,vV),1e-4);
       vec3 safeN=vN*inversesqrt(nLen2);
       vec3 safeV=vV*inversesqrt(vLen2);
       float ndv=clamp(abs(dot(safeN,safeV)),0.,1.);

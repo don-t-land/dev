@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.2 - 2026-08-07
+
+### Fixed
+
+- `mediump` fragment precision에서 `1e-8` epsilon이 0으로 underflow될 수 있던 열기류 shader를 `1e-4`로 보강해, 정확히 0인 view vector에서도 `inversesqrt` 결과가 항상 유한하도록 했습니다.
+
 ## 1.5.1 - 2026-08-07
 
 ### Fixed

@@ -5,6 +5,7 @@ const {
   updateAttitude,
   updateFreeLook,
   keyGuideVisibleFromStorage,
+  mouseInvertYFromStorage,
   updateEnergy,
   consumeDartEnergy,
   dashAcceleration,
@@ -65,10 +66,27 @@ test('mouse free-look rotates continuously and clamps only the vertical view', (
   assert.ok(second.pitch >= -1.35 && second.pitch <= 1.35);
 });
 
+test('mouse free-look reverses only vertical movement when Y inversion is enabled', () => {
+  const normal = updateFreeLook({ yaw: 0.4, pitch: 0 }, 40, -50, 0.0022, false);
+  const inverted = updateFreeLook({ yaw: 0.4, pitch: 0 }, 40, -50, 0.0022, true);
+
+  assert.equal(inverted.yaw, normal.yaw);
+  assert.equal(inverted.pitch, -normal.pitch);
+  assert.ok(normal.pitch > 0);
+  assert.ok(inverted.pitch < 0);
+});
+
 test('the key guide is visible by default and can be persisted off', () => {
   assert.equal(keyGuideVisibleFromStorage(null), true);
   assert.equal(keyGuideVisibleFromStorage('1'), true);
   assert.equal(keyGuideVisibleFromStorage('0'), false);
+});
+
+test('mouse Y inversion is off by default and restores only an enabled saved value', () => {
+  assert.equal(mouseInvertYFromStorage(null), false);
+  assert.equal(mouseInvertYFromStorage('0'), false);
+  assert.equal(mouseInvertYFromStorage('1'), true);
+  assert.equal(mouseInvertYFromStorage('true'), false);
 });
 
 test('energy regenerates normally and drains continuously while dash is held', () => {

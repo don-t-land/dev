@@ -42,6 +42,107 @@ test('dash and darts share one energy HUD instead of rechargeable ammo pips', ()
   assert.doesNotMatch(html, /id="ammo"|me\.ammo|me\.ammoT/);
 });
 
+test('coarse-pointer gameplay exposes a complete accessible touch keypad overlay', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /<script\s+src=['"]\.\/mobile-controls\.js['"]><\/script>/);
+  assert.match(html, /id="touch-controls"[^>]*aria-label="모바일 비행 조작"/);
+  for (const [code, label] of [
+    ['KeyW', '기수 내리기'],
+    ['KeyS', '기수 올리기'],
+    ['KeyA', '왼쪽으로 기울이기'],
+    ['KeyD', '오른쪽으로 기울이기'],
+    ['ShiftLeft', '대시'],
+    ['Space', '다트 발사']
+  ]) {
+    assert.match(html, new RegExp(`<button[^>]*data-flight-key="${code}"[^>]*aria-label="${label}"`));
+    assert.match(html, new RegExp(`<button[^>]*data-flight-key="${code}"[^>]*aria-pressed="false"`));
+  }
+  assert.match(html, /#touch-controls\s*\{[^}]*touch-action:\s*none/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#touch-controls\s*\{[^}]*display:\s*flex/s);
+});
+
+test('coarse-pointer gauges stay compact above the mobile controls', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#gauge\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(180px,\s*46vw\)[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#energy\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(180px,\s*46vw\)[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(html, /#gauge \.track\s*\{[^}]*height:\s*4px/);
+  assert.match(html, /#energy \.track\s*\{[^}]*height:\s*5px/);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#gauge\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(170px,\s*28vw\)/s);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#energy\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(170px,\s*28vw\)/s);
+});
+
+test('coarse-pointer D-pad uses larger touch targets in both orientations', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /\.touch-dpad\s*\{[^}]*grid-template:\s*repeat\(3,\s*64px\)\s*\/\s*repeat\(3,\s*64px\)/);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*\.touch-dpad\s*\{[^}]*grid-template:\s*repeat\(3,\s*56px\)\s*\/\s*repeat\(3,\s*56px\)/s);
+});
+
+test('dash and fire use large circular mobile action buttons', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /\.touch-action\s*\{[^}]*width:\s*84px[^}]*height:\s*84px[^}]*border-radius:\s*50%/);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*\.touch-action\s*\{[^}]*width:\s*78px[^}]*height:\s*78px[^}]*border-radius:\s*50%/s);
+});
+
+test('portrait touch HUD separates stats, timer, leaderboard, meters, and controls', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#stats\s*\{[^}]*transform:\s*scale\(\.66\)/s);
+  assert.match(html, /orientation:\s*portrait\)[\s\S]*#timer\s*\{[^}]*right:\s*12px[^}]*transform:\s*none/s);
+  assert.match(html, /orientation:\s*portrait\)[\s\S]*#board\s*\{[^}]*top:\s*140px[^}]*max-height:\s*min\(180px,\s*28vh\)[^}]*overflow-y:\s*auto/s);
+});
+
+test('short portrait touch HUD keeps the leaderboard clear of compact gauges', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*640px\)[\s\S]*#board\s*\{[^}]*top:\s*138px[^}]*max-height:\s*clamp\(0px,\s*calc\(100vh\s*-\s*env\(safe-area-inset-bottom\)\s*-\s*452px\),\s*116px\)[^}]*max-height:\s*clamp\(0px,\s*calc\(100dvh\s*-\s*env\(safe-area-inset-bottom\)\s*-\s*452px\),\s*116px\)[^}]*padding-block:\s*0[^}]*border-block-width:\s*0/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*500px\)[\s\S]*#board\s*\{[^}]*display:\s*none/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*440px\)[\s\S]*#gauge,\s*#energy\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)[^}]*transform:\s*none/s);
+});
+
+test('landscape touch HUD resets inherited small-screen positioning', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#board\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)[^}]*max-height:\s*88px/s);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#timer\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*transform:\s*translateX\(-50%\)/s);
+});
+
+test('touch keypad feeds the shared flight state and releases captured pointers safely', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /const\s+\{\s*createCombinedKeyState,\s*createTouchKeyState,\s*createTouchLookState\s*\}\s*=\s*window\.mobileControls/);
+  assert.match(html, /const keyboardKeys\s*=\s*\{\};[\s\S]*const touchKeys\s*=\s*\{\};[\s\S]*const keys\s*=\s*createCombinedKeyState\(keyboardKeys, touchKeys\)/);
+  assert.match(html, /createTouchKeyState\(touchKeys,[\s\S]*onPress:\s*code\s*=>\s*\{[\s\S]*code === 'Space'[\s\S]*shoot\(\)/);
+  assert.match(html, /onChange:\s*\(code, active\)[\s\S]*setAttribute\('aria-pressed', String\(active\)\)/);
+  assert.match(html, /function clearFlightKeys\(\)\s*\{[\s\S]*touchFlightKeys\?\.clear\(\)/);
+  assert.match(html, /button\.addEventListener\('pointerdown',[\s\S]*setPointerCapture\(event\.pointerId\)[\s\S]*touchFlightKeys\.press\(event\.pointerId, button\.dataset\.flightKey\)/);
+  for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    assert.match(html, new RegExp(`button\\.addEventListener\\('${eventName}', releaseTouchPointer\\)`));
+  }
+  assert.match(html, /button\.addEventListener\('click',[\s\S]*event\.detail !== 0[\s\S]*touchFlightKeys\.isPointerActive\(activationId\)/);
+  assert.match(html, /e\.target\.closest\('#touch-controls'\)/);
+  assert.match(html, /\$\('touch-menu'\)\.addEventListener\('click', openPauseMenu\)/);
+  assert.match(html, /function enterGame\(\)[\s\S]*\$\('touch-fire'\)\.classList\.toggle\('hide', !arena\)/);
+  assert.match(html, /function showResults\(results\)\s*\{[\s\S]*clearFlightKeys\(\)[\s\S]*setUnderlyingGameUiInert\(true\)/);
+});
+
+test('mobile canvas drag rotates free-look without stealing control-button touches', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /const\s+\{\s*createCombinedKeyState,\s*createTouchKeyState,\s*createTouchLookState\s*\}\s*=\s*window\.mobileControls/);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#c\s*\{[^}]*touch-action:\s*none/s);
+  assert.match(html, /createTouchLookState\(\{[\s\S]*onMove:[\s\S]*updateFreeLook\(freeLook, movementX, movementY, 0\.004/);
+  assert.match(html, /canvas\.addEventListener\('pointerdown',[\s\S]*event\.pointerType !== 'touch'[\s\S]*touchLook\.start\(event\.pointerId, event\.clientX, event\.clientY\)[\s\S]*setPointerCapture\(event\.pointerId\)/);
+  assert.match(html, /canvas\.addEventListener\('pointermove',[\s\S]*touchLook\.move\(event\.pointerId, event\.clientX, event\.clientY\)/);
+  for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    assert.match(html, new RegExp(`canvas\\.addEventListener\\('${eventName}', releaseTouchLookPointer\\)`));
+  }
+  assert.match(html, /canvas\.addEventListener\('click', event => \{[\s\S]*event\.pointerType === 'touch'/);
+  assert.match(html, /function clearFlightKeys\(\)\s*\{[\s\S]*touchLook\?\.clear\(\)/);
+  assert.match(html, /controls\(\)\s*\{[\s\S]*freeLook:\s*\{\s*\.\.\.freeLook\s*\}[\s\S]*touchLookActive:\s*touchLook\?\.isActive\(\)/);
+});
+
 test('room snapshots preserve active, crashed, and spectator roles', () => {
   const { getLocalRoundRole } = require('../public/room-state.js');
   const room = {
@@ -92,6 +193,16 @@ test('the client loads free-flight controls and exposes the ESC settings menu', 
   assert.doesNotMatch(html, /const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT/);
 });
 
+test('the ESC menu persists mouse Y inversion and applies it to free-look', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /for="mouse-invert-y-toggle"/);
+  assert.match(html, /id="mouse-invert-y-toggle"[^>]*type="checkbox"/);
+  assert.match(html, /mouseInvertYFromStorage\(localStorage\.getItem\(['"]pp_mouse_invert_y['"]\)\)/);
+  assert.match(html, /localStorage\.setItem\(['"]pp_mouse_invert_y['"],\s*enabled \? ['"]1['"] : ['"]0['"]\)/);
+  assert.match(html, /updateFreeLook\(freeLook,\s*event\.movementX,\s*event\.movementY,\s*0\.0022,\s*mouseInvertY\)/);
+});
+
 test('the ESC menu exposes persisted runtime graphics settings', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
@@ -102,6 +213,7 @@ test('the ESC menu exposes persisted runtime graphics settings', () => {
   assert.match(html, /id="graphics-csm"/);
   assert.match(html, /id="graphics-gtao"/);
   assert.match(html, /id="graphics-bloom"/);
+  assert.match(html, /id="graphics-anti-aliasing"/);
   assert.match(html, /id="graphics-fog-quality"/);
   assert.match(html, /id="graphics-shadow-softness"/);
   assert.match(html, /localStorage\.setItem\(['"]pp_graphics['"]/);
@@ -122,6 +234,9 @@ test('high graphics defaults extend shadows and view distance across biome envir
   assert.match(html, /from ['"]three\/addons\/csm\/CSM\.js['"]/);
   assert.match(html, /from ['"]three\/addons\/postprocessing\/GTAOPass\.js['"]/);
   assert.match(html, /from ['"]three\/addons\/postprocessing\/UnrealBloomPass\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/postprocessing\/SMAAPass\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/postprocessing\/ShaderPass\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/shaders\/FXAAShader\.js['"]/);
   assert.match(html, /function rebuildShadowSystem\(/);
   assert.match(html, /function configurePostProcessing\(/);
   assert.match(html, /buildBiomeEnvironment\(/);
@@ -133,6 +248,35 @@ test('high graphics defaults extend shadows and view distance across biome envir
   assert.match(html, /THREE\.VSMShadowMap/);
   assert.match(biomeVisuals, /mesh\.castShadow\s*=\s*castShadow/);
   assert.match(biomeVisuals, /mesh\.receiveShadow\s*=\s*true/);
+});
+
+test('runtime anti-aliasing rebuilds and disposes FXAA or SMAA before output', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /postEffectSignature[\s\S]*resolvedGraphics\.antiAliasing\.mode/);
+  assert.match(html, /if \(resolvedGraphics\.antiAliasing\.mode === 'fxaa'\)[\s\S]*new ShaderPass\(FXAAShader\)/);
+  assert.match(html, /else if \(resolvedGraphics\.antiAliasing\.mode === 'smaa'\)[\s\S]*new SMAAPass\(\)/);
+  assert.match(html, /composer\.addPass\(aaPass\)[\s\S]*composer\.addPass\(new OutputPass\(\)\)/);
+  assert.match(html, /aaPass\?\.material\?\.uniforms\?\.resolution\?\.value\.set\([\s\S]*resolvedGraphics\.pixelRatio/);
+  assert.match(html, /composer = gtaoPass = bloomPass = aaPass = null/);
+});
+
+test('thermal shader keeps bloom inputs finite across GPU implementations', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  const thermalShader = html.match(/const thermalMat = new THREE\.ShaderMaterial\(\{[\s\S]*?\n\}\);/)?.[0] || '';
+
+  assert.match(thermalShader, /vN=normalMatrix\*normal; vV=-mv\.xyz/);
+  assert.match(thermalShader, /float nLen2=max\(dot\(vN,vN\),1e-4\)/);
+  assert.match(thermalShader, /float vLen2=max\(dot\(vV,vV\),1e-4\)/);
+  assert.match(thermalShader, /vec3 safeN=vN\*inversesqrt\(nLen2\)/);
+  assert.match(thermalShader, /vec3 safeV=vV\*inversesqrt\(vLen2\)/);
+  assert.match(thermalShader, /float bandBase=clamp\([\s\S]*float band=pow\(bandBase,2\.2\)/);
+  assert.match(thermalShader, /float ndv=clamp\(abs\(dot\(safeN,safeV\)\),0\.,1\.\)/);
+  assert.match(thermalShader, /float edge=pow\(max\(0\.,1\.-ndv\),1\.6\)/);
+  assert.match(thermalShader, /float fade=\(1\.-smoothstep\(\.35,1\.,vUv\.y\)\)\*smoothstep\(0\.,\.08,vUv\.y\)/);
+  assert.doesNotMatch(thermalShader, /normalize\(/);
+  assert.doesNotMatch(thermalShader, /pow\(1\.-abs\(dot\(/);
+  assert.doesNotMatch(thermalShader, /smoothstep\(1\.,\.35,vUv\.y\)/);
 });
 
 test('graphics teardown releases CSM, remote-player, and GTAO resources', () => {
@@ -201,6 +345,7 @@ test('pause and result overlays isolate focus and suspend flight input', () => {
 test('result and mobile HUD layouts remain scrollable without overlap', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
+  assert.match(html, /#results,\s*\.modal-layer\s*\{[^}]*z-index:\s*60/s);
   assert.match(html, /#results\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(html, /#results \.box\s*\{[^}]*max-height:\s*calc\(100dvh/s);
   assert.match(html, /\.modal-layer\s*\{[^}]*overflow-y:\s*auto/s);

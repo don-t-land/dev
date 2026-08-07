@@ -90,16 +90,18 @@ test('advanced effects default to a balanced high-quality configuration', () => 
       csm: settings.csm,
       gtao: settings.gtao,
       bloom: settings.bloom,
+      antiAliasing: settings.antiAliasing,
       fogQuality: settings.fogQuality,
       shadowSoftness: settings.shadowSoftness
     },
-    { csm: 'high', gtao: 'medium', bloom: 'soft', fogQuality: 'atmospheric', shadowSoftness: 'soft' }
+    { csm: 'high', gtao: 'medium', bloom: 'soft', antiAliasing: 'smaa', fogQuality: 'atmospheric', shadowSoftness: 'soft' }
   );
   assert.equal(resolved.csm.cascades, 3);
   assert.equal(resolved.gtao.enabled, true);
   assert.equal(resolved.gtao.samples, 8);
   assert.equal(resolved.gtao.resolutionScale, 0.5);
   assert.equal(resolved.bloom.enabled, true);
+  assert.deepEqual(resolved.antiAliasing, { enabled: true, mode: 'smaa' });
   assert.ok(resolved.fog.altitudeFalloff > 0);
   assert.equal(resolved.shadowSoftness.type, 'pcf');
   assert.equal(resolved.shadowSoftness.radius, 4);
@@ -107,22 +109,38 @@ test('advanced effects default to a balanced high-quality configuration', () => 
 
 test('advanced effects can be disabled independently and invalid saved values fall back', () => {
   const settings = parseGraphicsSettings(JSON.stringify({
-    csm: 'off', gtao: 'off', bloom: 'off', fogQuality: 'basic', shadowSoftness: 'hard'
+    csm: 'off', gtao: 'off', bloom: 'off', antiAliasing: 'off', fogQuality: 'basic', shadowSoftness: 'hard'
   }));
   const resolved = resolveGraphicsSettings(settings, 1);
 
   assert.equal(resolved.csm.enabled, false);
   assert.equal(resolved.gtao.enabled, false);
   assert.equal(resolved.bloom.enabled, false);
+  assert.deepEqual(resolved.antiAliasing, { enabled: false, mode: 'off' });
   assert.equal(resolved.fog.altitudeFalloff, 0);
   assert.equal(resolved.shadowSoftness.type, 'pcf');
 
-  const migrated = parseGraphicsSettings('{"csm":"bad","gtao":"bad","bloom":"bad","fogQuality":"bad","shadowSoftness":"bad"}');
+  const migrated = parseGraphicsSettings('{"csm":"bad","gtao":"bad","bloom":"bad","antiAliasing":"bad","fogQuality":"bad","shadowSoftness":"bad"}');
   assert.equal(migrated.csm, DEFAULT_GRAPHICS_SETTINGS.csm);
   assert.equal(migrated.gtao, DEFAULT_GRAPHICS_SETTINGS.gtao);
   assert.equal(migrated.bloom, DEFAULT_GRAPHICS_SETTINGS.bloom);
+  assert.equal(migrated.antiAliasing, DEFAULT_GRAPHICS_SETTINGS.antiAliasing);
   assert.equal(migrated.fogQuality, DEFAULT_GRAPHICS_SETTINGS.fogQuality);
   assert.equal(migrated.shadowSoftness, DEFAULT_GRAPHICS_SETTINGS.shadowSoftness);
+});
+
+test('anti-aliasing persists FXAA and resolves every supported runtime mode', () => {
+  const fxaa = parseGraphicsSettings(serializeGraphicsSettings({
+    ...DEFAULT_GRAPHICS_SETTINGS,
+    antiAliasing: 'fxaa'
+  }));
+
+  assert.equal(fxaa.antiAliasing, 'fxaa');
+  assert.deepEqual(resolveGraphicsSettings(fxaa, 2).antiAliasing, { enabled: true, mode: 'fxaa' });
+  assert.deepEqual(
+    resolveGraphicsSettings({ ...DEFAULT_GRAPHICS_SETTINGS, antiAliasing: 'smaa' }, 2).antiAliasing,
+    { enabled: true, mode: 'smaa' }
+  );
 });
 
 test('ultra advanced effects increase cascade, GTAO, bloom, fog, and shadow samples', () => {

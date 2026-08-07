@@ -46,17 +46,22 @@
     return { yaw, pitch, roll };
   }
 
-  function updateFreeLook(state, movementX, movementY, sensitivity = 0.0022) {
+  function updateFreeLook(state, movementX, movementY, sensitivity = 0.0022, invertY = false) {
     const yaw = normalizeAngle((Number(state.yaw) || 0) - (Number(movementX) || 0) * sensitivity);
+    const pitchDirection = invertY ? 1 : -1;
     const pitch = Math.max(-LOOK_PITCH_LIMIT, Math.min(
       LOOK_PITCH_LIMIT,
-      (Number(state.pitch) || 0) - (Number(movementY) || 0) * sensitivity
+      (Number(state.pitch) || 0) + (Number(movementY) || 0) * sensitivity * pitchDirection
     ));
     return { yaw, pitch };
   }
 
   function keyGuideVisibleFromStorage(value) {
     return value !== '0';
+  }
+
+  function mouseInvertYFromStorage(value) {
+    return value === '1';
   }
 
   function updateEnergy(value, dt, wantsDash) {
@@ -96,6 +101,7 @@
     updateAttitude,
     updateFreeLook,
     keyGuideVisibleFromStorage,
+    mouseInvertYFromStorage,
     updateEnergy,
     consumeDartEnergy,
     dashAcceleration,

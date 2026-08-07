@@ -379,20 +379,25 @@ function addClouds(root, groups, biomes, materials) {
     const offsets = [
       [-.3, .02, .02, .36], [-.12, .2, -.08, .43], [.14, .23, .04, .5], [.34, .04, -.04, .34], [.03, -.02, .18, .44]
     ];
-    const puffs = clouds.flatMap(cloud => offsets.map((offset, index) => ({ cloud, offset, index })));
-    createMesh(root, new THREE.IcosahedronGeometry(1, 1), cloudMat, puffs, (o, entry) => {
-      const { cloud, offset, index } = entry;
+    const puffGeometry = new THREE.IcosahedronGeometry(1, 1);
+    const shadeGeometry = new THREE.IcosahedronGeometry(1, 1);
+    clouds.forEach(cloud => {
       const cos = Math.cos(cloud.yaw || 0), sin = Math.sin(cloud.yaw || 0);
-      const ox = offset[0] * cloud.w, oz = offset[2] * cloud.d;
-      o.position.set(cloud.x + ox * cos - oz * sin, cloud.y + offset[1] * cloud.h, cloud.z + ox * sin + oz * cos);
-      const variation = 1 + (((cloud.variant || 0) + index) % 3 - 1) * .08;
-      o.scale.set(cloud.w * offset[3] * variation, cloud.h * (.55 + offset[3]) * variation, cloud.d * offset[3] * variation);
-    }, false);
-    createMesh(root, new THREE.IcosahedronGeometry(1, 1), shadeMat, clouds, (o, cloud) => {
-      o.position.set(cloud.x, cloud.y - cloud.h * .27, cloud.z + cloud.d * .06);
-      o.rotation.y = cloud.yaw || 0;
-      o.scale.set(cloud.w * .42, cloud.h * .27, cloud.d * .4);
-    }, false);
+      const puffMesh = createMesh(root, puffGeometry, cloudMat, offsets, (o, offset, index) => {
+        const ox = offset[0] * cloud.w, oz = offset[2] * cloud.d;
+        o.position.set(ox * cos - oz * sin, offset[1] * cloud.h, ox * sin + oz * cos);
+        const variation = 1 + (((cloud.variant || 0) + index) % 3 - 1) * .08;
+        o.scale.set(cloud.w * offset[3] * variation, cloud.h * (.55 + offset[3]) * variation, cloud.d * offset[3] * variation);
+      }, false);
+      puffMesh.position.set(cloud.x, cloud.y, cloud.z);
+
+      const shadeMesh = createMesh(root, shadeGeometry, shadeMat, [cloud], (o, item) => {
+        o.position.set(0, -item.h * .27, item.d * .06);
+        o.rotation.y = item.yaw || 0;
+        o.scale.set(item.w * .42, item.h * .27, item.d * .4);
+      }, false);
+      shadeMesh.position.set(cloud.x, cloud.y, cloud.z);
+    });
   });
 }
 
@@ -763,7 +768,11 @@ export function buildBiomeEnvironment({ layout, biomes }) {
   for (let i = 0; i < biomes.length; i++) addPlatforms(root, (layout.platforms || []).filter(item => item.biome === i), biomes[i], materials);
   addLandmarks(root, layout.landmarks || [], biomes, materials);
   root.userData.dispose = () => {
-    root.traverse(object => object.geometry?.dispose?.());
+    const geometries = new Set();
+    root.traverse(object => {
+      if (object.geometry) geometries.add(object.geometry);
+    });
+    for (const geometry of geometries) geometry.dispose?.();
     for (const item of new Set(materials)) item.dispose?.();
   };
   return {

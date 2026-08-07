@@ -44,6 +44,16 @@ test('environment renderer uses layered instancing for every requested asset fam
   assert.match(visuals, /white-needle/);
 });
 
+test('overlapping cloud clusters remain separate transparent sort units', () => {
+  const cloudRenderer = visuals.match(/function addClouds\([\s\S]*?\n}/)?.[0] || '';
+
+  assert.match(cloudRenderer, /clouds\.forEach\(cloud =>/);
+  assert.match(cloudRenderer, /puffMesh\.position\.set\(cloud\.x, cloud\.y, cloud\.z\)/);
+  assert.match(cloudRenderer, /shadeMesh\.position\.set\(cloud\.x, cloud\.y, cloud\.z\)/);
+  assert.doesNotMatch(cloudRenderer, /clouds\.flatMap/);
+  assert.doesNotMatch(cloudRenderer, /alphaHash/);
+});
+
 test('weathered rocks keep duplicated face corners welded during deformation', () => {
   const rockGeometry = visuals.match(/function weatheredRockGeometry[\s\S]*?\n}/)?.[0] || '';
   assert.match(rockGeometry, /const cornerNoise = Math\.sin\(/);

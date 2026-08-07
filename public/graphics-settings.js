@@ -12,6 +12,7 @@
     csm: 'high',
     gtao: 'medium',
     bloom: 'soft',
+    antiAliasing: 'smaa',
     fogQuality: 'atmospheric',
     shadowSoftness: 'soft'
   });
@@ -23,6 +24,7 @@
     csm: new Set(['off', 'high', 'ultra']),
     gtao: new Set(['off', 'medium', 'high', 'ultra']),
     bloom: new Set(['off', 'soft', 'high', 'ultra']),
+    antiAliasing: new Set(['off', 'fxaa', 'smaa']),
     fogQuality: new Set(['basic', 'atmospheric', 'cinematic']),
     shadowSoftness: new Set(['hard', 'soft', 'cinematic'])
   });
@@ -70,6 +72,12 @@
     ultra: Object.freeze({ enabled: true, strength: 0.5, radius: 0.5, threshold: 1.1 })
   });
 
+  const ANTI_ALIASING_PRESETS = Object.freeze({
+    off: Object.freeze({ enabled: false, mode: 'off' }),
+    fxaa: Object.freeze({ enabled: true, mode: 'fxaa' }),
+    smaa: Object.freeze({ enabled: true, mode: 'smaa' })
+  });
+
   const FOG_QUALITY_PRESETS = Object.freeze({
     basic: Object.freeze({ altitudeFalloff: 0, sunTint: 0 }),
     atmospheric: Object.freeze({ altitudeFalloff: 0.35, sunTint: 0.18 }),
@@ -107,6 +115,7 @@
       csm: VALID.csm.has(source.csm) ? source.csm : DEFAULT_GRAPHICS_SETTINGS.csm,
       gtao: VALID.gtao.has(source.gtao) ? source.gtao : DEFAULT_GRAPHICS_SETTINGS.gtao,
       bloom: VALID.bloom.has(source.bloom) ? source.bloom : DEFAULT_GRAPHICS_SETTINGS.bloom,
+      antiAliasing: VALID.antiAliasing.has(source.antiAliasing) ? source.antiAliasing : DEFAULT_GRAPHICS_SETTINGS.antiAliasing,
       fogQuality: VALID.fogQuality.has(source.fogQuality) ? source.fogQuality : DEFAULT_GRAPHICS_SETTINGS.fogQuality,
       shadowSoftness: VALID.shadowSoftness.has(source.shadowSoftness) ? source.shadowSoftness : DEFAULT_GRAPHICS_SETTINGS.shadowSoftness
     };
@@ -144,12 +153,14 @@
       csm: { ...CSM_PRESETS[settings.csm] },
       gtao: { ...GTAO_PRESETS[settings.gtao] },
       bloom: { ...BLOOM_PRESETS[settings.bloom] },
+      antiAliasing: { ...ANTI_ALIASING_PRESETS[settings.antiAliasing] },
       fog: { ...FOG_QUALITY_PRESETS[settings.fogQuality] },
       shadowSoftness: { ...SHADOW_SOFTNESS_PRESETS[settings.shadowSoftness] }
     };
   }
 
   return {
+    ANTI_ALIASING_PRESETS,
     BLOOM_PRESETS,
     CSM_PRESETS,
     DEFAULT_GRAPHICS_SETTINGS,

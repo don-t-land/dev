@@ -62,6 +62,31 @@ test('coarse-pointer gameplay exposes a complete accessible touch keypad overlay
   assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#touch-controls\s*\{[^}]*display:\s*flex/s);
 });
 
+test('coarse-pointer gauges stay compact above the mobile controls', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#gauge\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(180px,\s*46vw\)[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#energy\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(180px,\s*46vw\)[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(html, /#gauge \.track\s*\{[^}]*height:\s*4px/);
+  assert.match(html, /#energy \.track\s*\{[^}]*height:\s*5px/);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#gauge\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(170px,\s*28vw\)/s);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#energy\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*min\(170px,\s*28vw\)/s);
+});
+
+test('coarse-pointer D-pad uses larger touch targets in both orientations', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /\.touch-dpad\s*\{[^}]*grid-template:\s*repeat\(3,\s*64px\)\s*\/\s*repeat\(3,\s*64px\)/);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*\.touch-dpad\s*\{[^}]*grid-template:\s*repeat\(3,\s*56px\)\s*\/\s*repeat\(3,\s*56px\)/s);
+});
+
+test('dash and fire use large circular mobile action buttons', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /\.touch-action\s*\{[^}]*width:\s*84px[^}]*height:\s*84px[^}]*border-radius:\s*50%/);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*\.touch-action\s*\{[^}]*width:\s*78px[^}]*height:\s*78px[^}]*border-radius:\s*50%/s);
+});
+
 test('portrait touch HUD separates stats, timer, leaderboard, meters, and controls', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
   assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#stats\s*\{[^}]*transform:\s*scale\(\.66\)/s);
@@ -71,14 +96,14 @@ test('portrait touch HUD separates stats, timer, leaderboard, meters, and contro
 
 test('landscape touch HUD resets inherited small-screen positioning', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
-  assert.match(html, /orientation:\s*landscape\)[\s\S]*#board\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)/s);
+  assert.match(html, /orientation:\s*landscape\)[\s\S]*#board\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)[^}]*max-height:\s*88px/s);
   assert.match(html, /orientation:\s*landscape\)[\s\S]*#timer\s*\{[^}]*left:\s*50%[^}]*right:\s*auto[^}]*transform:\s*translateX\(-50%\)/s);
 });
 
 test('touch keypad feeds the shared flight state and releases captured pointers safely', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
-  assert.match(html, /const\s+\{\s*createCombinedKeyState,\s*createTouchKeyState\s*\}\s*=\s*window\.mobileControls/);
+  assert.match(html, /const\s+\{\s*createCombinedKeyState,\s*createTouchKeyState,\s*createTouchLookState\s*\}\s*=\s*window\.mobileControls/);
   assert.match(html, /const keyboardKeys\s*=\s*\{\};[\s\S]*const touchKeys\s*=\s*\{\};[\s\S]*const keys\s*=\s*createCombinedKeyState\(keyboardKeys, touchKeys\)/);
   assert.match(html, /createTouchKeyState\(touchKeys,[\s\S]*onPress:\s*code\s*=>\s*\{[\s\S]*code === 'Space'[\s\S]*shoot\(\)/);
   assert.match(html, /onChange:\s*\(code, active\)[\s\S]*setAttribute\('aria-pressed', String\(active\)\)/);
@@ -92,6 +117,22 @@ test('touch keypad feeds the shared flight state and releases captured pointers 
   assert.match(html, /\$\('touch-menu'\)\.addEventListener\('click', openPauseMenu\)/);
   assert.match(html, /function enterGame\(\)[\s\S]*\$\('touch-fire'\)\.classList\.toggle\('hide', !arena\)/);
   assert.match(html, /function showResults\(results\)\s*\{[\s\S]*clearFlightKeys\(\)[\s\S]*setUnderlyingGameUiInert\(true\)/);
+});
+
+test('mobile canvas drag rotates free-look without stealing control-button touches', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /const\s+\{\s*createCombinedKeyState,\s*createTouchKeyState,\s*createTouchLookState\s*\}\s*=\s*window\.mobileControls/);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#c\s*\{[^}]*touch-action:\s*none/s);
+  assert.match(html, /createTouchLookState\(\{[\s\S]*onMove:[\s\S]*updateFreeLook\(freeLook, movementX, movementY, 0\.004/);
+  assert.match(html, /canvas\.addEventListener\('pointerdown',[\s\S]*event\.pointerType !== 'touch'[\s\S]*touchLook\.start\(event\.pointerId, event\.clientX, event\.clientY\)[\s\S]*setPointerCapture\(event\.pointerId\)/);
+  assert.match(html, /canvas\.addEventListener\('pointermove',[\s\S]*touchLook\.move\(event\.pointerId, event\.clientX, event\.clientY\)/);
+  for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    assert.match(html, new RegExp(`canvas\\.addEventListener\\('${eventName}', releaseTouchLookPointer\\)`));
+  }
+  assert.match(html, /canvas\.addEventListener\('click', event => \{[\s\S]*event\.pointerType === 'touch'/);
+  assert.match(html, /function clearFlightKeys\(\)\s*\{[\s\S]*touchLook\?\.clear\(\)/);
+  assert.match(html, /controls\(\)\s*\{[\s\S]*freeLook:\s*\{\s*\.\.\.freeLook\s*\}[\s\S]*touchLookActive:\s*touchLook\?\.isActive\(\)/);
 });
 
 test('room snapshots preserve active, crashed, and spectator roles', () => {

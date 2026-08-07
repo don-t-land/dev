@@ -3,7 +3,8 @@ const { test } = require('node:test');
 
 const {
   createCombinedKeyState,
-  createTouchKeyState
+  createTouchKeyState,
+  createTouchLookState
 } = require('../public/mobile-controls.js');
 
 test('mobile multi-touch keys compose with keyboard input and release independently', () => {
@@ -55,4 +56,23 @@ test('duplicate pointers keep a key pressed until the last pointer releases and 
   controls.clear();
   assert.equal(touch.Space, false);
   assert.equal(touch.KeyD, false);
+});
+
+test('one touch pointer owns screen-look drag and releases without affecting other touches', () => {
+  const moves = [];
+  const look = createTouchLookState({
+    onMove: (movementX, movementY) => moves.push([movementX, movementY])
+  });
+
+  assert.equal(look.start(21, 100, 120), true);
+  assert.equal(look.start(22, 30, 40), false);
+  assert.equal(look.move(22, 50, 60), false);
+  assert.equal(look.move(21, 124, 102), true);
+  assert.equal(look.move(21, 130, 110), true);
+  assert.deepEqual(moves, [[24, -18], [6, 8]]);
+
+  assert.equal(look.end(22), false);
+  assert.equal(look.end(21), true);
+  assert.equal(look.move(21, 160, 160), false);
+  assert.equal(look.isActive(), false);
 });

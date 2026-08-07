@@ -63,5 +63,50 @@
     };
   }
 
-  return { CONTROL_CODES, createCombinedKeyState, createTouchKeyState };
+  function createTouchLookState(options = {}) {
+    let activePointerId = null;
+    let lastX = 0;
+    let lastY = 0;
+
+    function start(pointerId, clientX, clientY) {
+      if (activePointerId !== null) return false;
+      activePointerId = pointerId;
+      lastX = Number(clientX) || 0;
+      lastY = Number(clientY) || 0;
+      return true;
+    }
+
+    function move(pointerId, clientX, clientY) {
+      if (pointerId !== activePointerId) return false;
+      const nextX = Number(clientX) || 0;
+      const nextY = Number(clientY) || 0;
+      const movementX = nextX - lastX;
+      const movementY = nextY - lastY;
+      lastX = nextX;
+      lastY = nextY;
+      if (movementX || movementY) options.onMove?.(movementX, movementY);
+      return true;
+    }
+
+    function end(pointerId) {
+      if (pointerId !== activePointerId) return false;
+      activePointerId = null;
+      return true;
+    }
+
+    function clear() {
+      activePointerId = null;
+    }
+
+    return {
+      start,
+      move,
+      end,
+      clear,
+      isActive: () => activePointerId !== null,
+      owns: pointerId => pointerId === activePointerId
+    };
+  }
+
+  return { CONTROL_CODES, createCombinedKeyState, createTouchKeyState, createTouchLookState };
 });

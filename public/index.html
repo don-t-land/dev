@@ -151,7 +151,7 @@
     pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none;
   }
   .touch-pad { pointer-events: none; }
-  .touch-dpad { display: grid; grid-template: repeat(3, 54px) / repeat(3, 54px); gap: 4px; }
+  .touch-dpad { display: grid; grid-template: repeat(3, 64px) / repeat(3, 64px); gap: 4px; }
   .touch-control {
     display: grid; place-items: center; min-width: 54px; min-height: 54px; padding: 5px;
     border: 1px solid rgba(220,239,255,.42); border-radius: 17px; color: #f5fbff;
@@ -166,7 +166,7 @@
   .touch-down { grid-area: 3 / 2; }
   .touch-right { grid-area: 2 / 3; }
   .touch-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-  .touch-action { width: 72px; min-height: 58px; border-radius: 21px; font-size: 13px; }
+  .touch-action { width: 84px; height: 84px; min-height: 84px; border-radius: 50%; font-size: 13px; }
   .touch-dash { color: #ffe5a6; border-color: rgba(255,211,120,.56); }
   .touch-fire { color: #ffd0c9; border-color: rgba(255,135,119,.62); }
   .touch-menu { width: 48px; min-width: 48px; min-height: 42px; border-radius: 15px; font-size: 18px; }
@@ -373,10 +373,14 @@
     #keys { display: none; }
   }
   @media (hover: none) and (pointer: coarse) {
+    #c { touch-action: none; }
     #touch-controls { display: flex; }
     #keys, #game-leave-btn { display: none !important; }
-    #gauge { left: 12px; right: 12px; bottom: calc(190px + env(safe-area-inset-bottom)); width: auto; padding: 8px 10px; }
-    #energy { left: 12px; right: 12px; bottom: calc(245px + env(safe-area-inset-bottom)); width: auto; padding: 8px 10px; }
+    #gauge { left: 50%; right: auto; bottom: calc(242px + env(safe-area-inset-bottom)); width: min(180px, 46vw); padding: 5px 8px; transform: translateX(-50%); }
+    #energy { left: 50%; right: auto; bottom: calc(276px + env(safe-area-inset-bottom)); width: min(180px, 46vw); padding: 5px 8px; transform: translateX(-50%); }
+    #gauge .lbl, #energy .lbl { margin-bottom: 3px; font-size: 9px; }
+    #gauge .track { height: 4px; }
+    #energy .track { height: 5px; }
   }
   @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     #stats { top: 12px; left: 12px; transform: scale(.66); transform-origin: top left; }
@@ -385,14 +389,14 @@
   }
   @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
     #touch-controls { left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); }
-    .touch-dpad { grid-template: repeat(3, 46px) / repeat(3, 46px); gap: 3px; }
-    .touch-control { min-width: 46px; min-height: 46px; border-radius: 15px; }
-    .touch-action { width: 66px; min-height: 48px; }
+    .touch-dpad { grid-template: repeat(3, 56px) / repeat(3, 56px); gap: 3px; }
+    .touch-control { min-width: 56px; min-height: 56px; border-radius: 18px; }
+    .touch-action { width: 78px; height: 78px; min-height: 78px; border-radius: 50%; }
     .touch-menu { width: 44px; min-width: 44px; min-height: 36px; }
-    #gauge { left: 32%; right: 32%; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; padding: 7px 9px; }
-    #energy { left: 32%; right: 32%; bottom: calc(57px + env(safe-area-inset-bottom)); width: auto; padding: 7px 9px; }
+    #gauge { left: 50%; right: auto; bottom: calc(8px + env(safe-area-inset-bottom)); width: min(170px, 28vw); padding: 5px 8px; transform: translateX(-50%); }
+    #energy { left: 50%; right: auto; bottom: calc(42px + env(safe-area-inset-bottom)); width: min(170px, 28vw); padding: 5px 8px; transform: translateX(-50%); }
     #stats { top: 8px; left: max(8px, env(safe-area-inset-left)); transform: scale(.68); transform-origin: top left; }
-    #board { top: 8px; left: auto; right: max(8px, env(safe-area-inset-right)); width: min(260px, 31vw); max-height: 104px; overflow-y: auto; padding: 6px 8px; }
+    #board { top: 8px; left: auto; right: max(8px, env(safe-area-inset-right)); width: min(260px, 31vw); max-height: 88px; overflow-y: auto; padding: 6px 8px; }
     #board .state { display: none; }
     #timer { top: 8px; left: 50%; right: auto; transform: translateX(-50%); font-size: 17px; }
   }
@@ -936,7 +940,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
-const { createCombinedKeyState, createTouchKeyState } = window.mobileControls;
+const { createCombinedKeyState, createTouchKeyState, createTouchLookState } = window.mobileControls;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
   updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage,
@@ -2561,6 +2565,12 @@ if (graphicsQaEnabled) {
       me.alive = previous.alive;
       return { active, after: this.set({}) };
     },
+    controls() {
+      return {
+        freeLook: { ...freeLook },
+        touchLookActive: touchLook?.isActive()
+      };
+    },
     preview(mode = 'DIST', seed = 4312) {
       game.mode = mode === 'ARENA' ? 'ARENA' : 'DIST';
       game.seed = Number(seed) || 4312;
@@ -3282,6 +3292,7 @@ const keyboardKeys = {};
 const touchKeys = {};
 const keys = createCombinedKeyState(keyboardKeys, touchKeys);
 let touchFlightKeys = null;
+let touchLook = null;
 let freeLook = { yaw: 0, pitch: 0 };
 let mouseInvertY = mouseInvertYFromStorage(localStorage.getItem('pp_mouse_invert_y'));
 let pauseReturnFocus = null;
@@ -3290,6 +3301,7 @@ let resultsReturnFocus = null;
 function clearFlightKeys() {
   for (const code of Object.keys(keyboardKeys)) keyboardKeys[code] = false;
   touchFlightKeys?.clear();
+  touchLook?.clear();
 }
 
 function isPauseMenuOpen() {
@@ -3444,7 +3456,37 @@ $('touch-menu').addEventListener('click', openPauseMenu);
 setKeyGuideVisible(keyGuideVisibleFromStorage(localStorage.getItem('pp_key_guide')));
 $('mouse-invert-y-toggle').checked = mouseInvertY;
 
-$('c').addEventListener('click', () => {
+const canvas = $('c');
+touchLook = createTouchLookState({
+  onMove: (movementX, movementY) => {
+    freeLook = updateFreeLook(freeLook, movementX, movementY, 0.004, mouseInvertY);
+  }
+});
+
+canvas.addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'touch' ||
+      (game.phase !== 'playing' && game.phase !== 'countdown') || isPauseMenuOpen() ||
+      !$('respawn-overlay').classList.contains('hide') || !$('results').classList.contains('hide')) return;
+  if (!touchLook.start(event.pointerId, event.clientX, event.clientY)) return;
+  event.preventDefault();
+  canvas.setPointerCapture(event.pointerId);
+});
+canvas.addEventListener('pointermove', event => {
+  if (!touchLook.owns(event.pointerId)) return;
+  event.preventDefault();
+  touchLook.move(event.pointerId, event.clientX, event.clientY);
+});
+const releaseTouchLookPointer = event => {
+  if (!touchLook.owns(event.pointerId)) return;
+  event.preventDefault();
+  touchLook.end(event.pointerId);
+};
+canvas.addEventListener('pointerup', releaseTouchLookPointer);
+canvas.addEventListener('pointercancel', releaseTouchLookPointer);
+canvas.addEventListener('lostpointercapture', releaseTouchLookPointer);
+
+canvas.addEventListener('click', event => {
+  if (event.pointerType === 'touch') return;
   if ((game.phase === 'playing' || game.phase === 'countdown') && $('pause-menu').classList.contains('hide'))
     requestFlightPointerLock();
 });

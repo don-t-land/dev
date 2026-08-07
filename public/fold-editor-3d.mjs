@@ -137,7 +137,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel, onAdjustHinge
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(40, 1, 0.05, 60);

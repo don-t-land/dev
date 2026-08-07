@@ -301,6 +301,15 @@
   .setting-row b { font-size: 14px; }
   .setting-row small { margin-top: 4px; color: #9db2c5; font-size: 11px; }
   .setting-row input { width: 22px; height: 22px; accent-color: #0a8cff; }
+  .graphics-settings { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1); }
+  .graphics-settings h3 { color: #dcecff; font-size: 12px; letter-spacing: .08em; }
+  .graphics-settings .setting-row { margin-top: 10px; cursor: default; }
+  .setting-row select {
+    flex: 0 0 146px; min-height: 38px; padding: 7px 28px 7px 10px; border: 1px solid #46627d;
+    border-radius: 9px; color: #eff7ff; background: #18334d; font: inherit; font-size: 12px;
+  }
+  .setting-row select:focus-visible { outline: 2px solid #7cc5ff; outline-offset: 2px; }
+  #graphics-summary { display: block; margin-top: 10px; color: #9db2c5; font-size: 11px; line-height: 1.45; }
 
   @media (max-width: 840px) {
     #lobby { align-items: flex-start; }
@@ -314,6 +323,8 @@
     .create-strip > div:first-child { display: block; }
     .create-strip > div:first-child span { display: block; margin-top: 4px; }
     .button-row, .result-actions, .modal-actions { flex-wrap: wrap; }
+    .graphics-settings .setting-row { align-items: stretch; flex-direction: column; gap: 10px; }
+    .graphics-settings .setting-row select { width: 100%; flex-basis: auto; }
     #stats { top: 12px; left: 12px; transform: scale(.86); transform-origin: top left; }
     #board { top: 128px; left: 12px; right: 12px; width: auto; transform: none; }
     #timer { top: 98px; font-size: 19px; }
@@ -639,6 +650,77 @@
         <div class="modal-kicker">FLIGHT SETTINGS</div>
         <h2 id="pause-title">비행 설정</h2>
         <p>온라인 경기는 메뉴를 연 동안에도 계속 진행됩니다.</p>
+        <section class="graphics-settings" aria-labelledby="graphics-title">
+          <h3 id="graphics-title">그래픽 설정</h3>
+          <label class="setting-row" for="graphics-resolution">
+            <span><b>렌더링 해상도</b><small>픽셀 선명도와 GPU 부하</small></span>
+            <select id="graphics-resolution">
+              <option value="performance">성능 · 75%</option>
+              <option value="native">기본 · 100%</option>
+              <option value="enhanced">향상 · 125%</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-shadows">
+            <span><b>광원 그림자</b><small>태양광 그림자 정밀도</small></span>
+            <select id="graphics-shadows">
+              <option value="off">끄기</option>
+              <option value="medium">보통 · 1024</option>
+              <option value="high">높음 · 2048</option>
+              <option value="ultra">울트라 · 4096</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-view-distance">
+            <span><b>시야 거리</b><small>실제 안개 가시거리와 카메라 범위</small></span>
+            <select id="graphics-view-distance">
+              <option value="standard">표준 · 3km</option>
+              <option value="far">장거리 · 5km</option>
+              <option value="ultra">울트라 · 7.5km</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-csm">
+            <span><b>캐스케이드 그림자</b><small>근거리와 원거리 그림자를 분리</small></span>
+            <select id="graphics-csm">
+              <option value="off">끄기 · 단일 그림자</option>
+              <option value="high">높음 · 3단계</option>
+              <option value="ultra">울트라 · 4단계</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-gtao">
+            <span><b>주변광 차폐 · GTAO</b><small>바위와 지면 접촉부의 입체감</small></span>
+            <select id="graphics-gtao">
+              <option value="off">끄기</option>
+              <option value="medium">보통 · 8샘플</option>
+              <option value="high">높음 · 16샘플</option>
+              <option value="ultra">울트라 · 24샘플</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-bloom">
+            <span><b>Bloom</b><small>링과 상승기류의 발광 효과</small></span>
+            <select id="graphics-bloom">
+              <option value="off">끄기</option>
+              <option value="soft">은은하게</option>
+              <option value="high">높음</option>
+              <option value="ultra">울트라</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-fog-quality">
+            <span><b>안개 품질</b><small>고도와 태양빛을 반영한 대기 원근감</small></span>
+            <select id="graphics-fog-quality">
+              <option value="basic">기본</option>
+              <option value="atmospheric">대기형</option>
+              <option value="cinematic">시네마틱</option>
+            </select>
+          </label>
+          <label class="setting-row" for="graphics-shadow-softness">
+            <span><b>그림자 부드러움</b><small>필터와 반그림자 블러 품질</small></span>
+            <select id="graphics-shadow-softness">
+              <option value="hard">선명함 · PCF</option>
+              <option value="soft">부드러움 · PCF 필터</option>
+              <option value="cinematic">시네마틱 · VSM</option>
+            </select>
+          </label>
+          <output id="graphics-summary" aria-live="polite"></output>
+        </section>
         <label class="setting-row" for="key-guide-toggle">
           <span><b>키 가이드</b><small>인게임 조작 안내 표시</small></span>
           <input id="key-guide-toggle" type="checkbox" checked>
@@ -719,7 +801,8 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/"
   }
 }
 </script>
@@ -745,6 +828,7 @@
 <script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./costume-showroom-3d.js"></script>
 <script type="module" src="./waiting-room-3d.js"></script>
+<script src="./graphics-settings.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
@@ -753,6 +837,12 @@ import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
 import { createFoldEditor } from './fold-editor-3d.mjs';
 import { buildBiomeEnvironment, terrainCollisionAtPoint } from './biome-visuals.js';
 const { getLaunchPose, localDeadline, getLaunchLayoutKey } = window.launchTransition;
+import { CSM } from 'three/addons/csm/CSM.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
@@ -760,6 +850,20 @@ const {
   updateEnergy, consumeDartEnergy, dashAcceleration, speedFov, MAX_ENERGY, DART_ENERGY_COST
 } = window.flightControls;
 const { getWaitingSlots, canStart, getLocalReady } = window.waitingRoomStatePolicy;
+const {
+  disposeShadowResources, fogDensityForMode, normalizeGraphicsSettings, parseGraphicsSettings,
+  serializeGraphicsSettings, resolveGraphicsSettings, sunPositionForTarget
+} = window.graphicsSettingsPolicy;
+let graphicsSettings = parseGraphicsSettings(localStorage.getItem('pp_graphics'));
+let resolvedGraphics = resolveGraphicsSettings(graphicsSettings, devicePixelRatio);
+const graphicsQaEnabled = new URLSearchParams(location.search).has('graphicsQa');
+let graphicsQaFrozen = false;
+let graphicsQaFrozenAt = 0;
+const game = {
+  mode: 'DIST', phase: 'lobby',
+  ends: 0, seed: 0, order: [],
+  frozen: true
+};
 
 /* ============================================================
    유틸
@@ -925,7 +1029,7 @@ function disposeObject3D(object) {
       for (const value of Object.values(material)) {
         if (value?.isTexture) value.dispose();
       }
-      material.dispose?.();
+      unregisterLitMaterial(material);
     });
   });
 }
@@ -1252,6 +1356,7 @@ function enterLobby(msg) {
   clearWorld();
   clearRemotePlayers();
   send({ t: 'list' });
+  setTimeout(() => $('lob-name').focus(), 0);
 }
 
 function enterRoomLobby(room, resultsPending = false) {
@@ -1506,6 +1611,22 @@ $('fold-leave-btn').addEventListener('click', () => {
   send({ t: 'leave' });
 });
 $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(event.currentTarget.checked));
+const graphicsControlIds = [
+  'graphics-resolution', 'graphics-shadows', 'graphics-view-distance', 'graphics-csm',
+  'graphics-gtao', 'graphics-bloom', 'graphics-fog-quality', 'graphics-shadow-softness'
+];
+for (const id of graphicsControlIds) {
+  $(id).addEventListener('change', () => applyGraphicsSettings({
+    resolution: $('graphics-resolution').value,
+    shadows: $('graphics-shadows').value,
+    viewDistance: $('graphics-view-distance').value,
+    csm: $('graphics-csm').value,
+    gtao: $('graphics-gtao').value,
+    bloom: $('graphics-bloom').value,
+    fogQuality: $('graphics-fog-quality').value,
+    shadowSoftness: $('graphics-shadow-softness').value
+  }));
+}
 $('copy-code-btn').addEventListener('click', async () => {
   const code = $('room-code-display').textContent;
   try {
@@ -1520,20 +1641,16 @@ $('copy-code-btn').addEventListener('click', async () => {
    Three.js 기본
    ============================================================ */
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(resolvedGraphics.pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const DIST_FOG_DENSITY = 0.0026;
-const ARENA_FOG_DENSITY = DIST_FOG_DENSITY / 3;
-scene.fog = new THREE.FogExp2(0xb8c9dd, DIST_FOG_DENSITY);
+scene.fog = new THREE.FogExp2(0xb8c9dd, fogDensityForMode(resolvedGraphics.fogDensity, 'DIST'));
 
-const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 5000);
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, resolvedGraphics.cameraFar);
 camera.position.set(0, 200, 100);
 
 /* 하늘 돔 */
@@ -1561,22 +1678,269 @@ scene.add(sky);
 
 scene.add(new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5));
 const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -140; sun.shadow.camera.right = 140;
-sun.shadow.camera.top = 140; sun.shadow.camera.bottom = -140;
-sun.shadow.camera.far = 400;
+sun.shadow.bias = -0.00035;
+sun.shadow.normalBias = 0.035;
 scene.add(sun, sun.target);
 
+const csmMaterials = new Set();
+let csm = null;
+let shadowSystemSignature = '';
+let composer = null;
+let gtaoPass = null;
+let bloomPass = null;
+let postEffectSignature = '';
+
+function registerLitMaterial(material) {
+  csmMaterials.add(material);
+  if (csm) csm.setupMaterial(material);
+  return material;
+}
+
+function detachMaterialFromCsm(material) {
+  if (!material || !csm?.shaders?.has(material)) return;
+  const shader = csm.shaders.get(material);
+  delete material.onBeforeCompile;
+  if (material.defines) {
+    delete material.defines.USE_CSM;
+    delete material.defines.CSM_CASCADES;
+    delete material.defines.CSM_FADE;
+  }
+  if (shader?.uniforms) {
+    delete shader.uniforms.CSM_cascades;
+    delete shader.uniforms.cameraNear;
+    delete shader.uniforms.shadowFar;
+  }
+  csm.shaders.delete(material);
+  material.needsUpdate = true;
+}
+
+function unregisterLitMaterial(material) {
+  csmMaterials.delete(material);
+  detachMaterialFromCsm(material);
+  material?.dispose?.();
+}
+
+function configureShadowFilter(light) {
+  light.shadow.radius = resolvedGraphics.shadowSoftness.radius;
+  light.shadow.blurSamples = resolvedGraphics.shadowSoftness.blurSamples;
+  light.shadow.normalBias = 0.035;
+}
+
+function disposeCsm() {
+  if (!csm) return;
+  for (const light of csm.lights) disposeShadowResources(light.shadow);
+  csm.remove();
+  csm.dispose();
+  csm = null;
+}
+
+function rebuildShadowSystem() {
+  const useCsm = resolvedGraphics.shadow.enabled && resolvedGraphics.csm.enabled;
+  const signature = [
+    resolvedGraphics.shadow.enabled, resolvedGraphics.shadow.mapSize,
+    resolvedGraphics.shadowSoftness.type, resolvedGraphics.shadowSoftness.radius,
+    useCsm ? resolvedGraphics.csm.cascades : 0,
+    useCsm ? Math.min(resolvedGraphics.csm.maxFar, resolvedGraphics.cameraFar) : 0
+  ].join(':');
+  if (signature === shadowSystemSignature) return;
+  shadowSystemSignature = signature;
+
+  disposeCsm();
+  disposeShadowResources(sun.shadow);
+  renderer.shadowMap.enabled = resolvedGraphics.shadow.enabled;
+  renderer.shadowMap.type = resolvedGraphics.shadowSoftness.type === 'vsm'
+    ? THREE.VSMShadowMap
+    : THREE.PCFShadowMap;
+  sun.visible = !useCsm;
+  sun.castShadow = resolvedGraphics.shadow.enabled && !useCsm;
+
+  if (!resolvedGraphics.shadow.enabled) {
+    renderer.shadowMap.needsUpdate = true;
+    return;
+  }
+
+  if (useCsm) {
+    csm = new CSM({
+      camera,
+      parent: scene,
+      cascades: resolvedGraphics.csm.cascades,
+      maxFar: Math.min(resolvedGraphics.csm.maxFar, resolvedGraphics.cameraFar),
+      mode: 'practical',
+      shadowMapSize: resolvedGraphics.shadow.mapSize,
+      shadowBias: -0.00018,
+      lightDirection: new THREE.Vector3(-70, -110, -50).normalize(),
+      lightIntensity: 2.6,
+      lightNear: 1,
+      lightFar: Math.max(2400, resolvedGraphics.csm.maxFar * 1.8),
+      lightMargin: 260
+    });
+    csm.fade = true;
+    for (const light of csm.lights) {
+      light.color.set(0xfff0d8);
+      configureShadowFilter(light);
+    }
+    for (const material of csmMaterials) csm.setupMaterial(material);
+    csm.updateFrustums();
+  } else {
+    sun.shadow.mapSize.set(resolvedGraphics.shadow.mapSize, resolvedGraphics.shadow.mapSize);
+    const extent = resolvedGraphics.shadow.extent;
+    Object.assign(sun.shadow.camera, {
+      left: -extent, right: extent, top: extent, bottom: -extent,
+      near: 1, far: resolvedGraphics.shadow.far
+    });
+    sun.shadow.bias = -0.00035;
+    configureShadowFilter(sun);
+    sun.shadow.camera.updateProjectionMatrix();
+  }
+  renderer.shadowMap.needsUpdate = true;
+}
+
+function disposePostProcessing() {
+  if (!composer) return;
+  // GTAOPass 0.184 omits these two shader materials from dispose().
+  gtaoPass?.gtaoMaterial?.dispose?.();
+  gtaoPass?.blendMaterial?.dispose?.();
+  for (const pass of composer.passes) pass.dispose?.();
+  composer.dispose();
+  composer = gtaoPass = bloomPass = null;
+}
+
+function excludeTransparentObjectsFromGtao(pass) {
+  if (!Array.isArray(pass?._visibilityCache) || typeof pass?._restoreVisibility !== 'function') {
+    throw new Error('Unsupported Three.js GTAOPass visibility contract');
+  }
+  pass._overrideVisibility = function () {
+    this.scene.traverse(object => {
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      const excluded = object.isPoints || object.isLine || object.isLine2 || object.isSprite ||
+        materials.some(material => material && (material.transparent || material.isShaderMaterial));
+      if (excluded && object.visible) {
+        object.visible = false;
+        this._visibilityCache.push(object);
+      }
+    });
+  };
+}
+
+function configurePostProcessing() {
+  const signature = `${resolvedGraphics.gtao.enabled}:${resolvedGraphics.bloom.enabled}`;
+
+  if (!composer || signature !== postEffectSignature) {
+    disposePostProcessing();
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    if (resolvedGraphics.gtao.enabled) {
+      gtaoPass = new GTAOPass(scene, camera, innerWidth, innerHeight);
+      gtaoPass.output = GTAOPass.OUTPUT.Default;
+      excludeTransparentObjectsFromGtao(gtaoPass);
+      composer.addPass(gtaoPass);
+    }
+    if (resolvedGraphics.bloom.enabled) {
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(innerWidth, innerHeight),
+        resolvedGraphics.bloom.strength,
+        resolvedGraphics.bloom.radius,
+        resolvedGraphics.bloom.threshold
+      );
+      composer.addPass(bloomPass);
+    }
+    composer.addPass(new OutputPass());
+    postEffectSignature = signature;
+  }
+
+  if (gtaoPass) {
+    gtaoPass.blendIntensity = resolvedGraphics.gtao.blendIntensity;
+    gtaoPass.updateGtaoMaterial({
+      radius: resolvedGraphics.gtao.radius,
+      distanceExponent: 1.5,
+      thickness: 1.2,
+      distanceFallOff: 1,
+      scale: 1,
+      samples: resolvedGraphics.gtao.samples,
+      screenSpaceRadius: false
+    });
+    gtaoPass.updatePdMaterial({
+      lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4,
+      radiusExponent: 1, rings: 2, samples: resolvedGraphics.gtao.denoiseSamples
+    });
+  }
+  if (bloomPass) {
+    bloomPass.strength = resolvedGraphics.bloom.strength;
+    bloomPass.radius = resolvedGraphics.bloom.radius;
+    bloomPass.threshold = resolvedGraphics.bloom.threshold;
+  }
+  composer.setPixelRatio(resolvedGraphics.pixelRatio);
+  composer.setSize(innerWidth, innerHeight);
+  if (gtaoPass) {
+    const gtaoWidth = Math.max(1, Math.floor(innerWidth * resolvedGraphics.pixelRatio * resolvedGraphics.gtao.resolutionScale));
+    const gtaoHeight = Math.max(1, Math.floor(innerHeight * resolvedGraphics.pixelRatio * resolvedGraphics.gtao.resolutionScale));
+    gtaoPass.setSize(gtaoWidth, gtaoHeight);
+  }
+}
+
+const activeFogBase = new THREE.Color(0xb8c9dd);
+const sunFogColor = new THREE.Color(0xe9c8aa);
+const activeSkyBottomBase = new THREE.Color(0xf2d9bd);
+const sunSkyBottom = new THREE.Color(0xffc88d);
+function updateAtmosphericFog() {
+  const altitude = THREE.MathUtils.clamp((camera.position.y - 40) / 420, 0, 1);
+  const modeDensity = fogDensityForMode(resolvedGraphics.fogDensity, game.mode);
+  scene.fog.density = modeDensity * (1 - altitude * resolvedGraphics.fog.altitudeFalloff);
+  scene.fog.color.copy(activeFogBase).lerp(sunFogColor, resolvedGraphics.fog.sunTint);
+  sky.material.uniforms.uBottom.value.copy(activeSkyBottomBase).lerp(sunSkyBottom, resolvedGraphics.fog.sunTint);
+}
+
+function renderScene(dt) {
+  if (composer && game.phase !== 'lobby') composer.render(dt);
+  else renderer.render(scene, camera);
+}
+
+function updateGraphicsSummary() {
+  const shadowText = resolvedGraphics.shadow.enabled ? `${resolvedGraphics.shadow.mapSize}px` : '꺼짐';
+  const csmText = resolvedGraphics.csm.enabled && resolvedGraphics.shadow.enabled ? `${resolvedGraphics.csm.cascades} CSM` : '단일';
+  const effects = [resolvedGraphics.gtao.enabled ? 'GTAO' : null, resolvedGraphics.bloom.enabled ? 'Bloom' : null].filter(Boolean).join('+') || '후처리 꺼짐';
+  $('graphics-summary').textContent =
+    `렌더 ${resolvedGraphics.pixelRatio.toFixed(2)}× · 그림자 ${shadowText}/${csmText} · 시야 ${resolvedGraphics.cameraFar}m · ${effects}`;
+}
+
+function syncGraphicsControls() {
+  $('graphics-resolution').value = graphicsSettings.resolution;
+  $('graphics-shadows').value = graphicsSettings.shadows;
+  $('graphics-view-distance').value = graphicsSettings.viewDistance;
+  $('graphics-csm').value = graphicsSettings.csm;
+  $('graphics-gtao').value = graphicsSettings.gtao;
+  $('graphics-bloom').value = graphicsSettings.bloom;
+  $('graphics-fog-quality').value = graphicsSettings.fogQuality;
+  $('graphics-shadow-softness').value = graphicsSettings.shadowSoftness;
+  updateGraphicsSummary();
+}
+
+function applyGraphicsSettings(next, persist = true) {
+  graphicsSettings = normalizeGraphicsSettings(next);
+  resolvedGraphics = resolveGraphicsSettings(graphicsSettings, devicePixelRatio);
+
+  renderer.setPixelRatio(resolvedGraphics.pixelRatio);
+  renderer.setSize(innerWidth, innerHeight);
+  camera.far = resolvedGraphics.cameraFar;
+  camera.updateProjectionMatrix();
+  rebuildShadowSystem();
+  configurePostProcessing();
+  updateAtmosphericFog();
+  if (persist) localStorage.setItem('pp_graphics', serializeGraphicsSettings(graphicsSettings));
+  syncGraphicsControls();
+}
+
+applyGraphicsSettings(graphicsSettings, false);
+
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(4000, 4000),
-  new THREE.MeshStandardMaterial({ color: 0x5f7a4e, roughness: 1, transparent: true })
+  new THREE.PlaneGeometry(16000, 16000),
+  registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0x5f7a4e, roughness: 1, transparent: true }))
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const grid = new THREE.GridHelper(2800, 70, 0x7a9468, 0x6d8a5c);
+const grid = new THREE.GridHelper(12000, 300, 0x7a9468, 0x6d8a5c);
 grid.material.transparent = true;
 grid.material.opacity = 0.35;
 scene.add(grid);
@@ -1600,10 +1964,12 @@ function biomeGroundOpacity(biome) {
 }
 
 function applyBiomePalette(biome) {
-  scene.fog.color.setHex(biome.fog);
+  activeFogBase.setHex(biome.fog);
+  scene.fog.color.copy(activeFogBase);
   sky.material.uniforms.uTop.value.setHex(biome.sky.top);
   sky.material.uniforms.uMid.value.setHex(biome.sky.mid);
-  sky.material.uniforms.uBottom.value.setHex(biome.sky.bottom);
+  activeSkyBottomBase.setHex(biome.sky.bottom);
+  sky.material.uniforms.uBottom.value.copy(activeSkyBottomBase);
   sun.color.copy(biomeLightColor(biome, biomeColorA));
   ground.material.color.setHex(biome.terrain.top);
   ground.material.opacity = biomeGroundOpacity(biome);
@@ -1611,10 +1977,12 @@ function applyBiomePalette(biome) {
 }
 
 function resetBiomeDefaults() {
-  scene.fog.color.setHex(DEFAULT_BIOME.fog);
+  activeFogBase.setHex(DEFAULT_BIOME.fog);
+  scene.fog.color.copy(activeFogBase);
   sky.material.uniforms.uTop.value.setHex(DEFAULT_BIOME.sky.top);
   sky.material.uniforms.uMid.value.setHex(DEFAULT_BIOME.sky.mid);
-  sky.material.uniforms.uBottom.value.setHex(DEFAULT_BIOME.sky.bottom);
+  activeSkyBottomBase.setHex(DEFAULT_BIOME.sky.bottom);
+  sky.material.uniforms.uBottom.value.copy(activeSkyBottomBase);
   sun.color.setHex(0xfff0d8);
   ground.material.color.setHex(DEFAULT_BIOME.terrain.top);
   ground.material.opacity = biomeGroundOpacity(DEFAULT_BIOME);
@@ -1635,14 +2003,16 @@ function updateDistanceBiomeVisuals(z) {
   const biomeB = window.mapGen.BIOMES[s.b];
 
   biomeColorA.setHex(biomeA.fog).lerp(biomeColorB.setHex(biomeB.fog), tQuant);
-  scene.fog.color.copy(biomeColorA);
+  activeFogBase.copy(biomeColorA);
+  scene.fog.color.copy(activeFogBase);
 
   biomeColorA.setHex(biomeA.sky.top).lerp(biomeColorB.setHex(biomeB.sky.top), tQuant);
   sky.material.uniforms.uTop.value.copy(biomeColorA);
   biomeColorA.setHex(biomeA.sky.mid).lerp(biomeColorB.setHex(biomeB.sky.mid), tQuant);
   sky.material.uniforms.uMid.value.copy(biomeColorA);
   biomeColorA.setHex(biomeA.sky.bottom).lerp(biomeColorB.setHex(biomeB.sky.bottom), tQuant);
-  sky.material.uniforms.uBottom.value.copy(biomeColorA);
+  activeSkyBottomBase.copy(biomeColorA);
+  sky.material.uniforms.uBottom.value.copy(activeSkyBottomBase);
 
   biomeLightColor(biomeA, biomeColorA);
   biomeLightColor(biomeB, biomeColorB);
@@ -1680,10 +2050,11 @@ function makePlaneMesh(color) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+  const mesh = new THREE.Mesh(geo, registerLitMaterial(new THREE.MeshStandardMaterial({
     color, roughness: 0.85, side: THREE.DoubleSide, flatShading: true
-  }));
+  })));
   mesh.castShadow = true;
+  mesh.receiveShadow = true;
   return mesh;
 }
 
@@ -1825,9 +2196,9 @@ function makeFoldedCraftVisual(model, tint = new THREE.Color(0xfdfcf7)) {
     const depthRatio = foldDepth / maxFoldDepth;
     const faceColor = tint.clone().lerp(new THREE.Color(0xffffff), .46 - depthRatio * .2);
     faceColor.offsetHSL(faceIndex * .008, 0, -depthRatio * .08);
-    const material = new THREE.MeshStandardMaterial({
+    const material = registerLitMaterial(new THREE.MeshStandardMaterial({
       color: faceColor, roughness: .72, side: THREE.DoubleSide, flatShading: true
-    });
+    }));
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
     visual.add(mesh);
@@ -1852,9 +2223,9 @@ function makePresetCraftVisual(name, tint = new THREE.Color(0xfdfcf7)) {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.computeVertexNormals();
     const color = tint.clone().lerp(new THREE.Color(0xffffff), .34 - faceIndex * .055);
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+    const mesh = new THREE.Mesh(geometry, registerLitMaterial(new THREE.MeshStandardMaterial({
       color, roughness: .72, side: THREE.DoubleSide, flatShading: true
-    }));
+    })));
     mesh.castShadow = true;
     visual.add(mesh);
   });
@@ -1949,11 +2320,40 @@ const me = {
 /* ============================================================
    게임 상태 · 월드
    ============================================================ */
-const game = {
-  mode: 'DIST', phase: 'lobby',
-  ends: 0, seed: 0, order: [],
-  frozen: true
-};
+if (graphicsQaEnabled) {
+  window.__graphicsQA = {
+    freeze(value = true) {
+      graphicsQaFrozen = Boolean(value);
+      if (graphicsQaFrozen) graphicsQaFrozenAt = Date.now();
+      clearFlightKeys?.();
+      if (graphicsQaFrozen) thermalMat.uniforms.uTime.value = 1.25;
+      return graphicsQaFrozen;
+    },
+    set(overrides) {
+      applyGraphicsSettings({ ...graphicsSettings, ...overrides }, false);
+      return {
+        settings: { ...graphicsSettings },
+        summary: $('graphics-summary').textContent,
+        csmLights: csm?.lights.length || 0,
+        csmMaterials: csmMaterials.size,
+        csmShaders: csm?.shaders?.size || 0,
+        postPasses: composer?.passes.length || 0,
+        memory: { ...renderer.info.memory }
+      };
+    },
+    preview(mode = 'DIST', seed = 4312) {
+      game.mode = mode === 'ARENA' ? 'ARENA' : 'DIST';
+      game.seed = Number(seed) || 4312;
+      game.phase = 'playing';
+      game.ends = Date.now() + 150000;
+      (game.mode === 'ARENA' ? buildArena : buildDistance)(game.seed);
+      spawnSelf();
+      enterGame();
+      this.freeze(true);
+      return { mode: game.mode, seed: game.seed, worldChildren: world.children.length };
+    },
+  };
+}
 
 /* 코스 상수 */
 const DIST_HALF = 155, DIST_LEN = 7500;
@@ -1991,7 +2391,7 @@ const thermalMat = new THREE.ShaderMaterial({
     }`
 });
 const thermalRingMat = new THREE.MeshBasicMaterial({ color: 0x4fd6a4, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
-const ringMat = new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 1.6, roughness: 0.4 });
+const ringMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 2.4, roughness: 0.4 }));
 
 function clearWorld() {
   if (typeof launchState !== 'undefined') {
@@ -2049,7 +2449,7 @@ function installBiomeLayout(layout) {
 /* ---- 멀리 날기: 시드로 7.5km 직선 협곡을 결정론적으로 생성 ---- */
 function buildDistance(seed) {
   clearWorld();
-  scene.fog.density = DIST_FOG_DENSITY;
+  scene.fog.density = fogDensityForMode(resolvedGraphics.fogDensity, 'DIST');
   const rng = mulberry32(seed);
   const { BIOMES: mgBiomes } = window.mapGen;
   const layout = window.mapGen.buildDistanceLayout(seed);
@@ -2077,7 +2477,7 @@ function buildDistance(seed) {
 /* ---- 오래 날기: 원형 아레나 ---- */
 function buildArena(seed) {
   clearWorld();
-  scene.fog.density = ARENA_FOG_DENSITY;
+  scene.fog.density = fogDensityForMode(resolvedGraphics.fogDensity, 'ARENA');
   const rng = mulberry32(seed);
   const layout = window.mapGen.buildArenaLayout(seed);
   const theme = window.mapGen.BIOMES[layout.biome];
@@ -2282,9 +2682,11 @@ const dartGeo = new THREE.ConeGeometry(0.3, 1.6, 6);
 dartGeo.rotateX(Math.PI / 2);
 
 function spawnDart(origin, vel, ownerId, color) {
-  const m = new THREE.Mesh(dartGeo, new THREE.MeshStandardMaterial({
-    color: 0xfffbe8, emissive: color, emissiveIntensity: 0.9, flatShading: true
+  const material = registerLitMaterial(new THREE.MeshStandardMaterial({
+    color: 0xfffbe8, emissive: color, emissiveIntensity: 1.8, flatShading: true
   }));
+  material.userData.dartOwned = true;
+  const m = new THREE.Mesh(dartGeo, material);
   m.position.copy(origin);
   scene.add(m);
   darts.push({ mesh: m, v: vel.clone(), owner: ownerId, life: 2.6 });
@@ -2330,7 +2732,7 @@ function stepDarts(dt) {
     // 남이 쏜 다트가 나에게 (시각 피드백용 — 판정은 상대 클라이언트가)
     if (dead) {
       scene.remove(d.mesh);
-      d.mesh.material.dispose();
+      unregisterLitMaterial(d.mesh.material);
       darts.splice(i, 1);
     }
   }
@@ -2654,7 +3056,7 @@ function setUnderlyingGameUiInert(inert) {
 
 function trapModalFocus(event, layer) {
   if (event.code !== 'Tab' || layer.classList.contains('hide')) return false;
-  const focusable = [...layer.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+  const focusable = [...layer.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')];
   if (!focusable.length) return false;
   const first = focusable[0], last = focusable[focusable.length - 1];
   if (event.shiftKey && (document.activeElement === first || !layer.contains(document.activeElement))) {
@@ -2729,7 +3131,8 @@ function openPauseMenu() {
   $('pause-menu').classList.remove('hide');
   setUnderlyingGameUiInert(true);
   releaseFlightPointerLock();
-  $('resume-btn').focus();
+  $('pause-menu').querySelector('.modal-card').scrollTop = 0;
+  $('graphics-resolution').focus();
 }
 
 function resumeFlight() {
@@ -2785,7 +3188,8 @@ document.addEventListener('visibilitychange', () => {
 /* ============================================================
    메인 루프
    ============================================================ */
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
+timer.connect(document);
 const dir = new THREE.Vector3();
 const fwdH = new THREE.Vector3();
 const camPos = new THREE.Vector3();
@@ -2932,14 +3336,17 @@ function physics(dt) {
   }
 }
 
-renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const now = Date.now();
-  const elapsed = clock.getElapsedTime();
-  thermalMat.uniforms.uTime.value = elapsed;
-  animateCostumes(scene, elapsed);
+renderer.setAnimationLoop(timestamp => {
+  timer.update(timestamp);
+  const dt = Math.min(timer.getDelta(), 0.05);
+  const now = graphicsQaFrozen ? graphicsQaFrozenAt : Date.now();
+  const elapsed = timer.getElapsed();
+  if (!graphicsQaFrozen) {
+    thermalMat.uniforms.uTime.value = elapsed;
+    animateCostumes(scene, elapsed);
+  }
 
-  if (game.phase === 'lobby') { renderer.render(scene, camera); return; }
+  if (game.phase === 'lobby') { renderScene(dt); return; }
 
   /* ---- 카운트다운 표시 ---- */
   if (game.phase === 'countdown') {
@@ -2947,22 +3354,23 @@ renderer.setAnimationLoop(() => {
     showCenter(Math.ceil(left), game.mode === 'ARENA' ? '오래 날기' : '멀리 날기', null);
   }
 
-  if (game.phase === 'launch') updateLaunch(performance.now());
+  if (game.phase === 'launch' && !graphicsQaFrozen) updateLaunch(performance.now());
 
   if (game.phase === 'playing') {
     roundClock = net.room?.phase === 'live'
       ? Math.max(0, (now - me.lifeStartedAt) / 1000)
       : Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
-    if (me.alive) physics(dt);
+    if (me.alive && !graphicsQaFrozen) physics(dt);
   }
 
-  stepDarts(dt);
+  if (!graphicsQaFrozen) stepDarts(dt);
 
   /* ---- 원격 기체 보간 ---- */
   for (const pl of net.players.values()) {
     const r = pl.remote;
     if (!r.seen || !pl.alive || game.phase !== 'playing') { r.group.visible = false; continue; }
     r.group.visible = true;
+    if (graphicsQaFrozen) continue;
     r.group.position.lerp(r.tp, Math.min(1, 12 * dt));
     r.group.rotation.x += (r.tr.x - r.group.rotation.x) * Math.min(1, 10 * dt);
     r.group.rotation.z += (r.tr.z - r.group.rotation.z) * Math.min(1, 10 * dt);
@@ -2974,7 +3382,7 @@ renderer.setAnimationLoop(() => {
   }
 
   craft.rotation.set(me.pitch, me.yaw, me.roll);
-  ringsArr.forEach(r => { if (!r.userData.taken) r.rotation.z += dt * 0.8; });
+  if (!graphicsQaFrozen) ringsArr.forEach(r => { if (!r.userData.taken) r.rotation.z += dt * 0.8; });
 
   /* ---- 카메라: 기체 중심 자유 오빗, 사망 시 관전 대상 추적 ---- */
   let followPos = craft.position, followYaw = me.yaw;
@@ -2997,13 +3405,20 @@ renderer.setAnimationLoop(() => {
     followPos.y + 4.8 + Math.sin(freeLook.pitch) * orbitRadius,
     followPos.z + Math.cos(orbitYaw) * orbitHorizontal
   );
-  camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
-  camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
+  if (graphicsQaFrozen) {
+    camera.position.copy(camPos);
+    camera.up.set(0, 1, 0);
+  } else {
+    camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
+    camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
+  }
   lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
   lookAt.y += 1.2;
   camera.lookAt(lookAt);
   const targetFov = speedFov(me.speed, me.dashing && me.alive);
-  const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.pow(0.025, dt));
+  const nextFov = graphicsQaFrozen
+    ? targetFov
+    : THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.pow(0.025, dt));
   if (Math.abs(nextFov - camera.fov) > 0.01) {
     camera.fov = nextFov;
     camera.updateProjectionMatrix();
@@ -3021,12 +3436,18 @@ renderer.setAnimationLoop(() => {
     ground.position.set(0, 0, 0);
     grid.position.set(0, 0.05, 0);
   }
-  sun.position.set(followPos.x + 70, 110, followPos.z + 50);
-  sun.target.position.copy(followPos);
+  if (!csm) {
+    const lightPosition = sunPositionForTarget(followPos);
+    sun.position.set(lightPosition.x, lightPosition.y, lightPosition.z);
+    sun.target.position.copy(followPos);
+  }
+  updateAtmosphericFog();
+  camera.updateMatrixWorld();
+  if (csm) csm.update();
 
   /* ---- 상태 송신 (15Hz) ---- */
   sendAcc += dt;
-  if (sendAcc > 0.066 && game.phase === 'playing' && me.alive) {
+  if (!graphicsQaFrozen && sendAcc > 0.066 && game.phase === 'playing' && me.alive) {
     sendAcc = 0;
     send({
       t: 's',
@@ -3057,13 +3478,12 @@ renderer.setAnimationLoop(() => {
     $('timer').classList.toggle('low', (game.phase === 'playing' || game.phase === 'launch') && left < 20);
   }
 
-  renderer.render(scene, camera);
+  renderScene(dt);
 });
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  applyGraphicsSettings(graphicsSettings, false);
 });
 
 /* 로비가 보이는 즉시 공개 방 목록을 요청합니다. 이름은 방 참가 시에만 전송합니다. */

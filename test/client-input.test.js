@@ -92,6 +92,71 @@ test('the client loads free-flight controls and exposes the ESC settings menu', 
   assert.doesNotMatch(html, /const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT/);
 });
 
+test('the ESC menu exposes persisted runtime graphics settings', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /<script\s+src=['"]\.\/graphics-settings\.js['"]><\/script>/);
+  assert.match(html, /id="graphics-resolution"/);
+  assert.match(html, /id="graphics-shadows"/);
+  assert.match(html, /id="graphics-view-distance"/);
+  assert.match(html, /id="graphics-csm"/);
+  assert.match(html, /id="graphics-gtao"/);
+  assert.match(html, /id="graphics-bloom"/);
+  assert.match(html, /id="graphics-fog-quality"/);
+  assert.match(html, /id="graphics-shadow-softness"/);
+  assert.match(html, /localStorage\.setItem\(['"]pp_graphics['"]/);
+  assert.match(html, /function applyGraphicsSettings\(/);
+  assert.match(html, /if \(graphicsQaEnabled\)[\s\S]*window\.__graphicsQA\s*=\s*\{/);
+  assert.match(html, /preview\(mode\s*=\s*['"]DIST['"],\s*seed\s*=\s*4312\)/);
+  assert.ok(html.indexOf('const game = {') < html.indexOf('applyGraphicsSettings(graphicsSettings, false)'));
+  assert.match(html, /select:not\(:disabled\)/);
+});
+
+test('high graphics defaults extend shadows and view distance across biome environment meshes', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  const biomeVisuals = fs.readFileSync(path.join(projectRoot, 'public/biome-visuals.js'), 'utf8');
+  const homePlane = fs.readFileSync(path.join(projectRoot, 'public/home-plane-3d.js'), 'utf8');
+  const foldEditor = fs.readFileSync(path.join(projectRoot, 'public/fold-editor-3d.mjs'), 'utf8');
+
+  assert.match(html, /resolveGraphicsSettings\(/);
+  assert.match(html, /from ['"]three\/addons\/csm\/CSM\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/postprocessing\/GTAOPass\.js['"]/);
+  assert.match(html, /from ['"]three\/addons\/postprocessing\/UnrealBloomPass\.js['"]/);
+  assert.match(html, /function rebuildShadowSystem\(/);
+  assert.match(html, /function configurePostProcessing\(/);
+  assert.match(html, /buildBiomeEnvironment\(/);
+  assert.match(html, /csm\.update\(\)/);
+  assert.match(html, /composer\.render\(/);
+  assert.doesNotMatch(html, /THREE\.PCFSoftShadowMap/);
+  assert.doesNotMatch(homePlane, /THREE\.PCFSoftShadowMap/);
+  assert.doesNotMatch(foldEditor, /THREE\.PCFSoftShadowMap/);
+  assert.match(html, /THREE\.VSMShadowMap/);
+  assert.match(biomeVisuals, /mesh\.castShadow\s*=\s*castShadow/);
+  assert.match(biomeVisuals, /mesh\.receiveShadow\s*=\s*true/);
+});
+
+test('graphics teardown releases CSM, remote-player, and GTAO resources', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /function detachMaterialFromCsm\([\s\S]*csm\.shaders\.delete\(material\)/);
+  assert.match(html, /function unregisterLitMaterial\([\s\S]*detachMaterialFromCsm\(material\)/);
+  assert.match(html, /function disposeObject3D\([\s\S]*unregisterLitMaterial\(material\)/);
+  assert.match(html, /gtaoPass\?\.gtaoMaterial\?\.dispose/);
+  assert.match(html, /gtaoPass\?\.blendMaterial\?\.dispose/);
+  assert.match(html, /Unsupported Three\.js GTAOPass visibility contract/);
+});
+
+test('graphics QA stays local and freezes time, camera, and network updates', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.doesNotMatch(html, /127\.0\.0\.1:33008/);
+  assert.doesNotMatch(html, /new THREE\.Clock/);
+  assert.match(html, /new THREE\.Timer\(\)/);
+  assert.match(html, /const now = graphicsQaFrozen \? graphicsQaFrozenAt : Date\.now\(\)/);
+  assert.match(html, /if \(graphicsQaFrozen\) \{[\s\S]*camera\.position\.copy\(camPos\)/);
+  assert.match(html, /if \(!graphicsQaFrozen && sendAcc > 0\.066/);
+});
+
 test('pause and result overlays isolate focus and suspend flight input', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
@@ -100,6 +165,9 @@ test('pause and result overlays isolate focus and suspend flight input', () => {
   assert.match(html, /visibilitychange/);
   assert.match(html, /function hideResults\([\s\S]*resultsReturnFocus\s*!==\s*document\.body/);
   assert.match(html, /function trapModalFocus\(/);
+  assert.match(html, /querySelector\(['"]\.modal-card['"]\)\.scrollTop\s*=\s*0/);
+  assert.match(html, /\$\(['"]graphics-resolution['"]\)\.focus\(\)/);
+  assert.match(html, /function enterLobby\([\s\S]*\$\(['"]lob-name['"]\)\.focus\(\)/);
   assert.match(html, /id="results"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="r-title"/);
   assert.match(html, /if\s*\(pauseOpen\)\s*return/);
 });

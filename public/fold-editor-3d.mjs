@@ -17,7 +17,12 @@
      angleAdjust → angleDrag  pointerdown — 세로 드래그가 각도(-π..π)
      angleDrag → idle    pointerup — 마지막으로 유효했던 각도로 확정,
                          유효한 각도가 한 번도 없었다면 onCancel
-   Escape는 언제든 취소. */
+   Escape는 언제든 취소.
+
+   시각 언어(main과 통일): 앞면 하늘색/뒷면 보라색 종이, 확정된 접는선은
+   금색 점선, 그리는 중인 접는선은 각도 부호로 색이 바뀌는(양수 민트/
+   음수 코랄) 네온 점선 + 화살촉, 각도 조절 중인 힌지 축은 유효할 때
+   금색 점선/거부되면 빨강으로 표시한다. */
 import * as THREE from 'three';
 
 const MIN_DRAG = 0.05;   // paper-fold-model의 최소 선 길이와 동일
@@ -30,10 +35,17 @@ const MAX_PITCH = 1.5;
 const RADIANS_PER_PIXEL = Math.PI / 220; // 세로 220px 드래그 = 180°
 const PREVIEW_STEP = Math.PI / 360;      // 0.5° 단위로만 미리보기 재계산
 const GROUND_Y = -1.25;
-const PAPER_TINT = 0xfdfcf7;
-const CREASE_COLOR = 0x76e5ef;  // 긋는 중인 점선
-const HINGE_COLOR = 0xf4cd6c;   // 각도 조절 중인 힌지 축
-const REJECT_COLOR = 0xff6b61;  // 접을 수 없는 각도
+
+// ---- 색 토큰 (main의 paper-fold-ui.js/multiplayer-flow.css 네온 접기 팔레트) ----
+const FRONT_HUE = 188;              // 하늘색(앞면) — hsl(188 62% L%)
+const FRONT_SAT = 0.62;
+const BACK_HUE = 267;               // 보라(뒷면) — hsl(267 38% max(57,L-9)%)
+const BACK_SAT = 0.38;
+const OUTLINE_COLOR = 0x25477b;     // rgba(37,71,123,.78)에 대응
+const CREASE_GOLD = 0xf4cd6c;       // 확정된 접는선 — 금색 점선
+const CREASE_MINT = 0x69e3b6;       // 그리는 중 · 양의 각도(밸리)
+const CREASE_CORAL = 0xff8d86;      // 그리는 중 · 음의 각도(마운틴)
+const REJECT_COLOR = 0xff6b61;      // 접을 수 없는 각도
 
 export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
   const api = typeof window !== 'undefined' ? window.paperFoldModel : null;
@@ -43,7 +55,10 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
   let camera = null;
   let paperGroup = null;
   let creaseLine = null;
+  let creaseGlowLine = null;
+  let creaseArrow = null;
   let hingeLine = null;
+  let committedCreaseGroup = null;
   let badge = null;
   let frame = 0;
   let started = false;
@@ -66,6 +81,10 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
   const pointerNdc = new THREE.Vector2();
 
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+
+  function setOrbiting(active) {
+    canvas?.classList.toggle('orbiting', Boolean(active));
+  }
 
   /* ---------- 씬 구성 ---------- */
 
@@ -117,17 +136,41 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     paperGroup = new THREE.Group();
     scene.add(paperGroup);
 
+    committedCreaseGroup = new THREE.Group();
+    scene.add(committedCreaseGroup);
+
+    // 긋는 중인 접는선 — 네온 점선(양/음 각도에 따라 민트/코랄) + 아래
+    // additive-blend로 깔리는 넓고 옅은 "glow" 선으로 canvas shadowBlur를
+    // 흉내낸다.
+    creaseGlowLine = new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({
+        color: CREASE_MINT, transparent: true, opacity: 0.35,
+        blending: THREE.AdditiveBlending, depthWrite: false, linewidth: 6
+      })
+    );
+    creaseGlowLine.visible = false;
+    creaseGlowLine.frustumCulled = false;
+    scene.add(creaseGlowLine);
+
     creaseLine = new THREE.Line(
       new THREE.BufferGeometry(),
-      new THREE.LineDashedMaterial({ color: CREASE_COLOR, dashSize: 0.07, gapSize: 0.045 })
+      new THREE.LineDashedMaterial({ color: CREASE_MINT, dashSize: 0.11, gapSize: 0.07 })
     );
     creaseLine.visible = false;
     creaseLine.frustumCulled = false;
     scene.add(creaseLine);
 
+    creaseArrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.028, 0.09, 10),
+      new THREE.MeshBasicMaterial({ color: CREASE_MINT })
+    );
+    creaseArrow.visible = false;
+    scene.add(creaseArrow);
+
     hingeLine = new THREE.Line(
       new THREE.BufferGeometry(),
-      new THREE.LineBasicMaterial({ color: HINGE_COLOR })
+      new THREE.LineDashedMaterial({ color: CREASE_GOLD, dashSize: 0.07, gapSize: 0.06 })
     );
     hingeLine.visible = false;
     hingeLine.frustumCulled = false;
@@ -155,12 +198,16 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       const child = group.children[0];
       group.remove(child);
       child.geometry?.dispose?.();
-      child.material?.dispose?.();
+      if (Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+      else child.material?.dispose?.();
     }
   }
 
   /* 게임 내 makeFoldedCraftVisual과 같은 시각 언어(접힘 깊이 명암·양면·
-     겹침 방지용 법선 오프셋)로 종이를 그린다. 스케일은 전개도 단위 그대로. */
+     겹침 방지용 법선 오프셋)로 종이를 그린다. 스케일은 전개도 단위 그대로.
+     main의 네온 팔레트를 따라 앞면은 하늘색, 뒷면은 보라색으로 그린다 —
+     MeshStandardMaterial은 side별로 다른 색을 낼 수 없으므로, 앞면용
+     FrontSide 메시와 뒷면용 BackSide 메시를 겹쳐 그린다. */
   function rebuildPaper(sourceModel) {
     if (!paperGroup) return;
     clearGroup(paperGroup);
@@ -168,8 +215,6 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     const geometry3d = api.computeFoldedGeometry(sourceModel);
     const faces = Array.isArray(geometry3d?.faces) ? geometry3d.faces : [];
     if (!faces.length) return;
-    const tint = new THREE.Color(PAPER_TINT);
-    const white = new THREE.Color(0xffffff);
     const maxFoldDepth = Math.max(1, ...faces.map(face => Number(face.foldDepth) || 0));
     faces.forEach((face, faceIndex) => {
       const poly3 = Array.isArray(face.vertices3) ? face.vertices3 : [];
@@ -193,16 +238,111 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
       geometry.computeVertexNormals();
+
+      // main과 같은 밝기 곡선: depthRatio가 커질수록(더 깊이 접힐수록)
+      // 앞면은 살짝 어두워지고, 뒷면 L은 최소 57%로 바닥을 둔다.
       const depthRatio = foldDepth / maxFoldDepth;
-      const faceColor = tint.clone().lerp(white, 0.46 - depthRatio * 0.2);
-      faceColor.offsetHSL(faceIndex * 0.008, 0, -depthRatio * 0.08);
-      const material = new THREE.MeshStandardMaterial({
-        color: faceColor, roughness: 0.72, side: THREE.DoubleSide, flatShading: true
+      const brightness = 72 - depthRatio * 8 - Math.min(8, faceIndex * 0.45);
+      const frontColor = new THREE.Color().setHSL(FRONT_HUE / 360, FRONT_SAT, clamp(brightness / 100, 0.4, 0.92));
+      const backLightness = Math.max(57, brightness - 9);
+      const backColor = new THREE.Color().setHSL(BACK_HUE / 360, BACK_SAT, clamp(backLightness / 100, 0.4, 0.92));
+
+      const frontMaterial = new THREE.MeshStandardMaterial({
+        color: frontColor, roughness: 0.72, side: THREE.FrontSide, flatShading: true
       });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = true;
-      mesh.userData.face = face;
-      paperGroup.add(mesh);
+      const backMaterial = new THREE.MeshStandardMaterial({
+        color: backColor, roughness: 0.72, side: THREE.BackSide, flatShading: true
+      });
+
+      const frontMesh = new THREE.Mesh(geometry, frontMaterial);
+      frontMesh.castShadow = true;
+      frontMesh.userData.face = face;
+      paperGroup.add(frontMesh);
+
+      // 뒷면은 같은 지오메트리를 공유하는 별도 메시 — BackSide만 그리므로
+      // z-fighting 없이 겹쳐진다. 레이캐스트 히트 판정은 앞면 메시(userData.
+      // face 보유)만으로 충분하므로 뒷면 메시는 그리기 판정에서 제외한다.
+      const backMesh = new THREE.Mesh(geometry, backMaterial);
+      backMesh.raycast = () => {};
+      paperGroup.add(backMesh);
+
+      // 면 윤곽선 — main의 outline 색(rgba(37,71,123,.78))에 대응.
+      const edges = new THREE.EdgesGeometry(geometry, 1);
+      const outline = new THREE.LineSegments(
+        edges,
+        new THREE.LineBasicMaterial({ color: OUTLINE_COLOR, transparent: true, opacity: 0.78 })
+      );
+      paperGroup.add(outline);
+    });
+  }
+
+  /* 확정된 접는선을 금색 점선 힌지로 그린다. 각 fold의 (A, d)는 전개도
+     좌표의 직선이며, computeFoldedGeometry의 axisFor와 동일한 방식으로
+     그 fold의 parents(생성 당시 힌지가 얹혀 있던 접힘들)를 통해 3D로
+     끌어올려야 실제로 접힌 후의 위치가 나온다. 이 함수는 그 변환을 순수
+     읽기 전용으로 재현할 뿐, 모델을 갱신하거나 엔진 동작을 바꾸지 않는다. */
+  function rebuildCommittedCreases(sourceModel) {
+    if (!committedCreaseGroup) return;
+    clearGroup(committedCreaseGroup);
+    if (!sourceModel || !Array.isArray(sourceModel.folds) || !sourceModel.folds.length) return;
+
+    const basePoint3 = point => new THREE.Vector3(point[0], 0, -point[1]);
+    const axisCache = new Array(sourceModel.folds.length).fill(null);
+
+    function transformThrough(point3, foldIndices) {
+      let current = point3;
+      for (const index of foldIndices) {
+        const fold = sourceModel.folds[index];
+        if (!fold) continue;
+        const axis = axisFor(index);
+        current = rotateAround(current, axis.origin3, axis.dir3, fold.angle);
+      }
+      return current;
+    }
+
+    function rotateAround(point3, origin3, dir3, angle) {
+      const local = point3.clone().sub(origin3);
+      local.applyAxisAngle(dir3, angle);
+      return local.add(origin3);
+    }
+
+    function axisFor(index) {
+      if (axisCache[index]) return axisCache[index];
+      const fold = sourceModel.folds[index];
+      const parents = fold.parents.slice().sort((left, right) => left - right);
+      const origin3 = transformThrough(basePoint3(fold.A), parents);
+      const tip3 = transformThrough(basePoint3([fold.A[0] + fold.d[0], fold.A[1] + fold.d[1]]), parents);
+      const dir3 = tip3.clone().sub(origin3).normalize();
+      axisCache[index] = { origin3, dir3 };
+      return axisCache[index];
+    }
+
+    const commands = Array.isArray(sourceModel.commands) ? sourceModel.commands : [];
+    sourceModel.folds.forEach((fold, index) => {
+      const parents = fold.parents.slice().sort((left, right) => left - right);
+      // 힌지 선분 자체는 실제로 그려졌던 start/end(model.commands[index])를
+      // 쓴다 — fold.d는 방향 단위벡터일 뿐 실제 그은 길이가 아니다. 이
+      // 선도 그 힌지가 생성될 때 얹혀 있던 부모 접힘들만 통과해 3D로
+      // 끌어올린다 (computeFoldedGeometry의 axisFor와 동일한 부모 체인).
+      const command = commands[index];
+      const rawStart = command ? command.start : fold.A;
+      const rawEnd = command ? command.end : [fold.A[0] + fold.d[0], fold.A[1] + fold.d[1]];
+      const start3 = transformThrough(basePoint3(rawStart), parents);
+      const end3 = transformThrough(basePoint3(rawEnd), parents);
+      // paperGroup의 법선-오프셋(겹침 방지)과 같은 결의 미세 리프트 —
+      // 힌지 선이 종이 표면과 z-fighting 없이 살짝 위에 뜨도록 한다.
+      const lift = new THREE.Vector3(0, 0.006 * (fold.parents.length + 1), 0);
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+        start3.clone().add(lift), end3.clone().add(lift)
+      ]);
+      const line = new THREE.Line(
+        lineGeometry,
+        new THREE.LineDashedMaterial({ color: CREASE_GOLD, dashSize: 0.07, gapSize: 0.06, transparent: true, opacity: 0.68 })
+      );
+      line.computeLineDistances();
+      line.frustumCulled = false;
+      line.userData.foldIndex = index;
+      committedCreaseGroup.add(line);
     });
   }
 
@@ -268,6 +408,31 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     line.visible = true;
   }
 
+  /* 긋는 중인 접는선(네온 점선 + glow + 화살촉)을 갱신한다. angleSign이
+     음수면 코랄(마운틴), 그 외(양수 또는 아직 각도 없음)에는 민트(밸리)를
+     쓴다. */
+  function setCreasePreview(from, to, normal, angleSign) {
+    const color = angleSign < 0 ? CREASE_CORAL : CREASE_MINT;
+    creaseLine.material.color.setHex(color);
+    creaseGlowLine.material.color.setHex(color);
+    creaseArrow.material.color.setHex(color);
+    setLine(creaseLine, from, to, normal);
+    const lift = normal ? normal.clone().multiplyScalar(0.02) : new THREE.Vector3();
+    creaseGlowLine.geometry.setFromPoints([from.clone().add(lift), to.clone().add(lift)]);
+    creaseGlowLine.visible = true;
+
+    const dir = to.clone().sub(from);
+    const length = dir.length();
+    if (length > 1e-6) {
+      dir.normalize();
+      creaseArrow.position.copy(to).add(lift).addScaledVector(dir, 0.045);
+      creaseArrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      creaseArrow.visible = true;
+    } else {
+      creaseArrow.visible = false;
+    }
+  }
+
   function setPointer(event) {
     const rect = canvas.getBoundingClientRect();
     pointerNdc.set(
@@ -283,7 +448,10 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     drawState = null;
     angleDrag = null;
     pending = null;
+    setOrbiting(false);
     if (creaseLine) creaseLine.visible = false;
+    if (creaseGlowLine) creaseGlowLine.visible = false;
+    if (creaseArrow) creaseArrow.visible = false;
     if (hingeLine) hingeLine.visible = false;
     if (badge) badge.style.display = 'none';
     if (previewShown) {
@@ -316,7 +484,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
         previewShown = false;
         rebuildPaper(model);
       }
-      hingeLine.material.color.setHex(HINGE_COLOR);
+      hingeLine.material.color.setHex(CREASE_GOLD);
       return;
     }
 
@@ -328,7 +496,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       pending.lastValidAngle = angle;
       previewShown = true;
       rebuildPaper(next);
-      hingeLine.material.color.setHex(HINGE_COLOR);
+      hingeLine.material.color.setHex(CREASE_GOLD);
     } else {
       hingeLine.material.color.setHex(REJECT_COLOR);
     }
@@ -366,7 +534,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
             startMaterial,
             endMaterial: startMaterial.slice()
           };
-          setLine(creaseLine, drawState.start3, drawState.end3, mapper.normal);
+          setCreasePreview(drawState.start3, drawState.end3, mapper.normal, 1);
           return;
         }
       }
@@ -374,6 +542,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
 
     mode = 'orbiting';
     orbitDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    setOrbiting(true);
   }
 
   function onPointerMove(event) {
@@ -393,7 +562,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       if (raycaster.ray.intersectPlane(drawState.mapper.plane, point)) {
         drawState.end3.copy(point);
         drawState.endMaterial = drawState.mapper.toMaterial(point);
-        setLine(creaseLine, drawState.start3, drawState.end3, drawState.mapper.normal);
+        setCreasePreview(drawState.start3, drawState.end3, drawState.mapper.normal, 1);
       }
       return;
     }
@@ -411,6 +580,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     if (mode === 'orbiting' && orbitDrag && event.pointerId === orbitDrag.pointerId) {
       mode = 'idle';
       orbitDrag = null;
+      setOrbiting(false);
       return;
     }
 
@@ -434,7 +604,9 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       drawState = null;
       mode = 'angleAdjust';
       creaseLine.visible = false;
-      hingeLine.material.color.setHex(HINGE_COLOR);
+      creaseGlowLine.visible = false;
+      creaseArrow.visible = false;
+      hingeLine.material.color.setHex(CREASE_GOLD);
       setLine(hingeLine, pending.start3, pending.end3, pending.normal);
       ensureBadge();
       if (badge) {
@@ -504,7 +676,10 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     model = nextModel || null;
     previewShown = false;
     resetInteraction();
-    if (renderer) rebuildPaper(model);
+    if (renderer) {
+      rebuildPaper(model);
+      rebuildCommittedCreases(model);
+    }
   }
 
   function setInteractive(value) {
@@ -521,6 +696,7 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
     if (!started) {
       started = true;
       rebuildPaper(model);
+      rebuildCommittedCreases(model);
       if (!frame) frame = requestAnimationFrame(tick);
     }
     return true;
@@ -545,8 +721,13 @@ export function createFoldEditor({ canvas, onCommitFold, onCancel }) {
       canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('keydown', onKeyDown);
       clearGroup(paperGroup);
+      clearGroup(committedCreaseGroup);
       creaseLine.geometry.dispose();
       creaseLine.material.dispose();
+      creaseGlowLine.geometry.dispose();
+      creaseGlowLine.material.dispose();
+      creaseArrow.geometry.dispose();
+      creaseArrow.material.dispose();
       hingeLine.geometry.dispose();
       hingeLine.material.dispose();
       renderer.dispose();

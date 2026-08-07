@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2 - 2026-08-07
+
+### Fixed
+
+- Cloudflare edge cache가 이전 biome helper와 map generator를 최대 4시간 제공하지 않도록, 변경 asset URL에 앱 버전 cache key를 추가했습니다.
+
 ## 1.4.1 - 2026-08-07
 
 ### Changed

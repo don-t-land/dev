@@ -12,12 +12,13 @@ const showcase = fs.readFileSync(path.join(publicDir, 'biome-showcase.html'), 'u
 const showroomMaterials = fs.readFileSync(path.join(publicDir, 'showroom-materials.js'), 'utf8');
 const biomeHelpers = fs.readFileSync(path.join(publicDir, 'biomes', 'helpers.js'), 'utf8');
 const physics = fs.readFileSync(path.join(publicDir, 'flight-physics-rapier.mjs'), 'utf8');
+const packageJson = require('../package.json');
 
-test('browser loads pure biome recipes before the registry and renderer module', () => {
-  const helpers = html.indexOf('<script src="./biomes/helpers.js"></script>');
+test('browser loads versioned pure biome recipes before the registry and renderer module', () => {
+  const helpers = html.indexOf(`<script src="./biomes/helpers.js?v=${packageJson.version}"></script>`);
   const desert = html.indexOf('<script src="./biomes/desert.js"></script>');
   const floating = html.indexOf('<script src="./biomes/floating.js"></script>');
-  const registry = html.indexOf('<script src="./map-gen.js"></script>');
+  const registry = html.indexOf(`<script src="./map-gen.js?v=${packageJson.version}"></script>`);
   assert.ok(helpers >= 0 && helpers < desert);
   assert.ok(desert < floating && floating < registry);
   assert.match(html, /import \{ buildBiomeEnvironment, terrainCollisionAtPoint \} from '\.\/biome-visuals\.js';/);

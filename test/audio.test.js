@@ -96,6 +96,11 @@ test('procedural audio engine defines original scene arrangements and detailed g
   assert.match(engine, /nextNoteTime/);
   assert.match(engine, /while \(layer\.nextNoteTime/);
   assert.match(engine, /setInterval\(schedule, 25\)/);
+  assert.match(engine, /stepsPerBeat:\s*[24]/);
+  assert.match(engine, /chords:\s*\[/);
+  assert.match(engine, /drums:\s*['"][^'"]*[KSH][^'"]*['"]/);
+  for (const layer of ['kick', 'snare', 'hat', 'chordStab']) assert.match(engine, new RegExp(`function ${layer}\\(`));
+  assert.match(engine, /section.*%/);
   assert.match(engine, /addUnlockListeners\(\)/);
 });
 

@@ -4,13 +4,49 @@
   const policy = root.gameAudioPolicy;
   const STORAGE_KEY = 'pp_audio';
   const SCENES = Object.freeze({
-    HOME:         { tempo: 76, wave: 'sine',     notes: [60, 64, 67, 71, 67, 64], bass: [36, 43], gain: .17 },
-    WAITING:      { tempo: 92, wave: 'triangle', notes: [62, 66, 69, 74, 69, 66], bass: [38, 45], gain: .16 },
-    FOLDING:      { tempo: 106, wave: 'triangle',notes: [57, 64, 69, 72, 69, 64], bass: [33, 40], gain: .15 },
-    LAUNCH:       { tempo: 128, wave: 'square',  notes: [55, 62, 67, 70, 74, 79], bass: [31, 38], gain: .14 },
-    FLIGHT_DIST:  { tempo: 116, wave: 'sawtooth',notes: [60, 67, 72, 76, 74, 67], bass: [36, 43], gain: .14 },
-    FLIGHT_ARENA: { tempo: 142, wave: 'square',  notes: [52, 55, 59, 64, 62, 55], bass: [28, 35], gain: .13 },
-    RESULTS:      { tempo: 84, wave: 'triangle', notes: [60, 64, 67, 72, 76, 72], bass: [36, 48], gain: .18 }
+    // Bright arcade-pop loops: 16-step hooks, four-bar chord cycles, bass and drum grooves.
+    HOME: {
+      tempo: 126, stepsPerBeat: 2, wave: 'triangle',
+      notes: [72, null, 76, 79, 81, null, 79, 76, 74, null, 76, 79, 84, 81, 79, 76],
+      chords: [[60,64,67], [57,60,64], [65,69,72], [67,71,74]], bass: [36,45,41,43],
+      drums: 'K.H.S.H.K.H.SHH.', gain: .13
+    },
+    WAITING: {
+      tempo: 132, stepsPerBeat: 2, wave: 'square',
+      notes: [74,78,81,null,86,81,78,null,76,79,83,null,88,83,79,null],
+      chords: [[62,66,69], [59,62,66], [67,71,74], [69,73,76]], bass: [38,47,43,45],
+      drums: 'K.H.S.H.KKHS.HH.', gain: .12
+    },
+    FOLDING: {
+      tempo: 136, stepsPerBeat: 2, wave: 'triangle',
+      notes: [69,73,76,81,78,76,73,null,71,74,78,83,81,78,74,null],
+      chords: [[57,61,64], [54,57,61], [62,66,69], [64,68,71]], bass: [33,42,38,40],
+      drums: 'K.H.SHH.K.H.S.H.', gain: .12
+    },
+    LAUNCH: {
+      tempo: 150, stepsPerBeat: 4, wave: 'square',
+      notes: [67,null,74,79,71,null,76,83,74,null,79,86,76,79,83,86],
+      chords: [[55,59,62], [57,60,64], [59,62,66], [60,64,67]], bass: [31,33,35,36],
+      drums: 'K.HHK.HSKKHHSHHH', gain: .105
+    },
+    FLIGHT_DIST: {
+      tempo: 144, stepsPerBeat: 4, wave: 'sawtooth',
+      notes: [72,null,76,79,84,79,76,null,74,null,77,81,86,81,77,null],
+      chords: [[60,64,67], [57,60,64], [65,69,72], [67,71,74]], bass: [36,45,41,43],
+      drums: 'K.HHK.HSK.HHKSHH', gain: .105
+    },
+    FLIGHT_ARENA: {
+      tempo: 160, stepsPerBeat: 4, wave: 'square',
+      notes: [76,null,79,83,88,83,79,76,74,null,79,83,86,83,79,null],
+      chords: [[52,55,59], [48,52,55], [55,59,62], [57,60,64]], bass: [28,36,31,33],
+      drums: 'KHHHSHHKK.HHSHHK', gain: .095
+    },
+    RESULTS: {
+      tempo: 126, stepsPerBeat: 2, wave: 'triangle',
+      notes: [72,76,79,84,83,79,76,null,74,77,81,86,84,81,79,null],
+      chords: [[60,64,67], [65,69,72], [62,65,69], [67,71,74]], bass: [36,41,38,43],
+      drums: 'K.H.S.H.K.H.SHH.', gain: .125
+    }
   });
   const COOLDOWNS = Object.freeze({
     uiClick: 45, uiHover: 90, select: 80, ready: 180, countdown: 350,
@@ -56,8 +92,9 @@
         compressor.ratio.value = 5;
         compressor.attack.value = .004;
         compressor.release.value = .22;
-        music.connect(master);
-        sfx.connect(compressor).connect(master);
+        music.connect(compressor);
+        sfx.connect(compressor);
+        compressor.connect(master);
         master.connect(context.destination);
         applySettings(false);
         createWind();
@@ -172,6 +209,20 @@
       source.start(start); source.stop(start + duration + .01);
     }
 
+    function kick(start, destination, volume = .13) {
+      tone(150, start, .14, volume, 'sine', destination, 46);
+    }
+    function snare(start, destination, volume = .065) {
+      noise(start, .11, volume, destination, 1100);
+      tone(190, start, .075, volume * .38, 'triangle', destination, 105);
+    }
+    function hat(start, destination, volume = .026) {
+      noise(start, .035, volume, destination, 5200);
+    }
+    function chordStab(notes, start, duration, volume, destination, wave = 'triangle') {
+      for (const note of notes) tone(midi(note), start, duration, volume / notes.length, wave, destination);
+    }
+
     function makeLayer(sceneName) {
       const arrangement = SCENES[sceneName];
       if (!arrangement || !context || context.state !== 'running') return null;
@@ -179,6 +230,8 @@
       bus.gain.setValueAtTime(.0001, context.currentTime);
       bus.connect(music);
       const beat = 60 / arrangement.tempo;
+      const stepDuration = beat / arrangement.stepsPerBeat;
+      const barSteps = arrangement.stepsPerBeat * 4;
       const layer = {
         bus, timer: null, stopped: false, step: 0, sceneName,
         nextNoteTime: context.currentTime + .035
@@ -186,11 +239,33 @@
       layers.add(layer);
       const scheduleNote = start => {
         const i = layer.step++;
-        tone(midi(arrangement.notes[i % arrangement.notes.length]), start, beat * .72, .19,
-          arrangement.wave, bus, midi(arrangement.notes[(i + 1) % arrangement.notes.length]));
-        if (i % 2 === 0) tone(midi(arrangement.bass[(i / 2) % arrangement.bass.length]), start, beat * 1.4, .13, 'sine', bus);
-        if (!settings.reducedAudio && (sceneName === 'LAUNCH' || sceneName === 'FLIGHT_ARENA'))
-          noise(start, .035, .025, bus, 1800);
+        const section = Math.floor(i / arrangement.notes.length) % 4;
+        const note = arrangement.notes[i % arrangement.notes.length];
+        if (note != null) {
+          const lifted = note + (section === 3 && i % 4 === 2 ? 12 : 0);
+          const leadVolume = section === 0 ? .09 : .115;
+          tone(midi(lifted), start, stepDuration * .78, leadVolume, arrangement.wave, bus);
+          if (!settings.reducedAudio && section === 2 && i % 4 === 0)
+            tone(midi(note + 12), start + stepDuration * .45, stepDuration * .4, .035, 'square', bus);
+        }
+
+        if (i % arrangement.stepsPerBeat === 0) {
+          const bar = Math.floor(i / barSteps);
+          const beatInBar = Math.floor(i / arrangement.stepsPerBeat) % 4;
+          const bassNote = arrangement.bass[bar % arrangement.bass.length] + (beatInBar === 2 ? 12 : 0);
+          tone(midi(bassNote), start, beat * .62, .09, 'square', bus);
+        }
+        if (!settings.reducedAudio && i % barSteps === 0) {
+          const chord = arrangement.chords[Math.floor(i / barSteps) % arrangement.chords.length];
+          chordStab(chord, start, beat * 1.45, section === 1 ? .09 : .07, bus);
+        }
+
+        const drum = arrangement.drums[i % arrangement.drums.length];
+        if (drum === 'K') kick(start, bus, sceneName === 'FLIGHT_ARENA' ? .15 : .12);
+        else if (drum === 'S') snare(start, bus, .055);
+        else if (drum === 'H' && !settings.reducedAudio) hat(start, bus, section === 3 ? .033 : .023);
+        if (!settings.reducedAudio && section === 3 && i % barSteps >= barSteps - 2)
+          hat(start + stepDuration * .5, bus, .02);
       };
       const schedule = () => {
         if (layer.stopped || context.state !== 'running') return;
@@ -198,7 +273,7 @@
         const horizon = context.currentTime + .14;
         while (layer.nextNoteTime < horizon) {
           scheduleNote(layer.nextNoteTime);
-          layer.nextNoteTime += beat;
+          layer.nextNoteTime += stepDuration;
         }
       };
       schedule();

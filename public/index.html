@@ -387,6 +387,15 @@
     #timer { top: 12px; left: auto; right: 12px; transform: none; font-size: 18px; }
     #board { top: 140px; left: 12px; right: 12px; width: auto; max-height: min(180px, 28vh); overflow-y: auto; }
   }
+  @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 640px) {
+    #board { top: 138px; max-height: clamp(0px, calc(100vh - 452px), 116px); }
+  }
+  @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px) {
+    #board { display: none; }
+  }
+  @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 440px) {
+    #gauge, #energy { left: auto; right: max(8px, env(safe-area-inset-right)); transform: none; }
+  }
   @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
     #touch-controls { left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); }
     .touch-dpad { grid-template: repeat(3, 56px) / repeat(3, 56px); gap: 3px; }

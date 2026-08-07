@@ -94,6 +94,14 @@ test('portrait touch HUD separates stats, timer, leaderboard, meters, and contro
   assert.match(html, /orientation:\s*portrait\)[\s\S]*#board\s*\{[^}]*top:\s*140px[^}]*max-height:\s*min\(180px,\s*28vh\)[^}]*overflow-y:\s*auto/s);
 });
 
+test('short portrait touch HUD keeps the leaderboard clear of compact gauges', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*640px\)[\s\S]*#board\s*\{[^}]*top:\s*138px[^}]*max-height:\s*clamp\(0px,\s*calc\(100vh\s*-\s*452px\),\s*116px\)/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*500px\)[\s\S]*#board\s*\{[^}]*display:\s*none/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)\s*and\s*\(max-height:\s*440px\)[\s\S]*#gauge,\s*#energy\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)[^}]*transform:\s*none/s);
+});
+
 test('landscape touch HUD resets inherited small-screen positioning', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
   assert.match(html, /orientation:\s*landscape\)[\s\S]*#board\s*\{[^}]*left:\s*auto[^}]*right:\s*max\(8px,\s*env\(safe-area-inset-right\)\)[^}]*max-height:\s*88px/s);

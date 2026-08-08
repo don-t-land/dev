@@ -996,7 +996,7 @@ import { makeStandingPlaneMascot } from './home-plane-3d.js';
 import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
 import { createFoldEditor } from './fold-editor-3d.mjs';
 import { buildBiomeEnvironment, terrainCollisionAtPoint } from './biome-visuals.js';
-const { getLaunchPose, localDeadline, getLaunchLayoutKey } = window.launchTransition;
+const { getLaunchPose, getLaunchMotion, getLaunchCameraPlan, localDeadline, getLaunchLayoutKey } = window.launchTransition;
 import { CSM } from 'three/addons/csm/CSM.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -3007,16 +3007,16 @@ function updateLaunch(now) {
     audioDirector.play('countdown', audioCount);
   }
   const pose = getLaunchPose(progress);
-  const runProgress = THREE.MathUtils.smoothstep(progress, .08, .67);
+  const motion = getLaunchMotion(progress);
   const jumpProgress = THREE.MathUtils.smoothstep(progress, .65, .92);
-  const stride = Math.sin(progress * Math.PI * 20);
+  const stride = motion.stride;
   const count = Math.max(1, game.order.length);
   const localIndex = Math.max(0, game.order.indexOf(net.id));
 
   launchState.actors.forEach((actor, index) => {
     const pathStart = launchSpawnPoint(index, count, 'start');
     const roofEdge = launchSpawnPoint(index, count, 'edge');
-    const position = pathStart.clone().lerp(roofEdge, runProgress);
+    const position = pathStart.clone().lerp(roofEdge, motion.runProgress);
     if (progress > .65) {
       position.lerp(actor.end, jumpProgress);
       position.y += Math.sin(jumpProgress * Math.PI) * 8;
@@ -3899,26 +3899,51 @@ renderer.setAnimationLoop(timestamp => {
     }
   }
 
-  fwdH.set(-Math.sin(followYaw), 0, -Math.cos(followYaw));
-  const orbitYaw = followYaw + freeLook.yaw;
-  const speedCameraAmount = THREE.MathUtils.clamp((me.speed - 22) / 48, 0, 1);
-  const orbitRadius = 16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0);
-  const orbitHorizontal = Math.cos(freeLook.pitch) * orbitRadius;
-  camPos.set(
-    followPos.x + Math.sin(orbitYaw) * orbitHorizontal,
-    followPos.y + 4.8 + Math.sin(freeLook.pitch) * orbitRadius,
-    followPos.z + Math.cos(orbitYaw) * orbitHorizontal
-  );
-  if (graphicsQaFrozen) {
-    camera.position.copy(camPos);
-    camera.up.set(0, 1, 0);
+  if (game.phase === 'launch' && launchState.actors.length) {
+    const localIndex = Math.max(0, game.order.indexOf(net.id));
+    const localActor = launchState.actors[localIndex] || launchState.actors[0];
+    const roofEdge = launchSpawnPoint(localIndex, Math.max(1, game.order.length), 'edge');
+    const launchCameraPlan = getLaunchCameraPlan(localActor.start, roofEdge);
+    camPos.set(
+      launchCameraPlan.position.x,
+      launchCameraPlan.position.y,
+      launchCameraPlan.position.z
+    );
+    if (graphicsQaFrozen) {
+      camera.position.copy(camPos);
+      camera.up.set(0, 1, 0);
+    } else {
+      camera.position.lerp(camPos, 1 - Math.pow(0.000001, dt));
+      camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.000001, dt));
+    }
+    lookAt.set(
+      launchCameraPlan.target.x,
+      launchCameraPlan.target.y,
+      launchCameraPlan.target.z
+    );
+    camera.lookAt(lookAt);
   } else {
-    camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
-    camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
+    fwdH.set(-Math.sin(followYaw), 0, -Math.cos(followYaw));
+    const orbitYaw = followYaw + freeLook.yaw;
+    const speedCameraAmount = THREE.MathUtils.clamp((me.speed - 22) / 48, 0, 1);
+    const orbitRadius = 16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0);
+    const orbitHorizontal = Math.cos(freeLook.pitch) * orbitRadius;
+    camPos.set(
+      followPos.x + Math.sin(orbitYaw) * orbitHorizontal,
+      followPos.y + 4.8 + Math.sin(freeLook.pitch) * orbitRadius,
+      followPos.z + Math.cos(orbitYaw) * orbitHorizontal
+    );
+    if (graphicsQaFrozen) {
+      camera.position.copy(camPos);
+      camera.up.set(0, 1, 0);
+    } else {
+      camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
+      camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
+    }
+    lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
+    lookAt.y += 1.2;
+    camera.lookAt(lookAt);
   }
-  lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
-  lookAt.y += 1.2;
-  camera.lookAt(lookAt);
   const targetFov = speedFov(me.speed, me.dashing && me.alive);
   const nextFov = graphicsQaFrozen
     ? targetFov

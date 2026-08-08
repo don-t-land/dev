@@ -3008,7 +3008,7 @@ function updateLaunch(now) {
   }
   const pose = getLaunchPose(progress);
   const motion = getLaunchMotion(progress);
-  const jumpProgress = THREE.MathUtils.smoothstep(progress, .65, .92);
+  const jumpProgress = motion.airProgress;
   const stride = motion.stride;
   const count = Math.max(1, game.order.length);
   const localIndex = Math.max(0, game.order.indexOf(net.id));

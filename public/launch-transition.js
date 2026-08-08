@@ -17,7 +17,7 @@
   function getLaunchPose(progress) {
     const value = clamp01(progress);
     const dropAt = 0.68;
-    const bodyTransition = smoothstep(value, 0.72, 0.94);
+    const bodyTransition = smoothstep(value, 0.56, 0.76);
     const poofProgress = value < dropAt ? 0 : smoothstep(value, dropAt, 0.86);
     const poofOpacity = value < dropAt ? 0 : 1 - smoothstep(value, 0.78, 0.9);
     return {
@@ -25,20 +25,24 @@
       legsVisible: value < dropAt,
       poofProgress,
       poofOpacity,
-      showFlightCraft: value >= 1
+      showFlightCraft: value >= 0.76
     };
   }
 
   function getLaunchMotion(progress) {
     const value = clamp01(progress);
     const runStart = 0.08;
-    const runEnd = 0.67;
+    const runEnd = 0.64;
     const running = value >= runStart && value < runEnd;
-    const runProgress = smoothstep(value, runStart, runEnd);
+    const runTime = clamp01((value - runStart) / (runEnd - runStart));
+    const runProgress = runTime * runTime * (2 - runTime);
+    const airTime = clamp01((value - runEnd) / (1 - runEnd));
+    const airProgress = airTime * (2 - airTime);
     const stridePhase = (value - runStart) / (runEnd - runStart);
     return {
       runProgress,
-      stride: running ? Math.sin(stridePhase * Math.PI * 8) : 0
+      airProgress,
+      stride: running ? Math.sin(stridePhase * Math.PI * 7) : 0
     };
   }
 

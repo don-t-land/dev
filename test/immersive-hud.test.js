@@ -8,7 +8,7 @@ const packageJson = require('../package.json');
 
 test('desktop HUD has no visible ESC settings button while keyboard ESC and touch settings remain', () => {
   assert.doesNotMatch(html, /id="game-leave-btn"/);
-  assert.match(html, /e\.code === 'Escape'[\s\S]*openPauseMenu\(\)/);
+  assert.match(html, /pauseMenuAction\(\{[\s\S]*code:\s*e\.code[\s\S]*if \(pauseAction[\s\S]*openPauseMenu\(\)/);
   assert.match(html, /id="touch-menu"[^>]*aria-label="비행 설정"/);
   assert.match(html, /\$\('touch-menu'\)\.addEventListener\('click', openPauseMenu\)/);
   assert.match(html, /@media\s*\(any-pointer:\s*coarse\)\s*and\s*\(pointer:\s*fine\)[\s\S]*#touch-controls\s*\{[^}]*display:\s*block[\s\S]*#touch-menu\s*\{[^}]*display:\s*grid/s);
@@ -80,6 +80,16 @@ test('join, kill, and death use typed, accessible impact announcements', () => {
   assert.match(html, /@keyframes\s+announcement-impact/);
   assert.match(html, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*#announcement\s*\{[^}]*transition:\s*none/s);
   assert.match(html, /freeze\(value = true\)\s*\{[\s\S]*const wasFrozen = graphicsQaFrozen[\s\S]*!graphicsQaFrozen && wasFrozen && announcementActive && !announcementTimer[\s\S]*playNextAnnouncement\(\)/);
+});
+
+test('respawn modal labels self-collision separately from an enemy takedown', () => {
+  assert.match(html, /id="respawn-kicker"/);
+  assert.match(html, /id="respawn-title"/);
+  assert.match(html, /function showRespawnOverlay\(byName\)[\s\S]*const\s+presentation\s*=\s*respawnPresentation\(byName,\s*me\.surv\)/s);
+  assert.match(html, /\$\('respawn-kicker'\)\.textContent\s*=\s*presentation\.kicker/);
+  assert.match(html, /\$\('respawn-title'\)\.textContent\s*=\s*presentation\.title/);
+  assert.match(html, /\$\('respawn-detail'\)\.textContent\s*=\s*presentation\.detail/);
+  assert.doesNotMatch(html, /<h2 id="respawn-title">격추되었습니다<\/h2>/);
 });
 
 test('remote crashes tear the folded paper craft into bounded, disposable world-space fragments', () => {

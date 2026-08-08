@@ -19,5 +19,31 @@
     return gameKeyCodes.has(event?.code) && !isEditableTarget(event?.target);
   }
 
-  return { shouldCaptureGameKey, isEditableTarget };
+  function pauseMenuAction({ code, repeat = false, pauseOpen = false, editable = false } = {}) {
+    if (code !== 'Escape' || repeat) return null;
+    if (!pauseOpen && editable) return null;
+    return pauseOpen ? 'resume' : 'open';
+  }
+
+  function modalSpaceAction({ code, repeat = false, modalOpen = false, editable = false } = {}) {
+    if (code !== 'Space' || repeat || !modalOpen || editable) return null;
+    return 'activate';
+  }
+
+  function pointerLockAction({
+    pointerLocked = false,
+    gameplay = false,
+    pauseOpen = false,
+    respawnOpen = false,
+    resultsOpen = false
+  } = {}) {
+    const blockingModalOpen = pauseOpen || respawnOpen || resultsOpen;
+    if (pointerLocked && blockingModalOpen) return 'release';
+    if (!pointerLocked && gameplay && !blockingModalOpen) return 'open-pause';
+    return null;
+  }
+
+  return {
+    shouldCaptureGameKey, isEditableTarget, pauseMenuAction, modalSpaceAction, pointerLockAction
+  };
 });

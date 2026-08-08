@@ -27,11 +27,65 @@ test('game controls are still captured outside editable fields', () => {
   assert.equal(shouldCaptureGameKey({ code: 'Escape', target: canvas }), false);
 });
 
+test('Escape toggles the pause menu once per physical key press', () => {
+  const { pauseMenuAction } = require('../public/input-policy.js');
+
+  assert.equal(pauseMenuAction({ code: 'Escape', repeat: false, pauseOpen: false, editable: false }), 'open');
+  assert.equal(pauseMenuAction({ code: 'Escape', repeat: false, pauseOpen: true, editable: false }), 'resume');
+  assert.equal(pauseMenuAction({ code: 'Escape', repeat: true, pauseOpen: true, editable: false }), null);
+  assert.equal(pauseMenuAction({ code: 'Escape', repeat: false, pauseOpen: false, editable: true }), null);
+  assert.equal(pauseMenuAction({ code: 'Escape', repeat: false, pauseOpen: true, editable: true }), 'resume');
+});
+
+test('Space activates a modal button once and never leaks into gameplay', () => {
+  const { modalSpaceAction } = require('../public/input-policy.js');
+
+  assert.equal(modalSpaceAction({ code: 'Space', modalOpen: true }), 'activate');
+  assert.equal(modalSpaceAction({ code: 'Space', modalOpen: true, repeat: true }), null);
+  assert.equal(modalSpaceAction({ code: 'Space', modalOpen: true, editable: true }), null);
+  assert.equal(modalSpaceAction({ code: 'Space', modalOpen: false }), null);
+  assert.equal(modalSpaceAction({ code: 'Enter', modalOpen: true }), null);
+});
+
+test('pointer lock never survives a blocking modal', () => {
+  const { pointerLockAction } = require('../public/input-policy.js');
+
+  assert.equal(pointerLockAction({ pointerLocked: true, gameplay: true, respawnOpen: true }), 'release');
+  assert.equal(pointerLockAction({ pointerLocked: true, gameplay: true, resultsOpen: true }), 'release');
+  assert.equal(pointerLockAction({ pointerLocked: true, gameplay: true, pauseOpen: true }), 'release');
+  assert.equal(pointerLockAction({ pointerLocked: false, gameplay: true }), 'open-pause');
+  assert.equal(pointerLockAction({ pointerLocked: false, gameplay: true, respawnOpen: true }), null);
+  assert.equal(pointerLockAction({ pointerLocked: false, gameplay: false }), null);
+});
+
+test('Space activates the focused or default button in every blocking modal', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /function\s+activateModalButtonOnSpace\(event,\s*layer,\s*defaultButton\)/);
+  assert.match(html, /modalSpaceAction\(\{[\s\S]*code:\s*event\.code[\s\S]*repeat:\s*event\.repeat[\s\S]*modalOpen:[\s\S]*editable:\s*isEditableTarget\(event\.target\)/s);
+  assert.match(html, /layer\.contains\(document\.activeElement\)[\s\S]*button:not\(:disabled\)[\s\S]*defaultButton/s);
+  assert.match(html, /event\.preventDefault\(\)[\s\S]*button\.click\(\)/s);
+  assert.match(html, /addEventListener\('keydown',[\s\S]*activateModalButtonOnSpace\(e,\s*\$\('pause-menu'\),\s*\$\('resume-btn'\)\)[\s\S]*activateModalButtonOnSpace\(e,\s*\$\('respawn-overlay'\),\s*\$\('respawn-now-btn'\)\)[\s\S]*activateModalButtonOnSpace\(e,\s*\$\('results'\),\s*\$\('results-ready-btn'\)\)/s);
+});
+
+test('pointerlockchange releases delayed locks while a modal is visible', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /const\s*\{[^}]*pointerLockAction[^}]*\}\s*=\s*window\.inputPolicy/);
+  assert.match(html, /document\.addEventListener\('pointerlockchange',[\s\S]*const\s+pointerAction\s*=\s*pointerLockAction\(\{[\s\S]*pointerLocked:[\s\S]*pauseOpen:[\s\S]*respawnOpen:[\s\S]*resultsOpen:/s);
+  assert.match(html, /if\s*\(pointerAction\s*===\s*'release'\)\s*releaseFlightPointerLock\(\)/);
+  assert.match(html, /else if\s*\(pointerAction\s*===\s*'open-pause'\)\s*openPauseMenu\(\)/);
+  assert.match(html, /function showResults\([^)]*\)[\s\S]*releaseFlightPointerLock\(\)[\s\S]*readyButton\.focus\(\)/s);
+});
+
 test('the client keyboard handler uses the editable-target policy', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
   assert.ok(html.includes(`<script src="./input-policy.js?v=${packageJson.version}"></script>`));
   assert.match(html, /if\s*\(!shouldCaptureGameKey\(e\)\)\s*return/);
+  assert.match(html, /const\s+pauseAction\s*=\s*pauseMenuAction\(\{[\s\S]*code:\s*e\.code[\s\S]*repeat:\s*e\.repeat[\s\S]*pauseOpen[\s\S]*editable:\s*isEditableTarget\(e\.target\)/s);
+  assert.match(html, /if\s*\(pauseAction\s*===\s*'resume'\)\s*resumeFlight\(\)/);
+  assert.match(html, /else if\s*\(pauseAction\s*===\s*'open'\)\s*openPauseMenu\(\)/);
 });
 
 test('dash and darts share one energy HUD instead of rechargeable ammo pips', () => {
@@ -141,7 +195,7 @@ test('touch keypad feeds the shared flight state and releases captured pointers 
   assert.match(html, /e\.target\.closest\('#touch-controls'\)/);
   assert.match(html, /\$\('touch-menu'\)\.addEventListener\('click', openPauseMenu\)/);
   assert.match(html, /function enterGame\(\)[\s\S]*\$\('touch-fire'\)\.classList\.toggle\('hide', !arena\)/);
-  assert.match(html, /function showResults\(results\)\s*\{[\s\S]*clearFlightKeys\(\)[\s\S]*setUnderlyingGameUiInert\(true\)/);
+  assert.match(html, /function showResults\(results\)\s*\{[\s\S]*clearFlightKeys\(\)[\s\S]*setUnderlyingGameUiInert\(true, 'results'\)/);
 });
 
 test('mobile canvas drag rotates free-look without stealing control-button touches', () => {
@@ -195,6 +249,26 @@ test('the lobby exposes public rooms and room-code actions', () => {
   assert.match(html, /id="join-code-btn"/);
   assert.match(html, /data-create-mode="DIST"/);
   assert.match(html, /data-create-mode="ARENA"/);
+});
+
+test('settings modal groups controls, graphics, and audio behind a responsive sidebar', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /class="modal-card settings-modal-card"/);
+  assert.match(html, /class="settings-sidebar"[^>]*role="tablist"[^>]*aria-label="설정 섹션"/);
+  for (const section of ['controls', 'graphics', 'audio']) {
+    assert.match(html, new RegExp(`id="settings-tab-${section}"[^>]*data-settings-tab="${section}"[^>]*role="tab"`));
+    assert.match(html, new RegExp(`id="settings-panel-${section}"[^>]*data-settings-panel="${section}"[^>]*role="tabpanel"`));
+  }
+  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*176px\s+minmax\(0,\s*1fr\)[^}]*min-height:\s*0/s);
+  assert.match(html, /\.settings-panels\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(html, /\.settings-panels\s*\{[^}]*min-height:\s*0/s);
+  assert.match(html, /@media\s*\(max-width:\s*640px\)[\s\S]*\.settings-layout\s*\{[^}]*grid-template-columns:\s*1fr[^}]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)/s);
+  assert.match(html, /function\s+setSettingsSection\(section/);
+  assert.match(html, /panel\.hidden\s*=\s*panel\.dataset\.settingsPanel\s*!==\s*section/);
+  assert.match(html, /tab\.setAttribute\('aria-selected',\s*String\(selected\)\)/);
+  assert.match(html, /document\.querySelectorAll\('\[data-settings-tab\]'\)/);
+  assert.match(html, /openPauseMenu\(\)[\s\S]*setSettingsSection\('controls'\)[\s\S]*\$\('settings-tab-controls'\)\.focus\(\)/s);
 });
 
 test('the client loads free-flight controls and exposes the ESC settings menu', () => {
@@ -330,6 +404,15 @@ test('graphics QA stays local and freezes time, camera, and network updates', ()
   assert.match(html, /if \(!graphicsQaFrozen && sendAcc > 0\.066/);
 });
 
+test('death modal preempts pause and becomes the only interactive HUD layer', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /function\s+setUnderlyingGameUiInert\(inert,\s*activeModalId\s*=\s*null\)/);
+  assert.match(html, /child\.inert\s*=\s*inert\s*&&\s*child\.id\s*!==\s*activeModalId/);
+  assert.match(html, /function showRespawnOverlay\(byName\)\s*\{[\s\S]*closePauseMenu\(\);[\s\S]*setUnderlyingGameUiInert\(true,\s*'respawn-overlay'\)[\s\S]*releaseFlightPointerLock\(\)/);
+  assert.match(html, /case 'spawned':[\s\S]*respawn-overlay'\)\.classList\.add\('hide'\)[\s\S]*setUnderlyingGameUiInert\(false\)[\s\S]*enterGame\(\)/);
+});
+
 test('ARENA death releases the mouse and offers a direct lobby exit', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
   const flowCss = fs.readFileSync(path.join(projectRoot, 'public/multiplayer-flow.css'), 'utf8');
@@ -340,7 +423,7 @@ test('ARENA death releases the mouse and offers a direct lobby exit', () => {
   assert.match(html, /function showRespawnOverlay\(byName\) \{[\s\S]*clearFlightKeys\(\);[\s\S]*releaseFlightPointerLock\(\);/);
   assert.match(html, /pointerlockchange[\s\S]{0,280}respawn-overlay'\)\.classList\.contains\('hide'\)/);
   assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,320}respawn-overlay'\)\.classList\.add\('hide'\)/);
-  assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);\s*if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*if \(e\.code === 'Escape'/);
+  assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);\s*if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*const pauseAction = pauseMenuAction\(/);
   assert.match(flowCss, /#respawn-leave-btn\s*\{[^}]*flex-basis:\s*100%/s);
 });
 
@@ -352,8 +435,9 @@ test('pause and result overlays isolate focus and suspend flight input', () => {
   assert.match(html, /visibilitychange/);
   assert.match(html, /function hideResults\([\s\S]*resultsReturnFocus\s*!==\s*document\.body/);
   assert.match(html, /function trapModalFocus\(/);
-  assert.match(html, /querySelector\(['"]\.modal-card['"]\)\.scrollTop\s*=\s*0/);
-  assert.match(html, /\$\(['"]graphics-resolution['"]\)\.focus\(\)/);
+  assert.match(html, /const focusable = \[\.\.\.layer\.querySelectorAll\([\s\S]*\.filter\(element => element\.tabIndex >= 0 && !element\.closest\('\[hidden\]'\) && !element\.closest\('\.hide'\)\)/);
+  assert.match(html, /function openPauseMenu\([\s\S]*setSettingsSection\('controls'\)/);
+  assert.match(html, /\$\(['"]settings-tab-controls['"]\)\.focus\(\)/);
   assert.match(html, /function enterLobby\([\s\S]*\$\(['"]lob-name['"]\)\.focus\(\)/);
   assert.match(html, /id="results"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="r-title"/);
   assert.match(html, /if\s*\(pauseOpen\)\s*return/);

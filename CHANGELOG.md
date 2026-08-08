@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.7.1 - 2026-08-08
+
+### Added
+
+- ESC 설정 모달에 **조작 / 그래픽 / 오디오** sidebar를 추가하고 선택된 섹션만 독립적으로 스크롤되도록 재구성했습니다. 작은 화면에서는 sidebar가 가로 tab rail로 전환됩니다.
+- 설정 tab에 ARIA tab/tabpanel semantics와 방향키·Home·End 탐색을 추가했습니다.
+- pause·respawn·results modal에서 `Space`로 현재 focus된 버튼을, focus가 없으면 기본 버튼을 실행할 수 있습니다.
+
+### Changed
+
+- 자가 충돌 사망은 `COLLISION / 충돌했습니다`, 실제 공격자에 의한 사망은 `SHOT DOWN / 격추되었습니다`로 구분해 표시합니다.
+- input/HUD policy와 browser asset cache key를 앱 버전 `1.7.1`과 일치시켰습니다.
+
+### Fixed
+
+- 한 번의 ESC 입력에서 key repeat와 pointer-lock 해제 event가 경쟁해 설정 메뉴가 닫힌 직후 다시 열리던 문제를 수정했습니다.
+- 사망·결과 modal이 표시된 뒤 지연된 pointer-lock 요청이 완료되어도 즉시 다시 해제해 mouse cursor와 modal 버튼을 항상 사용할 수 있도록 했습니다.
+- modal에서 처리한 `Space` 입력이 gameplay 발사 동작으로 전달되지 않도록 차단했습니다.
+- 설정 중 사망해도 respawn modal이 pause modal을 선점하고 유일한 interactive HUD layer가 되도록 inert 상태 전이를 수정했습니다.
+- sidebar 섹션을 바꾼 뒤 `Tab`/`Shift+Tab` focus가 modal 밖으로 이탈하던 문제를 수정했습니다.
+
 ## 1.7.0 - 2026-08-08
 
 ### Added

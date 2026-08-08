@@ -3,7 +3,8 @@ const test = require('node:test');
 
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
-  approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement, advancePaperFragment
+  approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
+  respawnPresentation, advancePaperFragment
 } = require('../public/hud-policy.js');
 
 function close(actual, expected, message) {
@@ -101,6 +102,17 @@ test('thermal screen intensity eases toward a clamped target and decays cleanly'
   const falling = approachThermalIntensity(0.8, 0, 0.1);
   assert.ok(falling >= 0 && falling < 0.8);
   assert.equal(approachThermalIntensity(0.4, 0.8, 0), 0.4);
+});
+
+test('respawn modal distinguishes collision from an enemy takedown', () => {
+  assert.deepEqual(respawnPresentation(null, 17.9), {
+    kicker: 'COLLISION', title: '충돌했습니다',
+    detail: '지형과 충돌 · 이번 생존 17초'
+  });
+  assert.deepEqual(respawnPresentation('에이스', 17.9), {
+    kicker: 'SHOT DOWN', title: '격추되었습니다',
+    detail: '에이스 님에게 격추 · 이번 생존 17초'
+  });
 });
 
 test('join, kill, and death announcements provide distinct immersive copy and tones', () => {

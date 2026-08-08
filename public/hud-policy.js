@@ -93,6 +93,22 @@
     return queue.length;
   }
 
+  function respawnPresentation(byName, survivedSeconds) {
+    const attacker = typeof byName === 'string' ? byName.trim() : '';
+    const survived = Math.max(0, Math.floor(Number(survivedSeconds) || 0));
+    return attacker
+      ? {
+          kicker: 'SHOT DOWN',
+          title: '격추되었습니다',
+          detail: `${attacker} 님에게 격추 · 이번 생존 ${survived}초`
+        }
+      : {
+          kicker: 'COLLISION',
+          title: '충돌했습니다',
+          detail: `지형과 충돌 · 이번 생존 ${survived}초`
+        };
+  }
+
   function announcementSpec(kind, pilotName) {
     const pilot = String(pilotName || '').trim() || '조종사';
     if (kind === 'kill') return {
@@ -128,6 +144,7 @@
 
   return {
     toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
-    approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement, advancePaperFragment
+    approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
+    respawnPresentation, advancePaperFragment
   };
 });

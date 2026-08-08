@@ -1768,12 +1768,22 @@ $('room-start-btn').addEventListener('click', () => {
   $('room-status').textContent = '라운드를 시작하는 중…';
   send({ t: 'start' });
 });
-$('room-leave-btn').addEventListener('click', () => send({ t: 'leave' }));
+function requestRoundLeave() {
+  // Do not keep rendering flight ambience while waiting for the authoritative `left` reply.
+  game.phase = 'leaving';
+  game.frozen = true;
+  audioDirector.setFlight({ speed: 0, dashing: false, alive: false });
+  audioDirector.setScene('HOME');
+  audioDirector.updateDeadline(NaN);
+  send({ t: 'leave' });
+}
+
+$('room-leave-btn').addEventListener('click', requestRoundLeave);
 $('game-leave-btn').addEventListener('click', openPauseMenu);
 $('resume-btn').addEventListener('click', resumeFlight);
 $('pause-leave-btn').addEventListener('click', () => {
   closePauseMenu();
-  send({ t: 'leave' });
+  requestRoundLeave();
 });
 $('results-ready-btn').addEventListener('click', event => {
   event.currentTarget.disabled = true;
@@ -1801,12 +1811,12 @@ $('respawn-refold-btn').addEventListener('click', () => {
 $('respawn-leave-btn').addEventListener('click', event => {
   event.currentTarget.disabled = true;
   $('respawn-status').textContent = '로비로 이동 중…';
-  send({ t: 'leave' });
+  requestRoundLeave();
 });
-$('leave-btn').addEventListener('click', () => send({ t: 'leave' }));
+$('leave-btn').addEventListener('click', requestRoundLeave);
 $('fold-leave-btn').addEventListener('click', () => {
   window.paperFoldingStage?.leave();
-  send({ t: 'leave' });
+  requestRoundLeave();
 });
 $('key-guide-toggle').addEventListener('change', event => setKeyGuideVisible(event.currentTarget.checked));
 $('mouse-invert-y-toggle').addEventListener('change', event => setMouseInvertY(event.currentTarget.checked));

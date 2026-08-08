@@ -128,3 +128,17 @@ test('client loads audio before the game module and wires scenes, cues, actions,
   assert.match(html, /paper-plane-selected[\s\S]*audioDirector\.play\('select'\)/);
   assert.doesNotMatch(html, /function showResults\(results\) \{[\s\S]{0,220}audioDirector\.play\('result'\)/);
 });
+
+test('leaving a round silences flight ambience before the server acknowledgement', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  const leaveBody = html.match(/function requestRoundLeave\(\) \{([\s\S]*?)\n\}/)?.[1] || '';
+
+  assert.match(leaveBody, /game\.phase = 'leaving'/);
+  assert.match(leaveBody, /game\.frozen = true/);
+  assert.match(leaveBody, /audioDirector\.setFlight\(\{[^}]*alive:\s*false[^}]*\}\)/);
+  assert.match(leaveBody, /audioDirector\.setScene\('HOME'\)/);
+  assert.match(leaveBody, /audioDirector\.updateDeadline\(NaN\)/);
+  assert.match(leaveBody, /send\(\{ t: 'leave' \}\)/);
+  assert.match(html, /\$\('pause-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}requestRoundLeave\(\)/);
+  assert.match(html, /\$\('respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,260}requestRoundLeave\(\)/);
+});

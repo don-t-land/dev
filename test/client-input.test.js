@@ -12,7 +12,7 @@ test('flight keys remain editable inside nickname inputs', () => {
 
   assert.equal(isEditableTarget(input), true);
 
-  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight']) {
+  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyN', 'Space', 'ShiftLeft', 'ShiftRight']) {
     assert.equal(shouldCaptureGameKey({ code, target: input }), false, `${code} should reach the input`);
   }
 });
@@ -23,13 +23,14 @@ test('game controls are still captured outside editable fields', () => {
 
   assert.equal(shouldCaptureGameKey({ code: 'KeyW', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'ShiftLeft', target: canvas }), true);
+  assert.equal(shouldCaptureGameKey({ code: 'KeyN', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'Escape', target: canvas }), false);
 });
 
 test('the client keyboard handler uses the editable-target policy', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
-  assert.match(html, /<script\s+src=['"]\.\/input-policy\.js['"]><\/script>/);
+  assert.ok(html.includes(`<script src="./input-policy.js?v=${packageJson.version}"></script>`));
   assert.match(html, /if\s*\(!shouldCaptureGameKey\(e\)\)\s*return/);
 });
 
@@ -43,24 +44,19 @@ test('dash and darts share one energy HUD instead of rechargeable ammo pips', ()
   assert.doesNotMatch(html, /id="ammo"|me\.ammo|me\.ammoT/);
 });
 
-test('ARENA minimap is mode-gated, world-backed, and responsive', () => {
+test('tactical minimap replaces the legacy ARENA-only map and stays world-backed in both modes', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
-  assert.ok(html.includes(`<script src="./arena-minimap.js?v=${packageJson.version}"></script>`));
-  assert.match(html, /<figure\s+id="arena-minimap"[^>]*aria-label="ARENA 미니맵"[^>]*class="hide"/);
-  assert.match(html, /<canvas\s+id="arena-minimap-canvas"[^>]*width="256"[^>]*height="256"/);
-  assert.match(html, /#arena-minimap\s*\{[^}]*top:\s*18px[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*auto[^}]*right:\s*8px[^}]*width:\s*104px[^}]*transform:\s*none/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(max-height:\s*440px\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*auto[^}]*right:\s*8px[^}]*width:\s*70px[^}]*transform:\s*none/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(max-height:\s*400px\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#arena-minimap\s*\{[^}]*width:\s*60px/s);
-  assert.match(html, /const\s+\{\s*createArenaMinimapFrame,\s*drawArenaMinimap\s*\}\s*=\s*window\.arenaMinimap/);
-  assert.match(html, /function enterGame\(\)[\s\S]*\$\('hud'\)\.classList\.toggle\('arena-mode', arena\)[\s\S]*\$\('arena-minimap'\)\.classList\.toggle\('hide', !arena\)/);
-  assert.match(html, /function updateArenaMinimap\(\)[\s\S]*mode:\s*game\.mode[\s\S]*arenaRadius:\s*ARENA_R[\s\S]*craft\.position[\s\S]*net\.players[\s\S]*ringsArr[\s\S]*thermals[\s\S]*drawArenaMinimap/);
-  assert.match(html, /@media\s*\(min-width:\s*561px\)\s*and\s*\(max-width:\s*889px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*32px[^}]*left:\s*auto[^}]*right:\s*132px[^}]*width:\s*120px[^}]*transform:\s*none[\s\S]*#board\.arena\s*\{[^}]*padding-top:\s*160px[^}]*max-height:\s*calc\(100dvh\s*-\s*210px\)[^}]*overflow-y:\s*auto/s);
-  assert.match(html, /@media\s*\(min-width:\s*561px\)\s*and\s*\(max-width:\s*889px\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*440px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*28px[^}]*right:\s*152px[^}]*width:\s*80px[^}]*[\s\S]*#board\.arena\s*\{[^}]*padding-top:\s*105px[^}]*max-height:\s*calc\(100dvh\s*-\s*180px\)[\s\S]*#hud\.arena-mode\s+#keys\s*,\s*#hud\.arena-mode\s+#game-leave-btn\s*\{[^}]*display:\s*none/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*440px\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*auto[^}]*right:\s*8px[^}]*width:\s*60px[^}]*height:\s*60px[^}]*transform:\s*none/s);
-  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*#arena-minimap\s*\{[^}]*top:\s*8px[^}]*left:\s*50%[^}]*right:\s*auto[^}]*width:\s*96px[^}]*transform:\s*translateX\(-50%\)/s);
-  assert.match(html, /minimapAcc\s*>=\s*1\s*\/\s*15[\s\S]*minimapAcc\s*%=\s*1\s*\/\s*15[\s\S]*updateArenaMinimap\(\)/);
+  assert.ok(html.includes(`<script src="./hud-policy.js?v=${packageJson.version}"></script>`));
+  assert.doesNotMatch(html, /arena-minimap(?:\.js|-canvas)?|window\.arenaMinimap|updateArenaMinimap/);
+  assert.match(html, /<section\s+id="minimap"[^>]*aria-keyshortcuts="N"/);
+  assert.match(html, /<canvas\s+id="minimap-canvas"[^>]*width="512"[^>]*height="512"/);
+  assert.match(html, /createMinimapView\(\{[\s\S]*gameMode:\s*game\.mode[\s\S]*arenaRadius:\s*ARENA_R/s);
+  assert.match(html, /function drawMinimap\([\s\S]*for \(const thermal of thermals\)/s);
+  assert.match(html, /function drawMinimap\([\s\S]*for \(const ring of ringsArr\)/s);
+  assert.match(html, /function drawMinimap\([\s\S]*for \(const player of net\.players\.values\(\)\)/s);
+  assert.match(html, /function drawMinimap\([\s\S]*drawMinimapPilot\(craft\.position, me\.yaw/s);
+  assert.match(html, /drawMinimap\(timestamp\)/);
 });
 
 test('coarse-pointer gameplay exposes a complete accessible touch keypad overlay', () => {
@@ -371,9 +367,11 @@ test('result and mobile HUD layouts remain scrollable without overlap', () => {
   assert.match(html, /#results \.box\s*\{[^}]*max-height:\s*calc\(100dvh/s);
   assert.match(html, /\.modal-layer\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(html, /\.modal-card\s*\{[^}]*max-height:\s*calc\(100dvh/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#keys\s*\{[^}]*bottom:\s*164px/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#board\s*\{[^}]*top:\s*128px/s);
-  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(max-height:\s*400px\)[\s\S]*#keys\s*\{[^}]*display:\s*none/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)[\s\S]*#keys,\s*#minimap\s*\{[^}]*display:\s*none\s*!important/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*portrait\)[\s\S]*#hud-right-rail\s*>\s*#board\s*\{[^}]*top:\s*140px/s);
+  assert.match(html, /@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*#hud-right-rail\s*>\s*#board\s*\{[^}]*top:\s*8px/s);
+  assert.match(html, /@media\s*\(max-width:\s*560px\)[\s\S]*#hud-right-rail\s*\{[^}]*top:\s*128px[^}]*display:\s*flex[\s\S]*#hud-right-rail\s*>\s*#board\s*\{[^}]*max-height:\s*min\(150px,\s*28vh\)/s);
+  assert.match(html, /@media\s*\(max-width:\s*560px\)\s*and\s*\(max-height:\s*400px\)[\s\S]*#hud-right-rail\s*>\s*#minimap\s*\{[^}]*display:\s*none/s);
   assert.match(html, /--sky-muted:\s*#5b6d80/);
 });
 
@@ -404,7 +402,8 @@ test('the client implements room lifecycle and authoritative leaderboard message
   assert.match(html, /send\(\{\s*t:\s*['"]join['"],\s*code/);
   assert.match(html, /send\(\{\s*t:\s*['"]start['"]/);
   assert.match(html, /send\(\{\s*t:\s*['"]leave['"]/);
-  assert.match(html, /id="game-leave-btn"/);
+  assert.match(html, /id="pause-menu"/);
+  assert.doesNotMatch(html, /id="game-leave-btn"/);
 });
 
 test('the first screen is a modular paper-plane home screen with two flight modes and a costume action', () => {

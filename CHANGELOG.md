@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.7.0 - 2026-08-08
+
+### Added
+
+- 랭킹·키 가이드·전술 지도를 하나의 bounded right rail에 배치해 최대 8명 경기에서도 HUD가 독립적으로 겹치지 않도록 했습니다.
+- `N` 키로 전체 전장과 플레이어 중심 `주변 420m` 지도를 전환하며, DIST 코스와 ARENA 경계·상대·링·상승기류를 같은 tactical map에 표시합니다.
+- 상승기류 진입 시 화면 중심으로 수렴하는 vortex를 표시하고, join·격추·사망 알림을 FIFO announcement로 제공합니다.
+- 실제 공격자가 있는 원격 격추에 18개의 world-space 종이 파편을 생성하고 수명 종료 시 geometry·material을 해제합니다.
+
+### Changed
+
+- PC의 클릭형 ESC 설정 버튼을 제거하되 키보드 `Escape`와 모바일 설정 버튼은 유지했습니다.
+- 기존 ARENA 전용 minimap module을 통합 tactical map으로 교체하고, DIST 전체 지도 폭은 biome/noise의 수학적 최대 폭을 사용합니다.
+- 운영 최신 audio 종료 처리와 rooftop launch 전환을 동기화하면서 beta 전용 양력 `0.70×`, 항력 `0.45×`, 비행 상한 `420m`, 고층 cloud band, loopback binding을 유지했습니다.
+- 변경된 input policy, HUD policy, biome helper, map generator의 cache key를 앱 버전 `1.7.0`과 일치시켰습니다.
+
+### Fixed
+
+- local map의 원형 반경 밖 corner marker를 숨기고, reduced-motion에서는 announcement transition과 종이 파편 burst를 생략합니다.
+- graphics QA freeze 해제 시 announcement queue가 멈추지 않도록 lifecycle을 복구합니다.
+- 순수 터치·극소 viewport에서 숨겨진 tactical map의 Canvas 렌더링을 중단하고, announcement pending queue를 6건으로 제한해 event burst에서도 CPU·메모리 사용이 누적되지 않도록 했습니다.
+
 ## 1.6.1 - 2026-08-07
 
 ### Added

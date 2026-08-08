@@ -24,6 +24,7 @@
   const FLIGHT_CEILING = helpers.FLIGHT_CEILING;
   const BAND_SIZE = DIST_LEN / 5;
   const BLEND_HALF = 150;
+  const WIDTH_NOISE_AMPLITUDE = .25;
   const LAYOUT_KEYS = ['walls', 'spires', 'rocks', 'thermals', 'rings', 'platforms', 'clouds', 'landmarks'];
 
   function mulberry32(a) {
@@ -68,6 +69,9 @@
     }
   ];
 
+  const MAX_DISTANCE_WIDTH_SCALE = Math.max(...BIOMES.map(biome => biome.widthScale)) *
+    (1 + WIDTH_NOISE_AMPLITUDE);
+
   for (const biome of BIOMES) {
     if (typeof biome.recipe !== 'function') throw new Error(`Missing biome recipe: ${biome.id}`);
   }
@@ -105,7 +109,7 @@
   function widthScaleAt(z, noise) {
     const s = sampleBiome(z);
     const scale = BIOMES[s.a].widthScale + (BIOMES[s.b].widthScale - BIOMES[s.a].widthScale) * s.t;
-    return (1 + noise(z) * .25) * scale;
+    return (1 + noise(z) * WIDTH_NOISE_AMPLITUDE) * scale;
   }
 
   function blankLayout() {
@@ -165,7 +169,8 @@
   }
 
   return {
-    DIST_LEN, DIST_HALF, ARENA_R, FLIGHT_CEILING, BAND_SIZE, BLEND_HALF, LAYOUT_KEYS,
+    DIST_LEN, DIST_HALF, ARENA_R, FLIGHT_CEILING, BAND_SIZE, BLEND_HALF,
+    WIDTH_NOISE_AMPLITUDE, MAX_DISTANCE_WIDTH_SCALE, LAYOUT_KEYS,
     BIOMES, mulberry32, sampleBiome, makeNoise1d, widthScaleAt,
     buildDistanceLayout, buildArenaLayout, arenaTheme,
     findArenaSpawn,

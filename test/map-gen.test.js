@@ -8,6 +8,7 @@ const biomeHelpers = require('../public/biomes/helpers.js');
 const {
   DIST_LEN,
   DIST_HALF,
+  MAX_DISTANCE_WIDTH_SCALE,
   ARENA_R,
   BIOMES,
   LAYOUT_KEYS,
@@ -32,6 +33,16 @@ test('five named biome recipes expose complete visual palettes', () => {
   }
   assert.equal(BIOMES[3].widthScale, .72);
   assert.equal(BIOMES[4].widthScale, 1.6);
+});
+
+test('distance width exposes a conservative envelope for every biome and noise value', () => {
+  assert.equal(MAX_DISTANCE_WIDTH_SCALE, 2);
+  for (let seed = 0; seed < 20; seed += 1) {
+    const noise = makeNoise1d(seed);
+    for (let z = 0; z >= -DIST_LEN; z -= 1) {
+      assert.ok(widthScaleAt(z, noise) <= MAX_DISTANCE_WIDTH_SCALE);
+    }
+  }
 });
 
 test('sampleBiome preserves band centers and blends both sides of boundaries', () => {

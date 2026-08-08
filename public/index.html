@@ -92,27 +92,17 @@
   }
   #timer.low { color: #ff8b7e; }
 
-  #arena-minimap {
-    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-    width: 150px; margin: 0; padding: 8px; border: 1px solid rgba(174,215,255,.24);
-    border-radius: 18px; color: #dcecff; background: rgba(5,16,29,.72);
-    box-shadow: 0 10px 30px rgba(0,0,0,.22); backdrop-filter: blur(10px);
-    pointer-events: none;
+  #hud-right-rail {
+    position: absolute; inset: 20px 30px 30px auto; width: min(340px, calc(100vw - 44px)); min-height: 0;
+    display: grid; grid-template-rows: minmax(96px, 1fr) auto auto; gap: 12px; pointer-events: none;
   }
-  #arena-minimap figcaption { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 8px; font-weight: 800; letter-spacing: .12em; }
-  #arena-minimap canvas { width: 100%; height: auto; aspect-ratio: 1; }
-  .minimap-legend { display: flex; justify-content: center; gap: 7px; margin-top: 3px; color: #a9bed1; font-size: 7px; white-space: nowrap; }
-  .minimap-legend i { display: inline-block; width: 6px; height: 6px; margin-right: 2px; border-radius: 50%; }
-  .minimap-self { background: #7ce8ff; }
-  .minimap-player { background: #ff7368; }
-  .minimap-ring { background: #ffc861; }
-  .minimap-thermal { background: #6ee7b7; }
-
   #board {
-    position: absolute; top: 20px; right: 22px; width: min(340px, calc(100vw - 44px));
     padding: 13px; background: rgba(7,16,28,.86); border: 1px solid rgba(174,215,255,.2);
     border-radius: 14px; backdrop-filter: blur(12px); font-size: 12px;
     box-shadow: 0 12px 34px rgba(0,0,0,.24);
+  }
+  #hud-right-rail > #board {
+    position: relative; inset: auto; width: 100%; min-height: 0; max-height: 100%; overflow-y: auto; align-self: start;
   }
   #board .board-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:9px; }
   #board .h { font-size: 10px; font-weight: 800; letter-spacing: .16em; color: #dcecff; }
@@ -134,7 +124,6 @@
   #board .row:nth-child(1) .rank { background:#f7cf62; color:#332600; }
   #board .row:nth-child(2) .rank { background:#b9c8d8; color:#22303d; }
   #board .row:nth-child(3) .rank { background:#ca8c60; color:#2f190d; }
-  #game-leave-btn { position: absolute; right: 22px; bottom: 92px; pointer-events: auto; }
 
   #gauge { position: absolute; bottom: 26px; left: 22px; width: 190px; }
   #gauge .track { height: 5px; background: rgba(255,255,255,.13); border-radius: 3px; overflow: hidden; position: relative; }
@@ -150,15 +139,54 @@
   #energy.dashing .fill { background: linear-gradient(90deg, #ff9f57, #fff0a0); box-shadow: 0 0 15px rgba(255,174,80,.72); }
   #energy.low .fill { background: #ff7368; }
 
-  #thermal {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, 90px);
-    font-size: 13px; letter-spacing: .2em; color: #6ee7b7;
-    opacity: 0; transition: opacity .18s; text-shadow: 0 0 20px rgba(110,231,183,.6);
+  #thermal-vortex {
+    position: absolute; inset: 0; --thermal-force: 0; opacity: var(--thermal-force);
+    overflow: hidden; pointer-events: none; mix-blend-mode: screen;
+    transition: opacity .12s linear;
   }
-  #thermal.on { opacity: 1; }
+  #thermal-vortex::before {
+    content: ""; position: absolute; inset: -12%;
+    background: radial-gradient(circle at 50% 50%, rgba(193,255,235,.32) 0 2%, rgba(91,232,198,.12) 9%, transparent 33%),
+      radial-gradient(circle at 50% 50%, transparent 35%, rgba(67,222,187,.08) 72%, rgba(195,255,236,.18) 100%);
+    filter: blur(2px); transform: scale(calc(1.04 - var(--thermal-force) * .04));
+  }
+  #thermal-vortex .wind-streak {
+    position: absolute; top: 50%; left: 50%; width: clamp(90px, 15vw, 260px); height: 2px;
+    transform-origin: 0 50%; border-radius: 999px;
+    background: linear-gradient(90deg, transparent, rgba(168,255,228,.2), rgba(235,255,249,.92));
+    box-shadow: 0 0 9px rgba(116,255,213,.58); opacity: 0;
+    animation: thermal-suction 1.05s linear infinite; animation-delay: var(--delay);
+  }
+  @keyframes thermal-suction {
+    0% { opacity: 0; transform: rotate(var(--angle)) translateX(58vmax) scaleX(1.8); }
+    18% { opacity: .9; }
+    82% { opacity: .75; }
+    100% { opacity: 0; transform: rotate(var(--angle)) translateX(5vmax) scaleX(.16); }
+  }
 
-  #keys { position: absolute; bottom: 26px; right: 22px; text-align: right; font-size: 11px; line-height: 1.9; color: #8496ad; }
-  #keys kbd { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); border-radius: 3px; padding: 1px 6px; color: #dce5f0; font: inherit; }
+  #keys {
+    padding: 13px 16px; text-align: right;
+    color: #e5f0f8; background: rgba(9,18,29,.82); border: 1px solid rgba(200,225,245,.18);
+    border-radius: 14px; backdrop-filter: blur(9px); box-shadow: 0 12px 28px rgba(0,0,0,.18);
+    font-size: 12px; line-height: 2.05;
+  }
+  #hud-right-rail > #keys {
+    position: relative; inset: auto; transform: none; width: 250px; justify-self: end;
+  }
+  #keys kbd { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); border-radius: 4px; padding: 2px 7px; color: #f1f7ff; font: inherit; font-family: ui-monospace, monospace; }
+
+  #minimap {
+    overflow: hidden; border: 1px solid rgba(175,220,245,.24); border-radius: 18px;
+    background: rgba(5,17,29,.82); box-shadow: 0 18px 42px rgba(0,0,0,.3), inset 0 1px rgba(255,255,255,.08);
+    backdrop-filter: blur(12px); pointer-events: none;
+  }
+  #hud-right-rail > #minimap {
+    position: relative; inset: auto; width: clamp(280px, 24vw, 340px); justify-self: end;
+  }
+  #minimap .minimap-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px 8px; color: #d9ecf7; font-size: 9px; font-weight: 800; letter-spacing: .16em; }
+  #minimap .minimap-hint { display: inline-flex; align-items: center; gap: 7px; color: #d9ecf7; font-weight: 650; letter-spacing: .06em; }
+  #minimap kbd { padding: 2px 6px; border: 1px solid rgba(210,236,250,.24); border-radius: 5px; color: #e9f9ff; background: rgba(255,255,255,.09); font: 800 9px/1.4 ui-monospace, monospace; }
+  #minimap-canvas { width: 100%; height: auto; aspect-ratio: 1; border-top: 1px solid rgba(195,225,245,.11); }
 
   #touch-controls {
     position: absolute; z-index: 45; left: max(12px, env(safe-area-inset-left));
@@ -195,11 +223,37 @@
   #center .msg { font-size: 15px; letter-spacing: .24em; color: #b9c7da; }
   #center .sub2 { margin-top: 8px; font-size: 11px; letter-spacing: .1em; color: #8496ad; }
 
-  #kill {
-    position: absolute; top: 27%; left: 50%; transform: translateX(-50%);
-    font-size: 13px; letter-spacing: .1em; color: #ffc861;
-    opacity: 0; transition: opacity .3s; text-shadow: 0 0 14px rgba(255,200,97,.5);
+  #announcement {
+    position: absolute; top: 54px; left: 50%; width: min(520px, calc(100vw - 32px));
+    transform: translate(-50%, -18px) scale(.96); opacity: 0; text-align: center;
+    --tone: #8fe3c4; --tone-rgb: 143,227,196;
+    transition: opacity .28s ease, transform .28s ease; pointer-events: none;
   }
+  #announcement .announcement-frame {
+    position: relative; overflow: hidden; padding: 17px 34px 19px;
+    border-block: 1px solid rgba(var(--tone-rgb),.72);
+    background: linear-gradient(90deg, transparent, rgba(4,15,27,.83) 18%, rgba(4,15,27,.9) 82%, transparent);
+    filter: drop-shadow(0 12px 30px rgba(0,0,0,.34));
+  }
+  #announcement .announcement-frame::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(104deg, transparent 35%, rgba(var(--tone-rgb),.28) 48%, transparent 61%);
+    transform: translateX(-110%);
+  }
+  #announcement .announcement-kicker { display: block; margin-bottom: 5px; color: var(--tone); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .32em; }
+  #announcement .announcement-title { display: block; color: #fff; font-size: clamp(25px, 3.2vw, 46px); font-weight: 900; letter-spacing: -.025em; text-shadow: 0 0 22px rgba(var(--tone-rgb),.62); }
+  #announcement .announcement-detail { display: block; margin-top: 5px; color: #d7e5ee; font-size: 12px; letter-spacing: .08em; }
+  #announcement[data-tone="join"] { --tone: #82e8df; --tone-rgb: 130,232,223; }
+  #announcement[data-tone="kill"] { --tone: #ffc467; --tone-rgb: 255,196,103; }
+  #announcement[data-tone="death"] { --tone: #ff8176; --tone-rgb: 255,129,118; }
+  #announcement.show { animation: announcement-impact .62s cubic-bezier(.17,.82,.2,1) both; }
+  #announcement.show .announcement-frame::before { animation: announcement-scan .72s .05s ease-out both; }
+  @keyframes announcement-impact {
+    0% { opacity: 0; transform: translate(-50%, -26px) scale(.82); filter: blur(5px); }
+    55% { opacity: 1; transform: translate(-50%, 3px) scale(1.035); filter: blur(0); }
+    100% { opacity: 1; transform: translate(-50%, 0) scale(1); filter: blur(0); }
+  }
+  @keyframes announcement-scan { to { transform: translateX(110%); } }
 
   #biome-badge {
     position: absolute; top: 16%; left: 50%; transform: translate(-50%, -8px);
@@ -316,9 +370,6 @@
   #energy { bottom: 104px; left: 30px; width: 250px; padding: 12px 16px; border-radius: 14px; background: rgba(9,18,29,.82); }
   #energy .track { height: 8px; }
   #energy .lbl { font-size: 12px; }
-  #keys { bottom: 30px; right: 30px; padding: 13px 16px; border-radius: 14px; color: #d3e2ef; background: rgba(9,18,29,.82); font-size: 13px; line-height: 2.15; }
-  #keys kbd { padding: 2px 8px; font-family: ui-monospace, monospace; }
-  #game-leave-btn { right: 30px; bottom: 130px; padding: 11px 15px; background: rgba(9,18,29,.65); }
   #center .msg { font-size: 19px; }
   #center .sub2 { font-size: 14px; }
   #results, .modal-layer { position: absolute; z-index: 60; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto; background: rgba(7,16,27,.68); backdrop-filter: blur(10px); }
@@ -358,6 +409,17 @@
   .setting-row select:focus-visible { outline: 2px solid #7cc5ff; outline-offset: 2px; }
   #graphics-summary { display: block; margin-top: 10px; color: #9db2c5; font-size: 11px; line-height: 1.45; }
 
+  @media (max-height: 720px) {
+    #hud-right-rail {
+      width: min(602px, calc(100vw - 44px));
+      grid-template-columns: minmax(190px, 250px) minmax(220px, 340px);
+      grid-template-rows: minmax(96px, 1fr) auto; gap: 12px;
+    }
+    #hud-right-rail > #board { grid-column: 2; grid-row: 1; }
+    #hud-right-rail > #keys { grid-column: 1; grid-row: 1 / 3; align-self: center; width: 100%; }
+    #hud-right-rail > #minimap { grid-column: 2; grid-row: 2; width: min(220px, 100%); }
+  }
+
   @media (max-width: 840px) {
     #lobby { align-items: flex-start; }
     #lobby .lobby-shell { width: min(100% - 24px, 620px); max-height: none; margin: 12px auto; grid-template-columns: 1fr; }
@@ -365,15 +427,7 @@
     .lobby-plane { opacity: .5; right: -20px; top: 4%; }
     #lobby #room-list { height: 260px; }
   }
-  @media (min-width: 561px) and (max-width: 889px) {
-    #arena-minimap { top: 32px; left: auto; right: 132px; width: 120px; transform: none; }
-    #board.arena {
-      padding-top: 160px;
-      max-height: calc(100vh - 210px);
-      max-height: calc(100dvh - 210px);
-      overflow-y: auto;
-    }
-  }
+
   @media (max-width: 560px) {
     #lobby .modes { grid-template-columns: 1fr; }
     .create-strip > div:first-child { display: block; }
@@ -382,32 +436,49 @@
     .graphics-settings .setting-row { align-items: stretch; flex-direction: column; gap: 10px; }
     .graphics-settings .setting-row select { width: 100%; flex-basis: auto; }
     #stats { top: 12px; left: 12px; transform: scale(.86); transform-origin: top left; }
-    #board { top: 128px; left: 12px; right: 12px; width: auto; transform: none; }
+    #hud-right-rail { top: 128px; right: 12px; bottom: auto; width: min(210px, 54vw); display: flex; flex-direction: column; gap: 8px; }
+    #hud-right-rail > #board { position: relative; inset: auto; width: 100%; max-height: min(150px, 28vh); overflow-y: auto; }
+    #hud-right-rail > #keys { display: none; }
+    #hud-right-rail > #minimap { width: 100%; }
     #timer { top: 98px; font-size: 19px; }
-    #arena-minimap { top: 8px; left: auto; right: 8px; width: 104px; padding: 7px; border-radius: 14px; transform: none; }
-    #arena-minimap figcaption { font-size: 7px; margin-bottom: 3px; }
-    .minimap-legend { gap: 4px; font-size: 6px; }
+
     #gauge { left: 12px; right: 12px; bottom: 12px; width: auto; }
     #energy { left: 12px; right: 12px; bottom: 92px; width: auto; }
-    #keys { left: 12px; right: 12px; bottom: 164px; max-width: none; text-align: center; font-size: 11px; line-height: 1.8; }
-    #game-leave-btn { right: 12px; bottom: 285px; }
+  }
+  @media (max-width: 560px) and (max-height: 640px) {
+    #hud-right-rail > #minimap { display: none; }
+  }
+  @media (max-width: 400px) {
+    #stats { transform: scale(.68); }
+    #hud-right-rail { width: min(200px, 52vw); }
   }
   @media (max-width: 560px) and (max-height: 400px) {
     #stats { top: 8px; left: 8px; transform: scale(.68); }
     #timer { top: 8px; left: auto; right: 8px; transform: none; font-size: 17px; }
-    #board { top: 80px; left: 8px; right: 8px; max-height: 96px; overflow-y: auto; padding: 6px 9px; }
+    #hud-right-rail { top: 80px; right: 8px; width: min(220px, 54vw); }
+    #hud-right-rail > #board { max-height: 96px; padding: 6px 9px; }
+    #hud-right-rail > #minimap { display: none; }
     #board .h { margin-bottom: 2px; }
     #board .row { min-height:32px; padding:3px 5px; }
     #board .state { display:none; }
-    #game-leave-btn { top: 126px; right: 8px; bottom: auto; padding: 8px 11px; }
     #gauge { left: 8px; right: 8px; bottom: 8px; padding: 8px 10px; }
     #energy { left: 8px; right: 8px; bottom: 65px; width: auto; padding: 8px 10px; }
     #keys { display: none; }
   }
+  @media (any-pointer: coarse) and (pointer: fine) {
+    #touch-controls {
+      display: block; left: auto; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); bottom: auto;
+    }
+    #touch-controls .touch-pad, #touch-controls .touch-action { display: none; }
+    #touch-controls .touch-actions { display: block; }
+    #touch-menu { display: grid; pointer-events: auto; }
+  }
   @media (hover: none) and (pointer: coarse) {
     #c { touch-action: none; }
+    #hud-right-rail { display: contents; }
+    #hud-right-rail > #board { position: absolute; width: min(340px, calc(100vw - 24px)); }
     #touch-controls { display: flex; }
-    #keys, #game-leave-btn { display: none !important; }
+    #keys, #minimap { display: none !important; }
     #gauge { left: 50%; right: auto; bottom: calc(242px + env(safe-area-inset-bottom)); width: min(180px, 46vw); padding: 5px 8px; transform: translateX(-50%); }
     #energy { left: 50%; right: auto; bottom: calc(276px + env(safe-area-inset-bottom)); width: min(180px, 46vw); padding: 5px 8px; transform: translateX(-50%); }
     #gauge .lbl, #energy .lbl { margin-bottom: 3px; font-size: 9px; }
@@ -417,10 +488,10 @@
   @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     #stats { top: 12px; left: 12px; transform: scale(.66); transform-origin: top left; }
     #timer { top: 12px; left: auto; right: 12px; transform: none; font-size: 18px; }
-    #board { top: 140px; left: 12px; right: 12px; width: auto; max-height: min(180px, 28vh); overflow-y: auto; }
+    #hud-right-rail > #board { top: 140px; left: 12px; right: 12px; bottom: auto; width: auto; max-height: min(180px, 28vh); overflow-y: auto; }
   }
   @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 640px) {
-    #board {
+    #hud-right-rail > #board {
       top: 138px;
       max-height: clamp(0px, calc(100vh - env(safe-area-inset-bottom) - 452px), 116px);
       max-height: clamp(0px, calc(100dvh - env(safe-area-inset-bottom) - 452px), 116px);
@@ -429,40 +500,12 @@
     }
   }
   @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px) {
-    #board { display: none; }
+    #hud-right-rail > #board { display: none; }
   }
   @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 440px) {
     #gauge, #energy { left: auto; right: max(8px, env(safe-area-inset-right)); transform: none; }
   }
-  @media (max-width: 560px) and (max-height: 440px) and (orientation: portrait) {
-    #arena-minimap { top: 8px; left: auto; right: 8px; width: 70px; height: 70px; padding: 4px; transform: none; }
-    #arena-minimap figcaption, #arena-minimap .minimap-legend { display: none; }
-    #arena-minimap canvas { height: 100%; }
-  }
-  @media (max-width: 560px) and (max-height: 400px) and (orientation: portrait) {
-    #arena-minimap { width: 60px; height: 60px; }
-  }
-  @media (min-width: 561px) and (max-width: 889px) and (orientation: landscape) and (max-height: 440px) {
-    #arena-minimap { top: 28px; left: auto; right: 152px; width: 80px; padding: 6px; transform: none; }
-    #arena-minimap figcaption { font-size: 7px; margin-bottom: 3px; }
-    #arena-minimap .minimap-legend { display: none; }
-    #board.arena {
-      padding-top: 105px;
-      max-height: calc(100vh - 180px);
-      max-height: calc(100dvh - 180px);
-    }
-    #hud.arena-mode #keys, #hud.arena-mode #game-leave-btn { display: none; }
-  }
-  @media (max-width: 560px) and (orientation: landscape) and (max-height: 440px) {
-    #arena-minimap { top: 8px; left: auto; right: 8px; width: 60px; height: 60px; padding: 4px; transform: none; }
-    #arena-minimap figcaption, #arena-minimap .minimap-legend { display: none; }
-    #arena-minimap canvas { height: 100%; }
-  }
   @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
-    #arena-minimap { top: 8px; left: 50%; right: auto; width: 96px; padding: 6px; transform: translateX(-50%); }
-    #arena-minimap figcaption { display: flex; font-size: 7px; margin-bottom: 3px; }
-    #arena-minimap .minimap-legend { display: none; }
-    #arena-minimap canvas { height: auto; }
     #touch-controls { left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); }
     .touch-dpad { grid-template: repeat(3, 56px) / repeat(3, 56px); gap: 3px; }
     .touch-control { min-width: 56px; min-height: 56px; border-radius: 18px; }
@@ -471,8 +514,7 @@
     #gauge { left: 50%; right: auto; bottom: calc(8px + env(safe-area-inset-bottom)); width: min(170px, 28vw); padding: 5px 8px; transform: translateX(-50%); }
     #energy { left: 50%; right: auto; bottom: calc(42px + env(safe-area-inset-bottom)); width: min(170px, 28vw); padding: 5px 8px; transform: translateX(-50%); }
     #stats { top: 8px; left: max(8px, env(safe-area-inset-left)); transform: scale(.68); transform-origin: top left; }
-    #board { top: 8px; left: auto; right: max(8px, env(safe-area-inset-right)); width: min(260px, 31vw); max-height: 88px; overflow-y: auto; padding: 6px 8px; }
-    #board.arena { max-height: 88px; padding: 6px 8px; }
+    #hud-right-rail > #board { top: 8px; left: auto; right: max(8px, env(safe-area-inset-right)); bottom: auto; width: min(260px, 31vw); max-height: 88px; overflow-y: auto; padding: 6px 8px; }
     #board .state { display: none; }
     #timer { top: 8px; left: 50%; right: auto; transform: translateX(-50%); font-size: 17px; }
   }
@@ -489,12 +531,16 @@
   #audio-quick-toggle[aria-pressed="true"] { color: #ff9d93; border-color: rgba(255,139,126,.5); }
   @media (prefers-reduced-motion: reduce) {
     .lobby-plane, .cloud { animation: none; }
+    #thermal-vortex .wind-streak { animation: none; opacity: 0; }
+    #announcement { transition: none; }
+    #announcement.show, #announcement.show .announcement-frame::before { animation: none; }
+    #announcement.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
   }
 </style>
 </head>
 <body>
 
-<canvas id="c"></canvas>
+<canvas id="c" tabindex="-1" aria-label="3D 종이비행기 비행 장면"></canvas>
 <button id="audio-quick-toggle" type="button" aria-label="전체 음소거" aria-pressed="false" title="오디오 켜기/끄기">🔊</button>
 
 <section id="home-screen" aria-labelledby="home-title">
@@ -778,20 +824,6 @@
 
     <div id="timer">--:--</div>
 
-    <figure id="arena-minimap" aria-label="ARENA 미니맵" class="hide">
-      <figcaption><span>ARENA MAP</span><span>북 ↑</span></figcaption>
-      <canvas id="arena-minimap-canvas" width="256" height="256" aria-hidden="true"></canvas>
-      <div class="minimap-legend" aria-hidden="true">
-        <span><i class="minimap-self"></i>나</span><span><i class="minimap-player"></i>상대</span>
-        <span><i class="minimap-ring"></i>링</span><span><i class="minimap-thermal"></i>상승</span>
-      </div>
-    </figure>
-
-    <div id="board" aria-label="실시간 랭킹">
-      <div class="board-head"><div class="h" id="b-title">실시간 랭킹</div><div class="board-count" id="b-count"></div></div>
-      <div id="b-rows" role="list"></div>
-    </div>
-    <button id="game-leave-btn" class="action-btn" aria-keyshortcuts="Escape">설정 <span aria-hidden="true">· ESC</span></button>
 
     <div id="energy">
       <div class="lbl"><span>에너지</span><span id="s-energy">100</span></div>
@@ -803,15 +835,54 @@
       <div class="track"><div class="stallzone" id="s-stall"></div><div class="fill" id="s-fill"></div></div>
     </div>
 
-    <div id="thermal">상승기류</div>
-    <div id="kill"></div>
+    <div id="thermal-vortex" aria-hidden="true">
+      <i class="wind-streak" style="--angle:0deg;--delay:-.05s"></i>
+      <i class="wind-streak" style="--angle:22.5deg;--delay:-.47s"></i>
+      <i class="wind-streak" style="--angle:45deg;--delay:-.81s"></i>
+      <i class="wind-streak" style="--angle:67.5deg;--delay:-.22s"></i>
+      <i class="wind-streak" style="--angle:90deg;--delay:-.63s"></i>
+      <i class="wind-streak" style="--angle:112.5deg;--delay:-.94s"></i>
+      <i class="wind-streak" style="--angle:135deg;--delay:-.34s"></i>
+      <i class="wind-streak" style="--angle:157.5deg;--delay:-.72s"></i>
+      <i class="wind-streak" style="--angle:180deg;--delay:-.14s"></i>
+      <i class="wind-streak" style="--angle:202.5deg;--delay:-.56s"></i>
+      <i class="wind-streak" style="--angle:225deg;--delay:-.88s"></i>
+      <i class="wind-streak" style="--angle:247.5deg;--delay:-.29s"></i>
+      <i class="wind-streak" style="--angle:270deg;--delay:-.68s"></i>
+      <i class="wind-streak" style="--angle:292.5deg;--delay:-1.02s"></i>
+      <i class="wind-streak" style="--angle:315deg;--delay:-.39s"></i>
+      <i class="wind-streak" style="--angle:337.5deg;--delay:-.77s"></i>
+    </div>
+    <div id="announcement" role="status" aria-live="polite" aria-atomic="true">
+      <div class="announcement-frame">
+        <span id="announcement-kicker" class="announcement-kicker"></span>
+        <strong id="announcement-title" class="announcement-title"></strong>
+        <span id="announcement-detail" class="announcement-detail"></span>
+      </div>
+    </div>
     <div id="biome-badge"></div>
 
-    <div id="keys">
-      <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 롤/선회 · <kbd>Shift</kbd> 대시</span><br>
-      <span><kbd>마우스</kbd> 자유 시점 · <kbd>ESC</kbd> 설정</span><br>
-      <span id="keys-fire" class="hide"><kbd>Space</kbd> 다트 발사</span>
-    </div>
+    <aside id="hud-right-rail" aria-label="비행 전술 정보">
+      <div id="board" aria-label="실시간 랭킹">
+        <div class="board-head"><div class="h" id="b-title">실시간 랭킹</div><div class="board-count" id="b-count"></div></div>
+        <div id="b-rows" role="list"></div>
+      </div>
+
+      <div id="keys">
+        <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 롤/선회 · <kbd>Shift</kbd> 대시</span><br>
+        <span><kbd>마우스</kbd> 자유 시점 · <kbd>ESC</kbd> 설정</span><br>
+        <span><kbd>N</kbd> 주변 지도</span><br>
+        <span id="keys-fire" class="hide"><kbd>Space</kbd> 다트 발사</span>
+      </div>
+
+      <section id="minimap" aria-labelledby="minimap-title" aria-keyshortcuts="N">
+        <div class="minimap-head">
+          <span id="minimap-title">TACTICAL MAP</span>
+          <span class="minimap-hint"><kbd>N</kbd><span id="minimap-mode" role="status" aria-live="polite" aria-atomic="true">전체 전장</span></span>
+        </div>
+        <canvas id="minimap-canvas" width="512" height="512" aria-hidden="true"></canvas>
+      </section>
+    </aside>
 
     <div id="touch-controls" aria-label="모바일 비행 조작">
       <div class="touch-pad touch-dpad" role="group" aria-label="비행 방향">
@@ -1029,9 +1100,10 @@
   }
 }
 </script>
-<script src="./input-policy.js"></script>
+<script src="./input-policy.js?v=1.7.0"></script>
+<script src="./hud-policy.js?v=1.7.0"></script>
 <script src="./mobile-controls.js"></script>
-<script src="./arena-minimap.js?v=1.6.1"></script>
+
 <script src="./room-state.js"></script>
 <script src="./flight-controls.js"></script>
 <script src="./costume-state.js"></script>
@@ -1042,13 +1114,13 @@
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
-<script src="./biomes/helpers.js?v=1.6.1"></script>
+<script src="./biomes/helpers.js?v=1.7.0"></script>
 <script src="./biomes/desert.js"></script>
 <script src="./biomes/pillars.js"></script>
 <script src="./biomes/glacier.js"></script>
 <script src="./biomes/lava.js"></script>
 <script src="./biomes/floating.js"></script>
-<script src="./map-gen.js?v=1.6.1"></script>
+<script src="./map-gen.js?v=1.7.0"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./costume-showroom-3d.js"></script>
@@ -1074,8 +1146,12 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 const { shouldCaptureGameKey, isEditableTarget } = window.inputPolicy;
+const {
+  toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
+  approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement, advancePaperFragment
+} = window.hudPolicy;
 const { createCombinedKeyState, createTouchKeyState, createTouchLookState } = window.mobileControls;
-const { createArenaMinimapFrame, drawArenaMinimap } = window.arenaMinimap;
+
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
   updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage,
@@ -1455,7 +1531,7 @@ function handle(m) {
             m.commands || '[]'
           );
         }
-        showKill(`${escapeHtml(m.name || '조종사')} 참전!`);
+        showAnnouncement('join', m.name || '조종사');
       }
       refreshBoard();
       break;
@@ -1498,13 +1574,17 @@ function handle(m) {
           dieLocal(false);
           if (net.room?.phase === 'live') showRespawnOverlay(m.by);
         }
-        if (net.room?.phase !== 'live' && m.by) showKill(`${m.by} 님에게 격추되었습니다`);
+        if (net.room?.phase !== 'live' && m.by) showAnnouncement('death', m.by);
       } else {
         const player = net.players.get(m.id);
-        if (player) { player.alive = false; player.remote.group.visible = false; }
+        if (player && m.by) spawnPaperTearBurst(player.remote.group, player.remote.color);
+        if (player) {
+          player.alive = false;
+          player.remote.group.visible = false;
+        }
         if (m.by === myName) {
           audioDirector.play('score');
-          showKill(`${player ? player.name : '?'} 격추!`);
+          showAnnouncement('kill', player ? player.name : '조종사');
         }
       }
       refreshBoard();
@@ -1538,9 +1618,14 @@ function handle(m) {
    ============================================================ */
 let myName = '';
 let liveSpawnGeneration = 0;
+const announcementQueue = [];
+const MAX_ANNOUNCEMENT_QUEUE = 6;
+let announcementTimer = null;
+let announcementActive = false;
 
 function enterHome(msg) {
   audioDirector.setScene('HOME');
+  clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
   $('home-screen').classList.remove('hide');
   $('room-entry').classList.add('hide');
@@ -1591,6 +1676,7 @@ function closeRoomEntry() {
 
 function enterLobby(msg) {
   audioDirector.setScene('HOME');
+  clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
   game.phase = 'lobby';
   game.frozen = true;
@@ -1611,6 +1697,7 @@ function enterLobby(msg) {
 
 function enterRoomLobby(room, resultsPending = false) {
   audioDirector.setScene('WAITING');
+  clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
   $('home-screen').classList.add('hide');
   $('room-entry').classList.add('hide');
@@ -1665,6 +1752,7 @@ function enterRoomLobby(room, resultsPending = false) {
 
 function enterFolding() {
   audioDirector.setScene('FOLDING');
+  clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
   closePauseMenu();
   releaseFlightPointerLock();
@@ -1689,8 +1777,7 @@ function enterGame() {
   const arena = game.mode === 'ARENA';
   $('timer').classList.toggle('hide', arena);
   $('hud').classList.toggle('arena-mode', arena);
-  $('arena-minimap').classList.toggle('hide', !arena);
-  $('board').classList.toggle('arena', arena);
+
   $('s-cap').textContent = arena ? '생존 시간' : '직선 거리';
   $('s-unit').textContent = arena ? 's' : 'm';
   $('keys-fire').classList.toggle('hide', !arena);
@@ -1849,7 +1936,6 @@ function requestRoundLeave() {
 }
 
 $('room-leave-btn').addEventListener('click', requestRoundLeave);
-$('game-leave-btn').addEventListener('click', openPauseMenu);
 $('resume-btn').addEventListener('click', resumeFlight);
 $('pause-leave-btn').addEventListener('click', () => {
   closePauseMenu();
@@ -2727,10 +2813,16 @@ const me = {
 if (graphicsQaEnabled) {
   window.__graphicsQA = {
     freeze(value = true) {
+      const wasFrozen = graphicsQaFrozen;
       graphicsQaFrozen = Boolean(value);
       if (graphicsQaFrozen) graphicsQaFrozenAt = Date.now();
       clearFlightKeys?.();
       if (graphicsQaFrozen) thermalMat.uniforms.uTime.value = 1.25;
+      if (!graphicsQaFrozen && wasFrozen && announcementActive && !announcementTimer) {
+        $('announcement')?.classList.remove('show');
+        announcementActive = false;
+        playNextAnnouncement();
+      }
       return graphicsQaFrozen;
     },
     set(overrides) {
@@ -2778,6 +2870,50 @@ if (graphicsQaEnabled) {
         touchLookActive: touchLook?.isActive()
       };
     },
+    paperTear({ freeze = true } = {}) {
+      const probe = new THREE.Group();
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+      probe.position.copy(camera.position).addScaledVector(forward, 3).addScaledVector(right, -1.1);
+      probe.quaternion.copy(camera.quaternion);
+      probe.visible = true;
+      spawnPaperTearBurst(probe, 0xffd36a);
+      const burst = paperTearBursts.at(-1);
+      if (burst) {
+        burst.material.depthTest = false;
+        burst.material.emissiveIntensity = .45;
+        burst.fragments.forEach(fragment => { fragment.mesh.renderOrder = 999; });
+      }
+      for (let frame = 0; frame < 12; frame += 1) stepPaperTears(1 / 60);
+      if (freeze) this.freeze(true);
+      return this.paperState();
+    },
+    paperState() {
+      const projected = paperTearBursts.flatMap(burst => burst.fragments.map(fragment => {
+        const point = new THREE.Vector3();
+        fragment.mesh.getWorldPosition(point);
+        point.project(camera);
+        return { x: point.x, y: point.y, z: point.z, visible: fragment.mesh.visible };
+      }));
+      return {
+        bursts: paperTearBursts.length,
+        fragments: projected.length,
+        projected,
+        memory: { ...renderer.info.memory }
+      };
+    },
+    clearPaperTear() {
+      clearPaperTears();
+      return this.paperState();
+    },
+    announce(kind = 'kill', pilotName = 'QA TARGET') {
+      showAnnouncement(kind, pilotName);
+      if (graphicsQaFrozen) {
+        clearTimeout(announcementTimer);
+        announcementTimer = null;
+      }
+      return { queued: announcementQueue.length, active: announcementActive };
+    },
     preview(mode = 'DIST', seed = 4312) {
       game.mode = mode === 'ARENA' ? 'ARENA' : 'DIST';
       game.seed = Number(seed) || 4312;
@@ -2805,35 +2941,171 @@ let spires = [], rocks = [], platforms = [], terrainColliders = [], thermals = [
 let biomeEnvironment = null;
 let distanceWidthNoise = null;
 
-function updateArenaMinimap() {
-  const frame = createArenaMinimapFrame({
-    mode: game.mode,
+const minimapCanvas = $('minimap-canvas');
+const minimapContext = minimapCanvas.getContext('2d');
+const minimapCoarsePointerQuery = matchMedia('(hover: none) and (pointer: coarse)');
+const minimapCompactViewportQuery = matchMedia('(max-width: 560px) and (max-height: 640px)');
+const MINIMAP_PADDING = 22;
+const MINIMAP_LOCAL_RADIUS = 420;
+let minimapMode = 'full';
+let minimapLastDraw = -Infinity;
+let thermalVisualTarget = 0;
+let thermalVisualStrength = 0;
+
+function updateThermalScreenEffect(dt) {
+  thermalVisualStrength = approachThermalIntensity(thermalVisualStrength, thermalVisualTarget, dt);
+  const vortex = $('thermal-vortex');
+  vortex.style.setProperty('--thermal-force', thermalVisualStrength.toFixed(3));
+}
+
+function updateMinimapModeLabel() {
+  $('minimap-mode').textContent = minimapMode === 'local' ? '주변 420m' : '전체 전장';
+}
+
+function getDistanceMinimapHalfWidth() {
+  return DIST_HALF * window.mapGen.MAX_DISTANCE_WIDTH_SCALE;
+}
+
+function currentMinimapView() {
+  return createMinimapView({
+    mode: minimapMode,
+    gameMode: game.mode,
+    player: { x: craft.position.x, z: craft.position.z, yaw: me.yaw },
+    courseHalf: getDistanceMinimapHalfWidth(),
+    courseLength: DIST_LEN,
     arenaRadius: ARENA_R,
-    local: me.alive ? {
-      x: craft.position.x, z: craft.position.z, yaw: me.yaw, alive: true
-    } : null,
-    players: [...net.players.entries()].map(([id, player]) => ({
-      id,
-      x: player.remote.group.position.x,
-      z: player.remote.group.position.z,
-      alive: player.alive,
-      seen: player.remote.seen
-    })),
-    rings: ringsArr.map(ring => ({
-      x: ring.position.x, z: ring.position.z, taken: ring.userData.taken
-    })),
-    thermals: thermals.map(thermal => ({
-      x: thermal.position.x, z: thermal.position.z
-    }))
+    localRadius: MINIMAP_LOCAL_RADIUS
   });
-  const drawn = drawArenaMinimap($('arena-minimap-canvas'), frame);
-  if (drawn) {
-    $('arena-minimap').setAttribute(
-      'aria-label',
-      `ARENA 미니맵. 생존 상대 ${frame.players.length}명, 에너지 링 ${frame.rings.length}개, 상승기류 ${frame.thermals.length}개`
-    );
+}
+
+function minimapPoint(position, view) {
+  return projectMinimapPoint(position, view, minimapCanvas.width, minimapCanvas.height, MINIMAP_PADDING);
+}
+
+function traceMinimapBoundary(context, view) {
+  context.beginPath();
+  if (game.mode === 'ARENA') {
+    for (let index = 0; index <= 72; index += 1) {
+      const angle = index / 72 * Math.PI * 2;
+      const point = minimapPoint({ x: Math.cos(angle) * ARENA_R, z: Math.sin(angle) * ARENA_R }, view);
+      if (index === 0) context.moveTo(point.x, point.y);
+      else context.lineTo(point.x, point.y);
+    }
+  } else {
+    const left = [], right = [];
+    for (let index = 0; index <= 60; index += 1) {
+      const z = -DIST_LEN * index / 60;
+      const widthScale = distanceWidthNoise ? window.mapGen.widthScaleAt(z, distanceWidthNoise) : 1;
+      const half = DIST_HALF * widthScale;
+      left.push(minimapPoint({ x: -half, z }, view));
+      right.push(minimapPoint({ x: half, z }, view));
+    }
+    [...left, ...right.reverse(), left[0]].forEach((point, index) => {
+      if (index === 0) context.moveTo(point.x, point.y);
+      else context.lineTo(point.x, point.y);
+    });
+  }
+  context.closePath();
+  context.fillStyle = 'rgba(42,94,108,.2)';
+  context.strokeStyle = 'rgba(133,225,221,.5)';
+  context.lineWidth = 2.2;
+  context.fill();
+  context.stroke();
+}
+
+function drawMinimapMarker(position, view, color, radius, ring = false) {
+  const point = minimapPoint(position, view);
+  if (!point.visible) return;
+  minimapContext.beginPath();
+  minimapContext.arc(point.x, point.y, radius, 0, Math.PI * 2);
+  if (ring) {
+    minimapContext.strokeStyle = color;
+    minimapContext.lineWidth = 2;
+    minimapContext.stroke();
+  } else {
+    minimapContext.fillStyle = color;
+    minimapContext.fill();
   }
 }
+
+function drawMinimapPilot(position, yaw, view, color, localPlayer = false) {
+  const point = minimapPoint(position, view);
+  if (!point.visible && !localPlayer) return;
+  minimapContext.save();
+  minimapContext.translate(point.x, point.y);
+  minimapContext.rotate(view.mode === 'local' ? -(yaw - me.yaw) : -yaw);
+  minimapContext.beginPath();
+  minimapContext.moveTo(0, -12);
+  minimapContext.lineTo(8, 9);
+  minimapContext.lineTo(0, 5);
+  minimapContext.lineTo(-8, 9);
+  minimapContext.closePath();
+  minimapContext.fillStyle = color;
+  minimapContext.shadowColor = color;
+  minimapContext.shadowBlur = localPlayer ? 15 : 8;
+  minimapContext.fill();
+  minimapContext.restore();
+}
+
+function drawMinimap(timestamp = performance.now(), force = false) {
+  if (!shouldRenderMinimap({
+    force,
+    coarsePointer: minimapCoarsePointerQuery.matches,
+    compactViewport: minimapCompactViewportQuery.matches
+  })) {
+    minimapLastDraw = -Infinity;
+    return;
+  }
+  if (!force && timestamp - minimapLastDraw < 100) return;
+  minimapLastDraw = timestamp;
+  const context = minimapContext;
+  const width = minimapCanvas.width, height = minimapCanvas.height;
+  const view = currentMinimapView();
+  context.clearRect(0, 0, width, height);
+
+  const background = context.createRadialGradient(width / 2, height / 2, 20, width / 2, height / 2, width * .7);
+  background.addColorStop(0, 'rgba(18,49,66,.96)');
+  background.addColorStop(1, 'rgba(4,16,28,.98)');
+  context.fillStyle = background;
+  context.fillRect(0, 0, width, height);
+
+  context.save();
+  context.strokeStyle = 'rgba(177,221,237,.075)';
+  context.lineWidth = 1;
+  for (let offset = 64; offset < width; offset += 64) {
+    context.beginPath(); context.moveTo(offset, 0); context.lineTo(offset, height); context.stroke();
+    context.beginPath(); context.moveTo(0, offset); context.lineTo(width, offset); context.stroke();
+  }
+  traceMinimapBoundary(context, view);
+
+  const obstacles = [...spires, ...rocks, ...platforms];
+  const obstacleStep = Math.max(1, Math.ceil(obstacles.length / 180));
+  for (let index = 0; index < obstacles.length; index += obstacleStep)
+    drawMinimapMarker(obstacles[index].position, view, 'rgba(176,196,202,.48)', 2.2);
+  for (const thermal of thermals)
+    drawMinimapMarker(thermal.position, view, 'rgba(90,239,196,.82)', 6, true);
+  for (const ring of ringsArr) {
+    if (!ring.userData.taken) drawMinimapMarker(ring.position, view, 'rgba(255,204,103,.9)', 4, true);
+  }
+
+  for (const player of net.players.values()) {
+    if (!player.alive || !player.remote.seen) continue;
+    drawMinimapPilot(player.remote.group.position, player.remote.group.rotation.y, view, '#ff9c83');
+  }
+  drawMinimapPilot(craft.position, me.yaw, view, '#8ff0d0', true);
+
+  if (view.mode === 'local') {
+    context.beginPath();
+    context.arc(width / 2, height / 2, width / 2 - MINIMAP_PADDING, 0, Math.PI * 2);
+    context.strokeStyle = 'rgba(143,240,208,.18)';
+    context.setLineDash([6, 8]);
+    context.stroke();
+    context.setLineDash([]);
+  }
+  context.restore();
+}
+
+updateMinimapModeLabel();
 
 const thermalMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide,
@@ -2868,6 +3140,7 @@ const ringMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0xff
 
 function clearWorld() {
   clearDarts();
+  clearPaperTears();
   if (typeof launchState !== 'undefined') {
     clearLaunchActors();
     clearLaunchTowers();
@@ -3155,6 +3428,115 @@ function updateLaunch(now) {
     game.frozen = true;
     me.alive = false;
     showCenter(null, '비행 준비 완료', '서버 출발 신호를 기다리는 중');
+  }
+}
+
+/* ============================================================
+   종이 찢김 격추 파편
+   ============================================================ */
+const paperTearBursts = [];
+const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+function makeTornPaperGeometry(scale = 1) {
+  const width = (0.75 + Math.random() * 0.9) * scale;
+  const height = (0.65 + Math.random() * 1.15) * scale;
+  const notch = (Math.random() - 0.5) * width * 0.28;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -width * .56, -height * .18, 0,
+    notch, -height * .34, 0,
+    width * .58, height * .02, 0,
+    width * .12, height * .62, 0,
+    -width * .44, height * .38, 0
+  ], 3));
+  geometry.setIndex([0, 1, 4, 1, 3, 4, 1, 2, 3]);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function spawnPaperTearBurst(remoteGroup, color) {
+  if (reducedMotion) return;
+  if (!remoteGroup?.visible) return;
+  remoteGroup.updateWorldMatrix(true, false);
+  const origin = new THREE.Vector3();
+  const worldQuaternion = new THREE.Quaternion();
+  remoteGroup.getWorldPosition(origin);
+  remoteGroup.getWorldQuaternion(worldQuaternion);
+
+  const paperColor = color?.isColor ? color.clone() : new THREE.Color(color || 0xf1f5f7);
+  paperColor.offsetHSL(0, -.08, .12);
+  const material = registerLitMaterial(new THREE.MeshStandardMaterial({
+    color: paperColor, emissive: paperColor, emissiveIntensity: .09,
+    roughness: .94, metalness: 0, flatShading: true, side: THREE.DoubleSide
+  }));
+  const fragmentCount = 18;
+  const fragments = [];
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(worldQuaternion);
+
+  for (let index = 0; index < fragmentCount; index++) {
+    const geometry = makeTornPaperGeometry(1);
+    const mesh = new THREE.Mesh(geometry, material);
+    const localOffset = new THREE.Vector3(
+      (Math.random() - .5) * 4.5,
+      (Math.random() - .5) * 1.1,
+      (Math.random() - .5) * 2.8
+    );
+    const worldOffset = localOffset.clone().applyQuaternion(worldQuaternion);
+    mesh.position.copy(origin).add(worldOffset);
+    mesh.quaternion.copy(worldQuaternion);
+    mesh.rotateX((Math.random() - .5) * 1.2);
+    mesh.rotateY((Math.random() - .5) * 1.2);
+    mesh.rotateZ((Math.random() - .5) * 1.2);
+    scene.add(mesh);
+
+    const outward = worldOffset.lengthSq() > .001
+      ? worldOffset.clone().normalize()
+      : new THREE.Vector3(Math.random() - .5, Math.random(), Math.random() - .5).normalize();
+    const velocity = outward.multiplyScalar(6 + Math.random() * 9)
+      .addScaledVector(forward, 2.5 + Math.random() * 3)
+      .add(new THREE.Vector3(0, 3 + Math.random() * 5, 0));
+    fragments.push({
+      mesh, position: mesh.position, rotation: mesh.rotation, velocity,
+      spin: new THREE.Vector3(
+        (Math.random() - .5) * 13,
+        (Math.random() - .5) * 13,
+        (Math.random() - .5) * 15
+      ),
+      life: 1.15 + Math.random() * .35,
+      alive: true
+    });
+  }
+  paperTearBursts.push({ fragments, material, disposed: false });
+}
+
+function disposePaperTearBurst(burst) {
+  if (!burst || burst.disposed) return;
+  burst.disposed = true;
+  for (const fragment of burst.fragments) {
+    scene.remove(fragment.mesh);
+    fragment.mesh.geometry.dispose();
+  }
+  unregisterLitMaterial(burst.material);
+}
+
+function clearPaperTears() {
+  for (const burst of paperTearBursts) disposePaperTearBurst(burst);
+  paperTearBursts.length = 0;
+}
+
+function stepPaperTears(dt) {
+  for (let burstIndex = paperTearBursts.length - 1; burstIndex >= 0; burstIndex--) {
+    const burst = paperTearBursts[burstIndex];
+    let aliveCount = 0;
+    for (const fragment of burst.fragments) {
+      if (!fragment.alive) continue;
+      fragment.alive = advancePaperFragment(fragment, dt);
+      fragment.mesh.visible = fragment.alive;
+      if (fragment.alive) aliveCount++;
+    }
+    if (aliveCount > 0) continue;
+    disposePaperTearBurst(burst);
+    paperTearBursts.splice(burstIndex, 1);
   }
 }
 
@@ -3479,12 +3861,38 @@ function showCenter(cd, msg, sub) {
 }
 function hideCenter() { $('center').classList.add('hide'); }
 
-let killT = null;
-function showKill(text) {
-  $('kill').textContent = text;
-  $('kill').style.opacity = 1;
-  clearTimeout(killT);
-  killT = setTimeout(() => { $('kill').style.opacity = 0; }, 2200);
+function showAnnouncement(kind, pilotName) {
+  enqueueBoundedAnnouncement(announcementQueue, announcementSpec(kind, pilotName), MAX_ANNOUNCEMENT_QUEUE);
+  playNextAnnouncement();
+}
+
+function playNextAnnouncement() {
+  if (announcementActive || announcementQueue.length === 0) return;
+  announcementActive = true;
+  const spec = announcementQueue.shift();
+  const layer = $('announcement');
+  layer.dataset.tone = spec.tone;
+  $('announcement-kicker').textContent = spec.kicker;
+  $('announcement-title').textContent = spec.title;
+  $('announcement-detail').textContent = spec.detail;
+  layer.classList.remove('show');
+  void layer.offsetWidth;
+  layer.classList.add('show');
+  announcementTimer = setTimeout(() => {
+    layer.classList.remove('show');
+    announcementTimer = setTimeout(() => {
+      announcementActive = false;
+      playNextAnnouncement();
+    }, 180);
+  }, spec.duration);
+}
+
+function clearAnnouncements() {
+  announcementQueue.length = 0;
+  clearTimeout(announcementTimer);
+  announcementTimer = null;
+  announcementActive = false;
+  $('announcement')?.classList.remove('show');
 }
 
 function escapeHtml(value) {
@@ -3608,7 +4016,7 @@ function hideResults() {
   }
   if (!restored) {
     const fallback = !$('room-lobby').classList.contains('hide') ? $('room-mode-title')
-      : !$('lobby').classList.contains('hide') ? $('lob-name') : $('game-leave-btn');
+      : !$('lobby').classList.contains('hide') ? $('lob-name') : $('c');
     fallback.focus();
   }
   resultsReturnFocus = null;
@@ -3622,7 +4030,7 @@ function closePauseMenu() {
   if (wasOpen) {
     if (pauseReturnFocus && pauseReturnFocus !== document.body && pauseReturnFocus.isConnected &&
         !pauseReturnFocus.closest('.hide')) pauseReturnFocus.focus();
-    else $('game-leave-btn').focus();
+    else $('c').focus();
   }
   pauseReturnFocus = null;
 }
@@ -3776,6 +4184,11 @@ addEventListener('keydown', e => {
   if (!shouldCaptureGameKey(e)) return;
   keyboardKeys[e.code] = true;
   e.preventDefault();
+  if (e.code === 'KeyN' && !e.repeat) {
+    minimapMode = toggleMinimapMode(minimapMode);
+    updateMinimapModeLabel();
+    drawMinimap(performance.now(), true);
+  }
   if (e.code === 'Space' && !e.repeat) shoot();
 });
 addEventListener('keyup', e => {
@@ -3797,7 +4210,7 @@ const camPos = new THREE.Vector3();
 const lookAt = new THREE.Vector3();
 const tmpV = new THREE.Vector3();
 
-let sendAcc = 0, roundClock = 0, minimapAcc = 0;
+let sendAcc = 0, roundClock = 0;
 
 function physics(dt) {
   const wasDashing = me.dashing;
@@ -3811,6 +4224,8 @@ function physics(dt) {
       inTh = Math.max(inTh, (1 - (distance / THERMAL_R) * .75) * (thermal.userData.strength || 1));
     }
   }
+
+  thermalVisualTarget = THREE.MathUtils.clamp(inTh, 0, 1);
 
   const energyStep = updateEnergy(
     me.energy,
@@ -3912,7 +4327,6 @@ function physics(dt) {
 
   /* 상승기류: Rapier에서는 고정 스텝 외력으로 이미 적용됩니다. */
   if (inTh > 0 && !rapierFlight) craft.position.y += THERMAL_LIFT * inTh * dt;
-  $('thermal').classList.toggle('on', inTh > 0);
   craft.position.y = Math.min(craft.position.y, MAX_ALT);
   rapierFlight?.setPosition({
     x: craft.position.x,
@@ -3950,7 +4364,12 @@ renderer.setAnimationLoop(timestamp => {
     animateCostumes(scene, elapsed);
   }
 
-  if (game.phase === 'lobby') { renderScene(dt); return; }
+  if (game.phase === 'lobby') {
+    thermalVisualTarget = 0;
+    updateThermalScreenEffect(dt);
+    renderScene(dt);
+    return;
+  }
 
   /* ---- 카운트다운 표시 ---- */
   if (game.phase === 'countdown') {
@@ -3966,8 +4385,13 @@ renderer.setAnimationLoop(timestamp => {
       : Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
     if (me.alive && !graphicsQaFrozen) physics(dt);
   }
+  if (game.phase !== 'playing' || !me.alive) thermalVisualTarget = 0;
+  updateThermalScreenEffect(dt);
 
-  if (!graphicsQaFrozen) stepDarts(dt);
+  if (!graphicsQaFrozen) {
+    stepDarts(dt);
+    stepPaperTears(dt);
+  }
 
   /* ---- 원격 기체 보간 ---- */
   for (const pl of net.players.values()) {
@@ -3985,11 +4409,6 @@ renderer.setAnimationLoop(timestamp => {
     r.group.rotation.y += dy * Math.min(1, 10 * dt);
   }
 
-  minimapAcc += dt;
-  if (minimapAcc >= 1 / 15) {
-    minimapAcc %= 1 / 15;
-    updateArenaMinimap();
-  }
 
   craft.rotation.set(me.pitch, me.yaw, me.roll);
   if (!graphicsQaFrozen) ringsArr.forEach(r => { if (!r.userData.taken) r.rotation.z += dt * 0.8; });
@@ -4105,6 +4524,7 @@ renderer.setAnimationLoop(timestamp => {
   $('energy').classList.toggle('dashing', me.dashing);
   $('energy').classList.toggle('low', me.energy < DART_ENERGY_COST);
   audioDirector.setFlight({ speed: me.speed, dashing: me.dashing, alive: me.alive && game.phase === 'playing' });
+  drawMinimap(timestamp);
 
   if (game.phase === 'playing' || game.phase === 'countdown' || game.phase === 'launch') {
     const left = Math.max(0, (game.ends - now) / 1000);

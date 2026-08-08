@@ -14,13 +14,14 @@ const biomeHelpers = fs.readFileSync(path.join(publicDir, 'biomes', 'helpers.js'
 const physics = fs.readFileSync(path.join(publicDir, 'flight-physics-rapier.mjs'), 'utf8');
 const packageJson = require('../package.json');
 
-test('browser loads versioned pure biome recipes before the registry and renderer module', () => {
-  const minimap = html.indexOf(`<script src="./arena-minimap.js?v=${packageJson.version}"></script>`);
+test('browser loads HUD policy and versioned pure biome recipes before the registry and renderer module', () => {
+  const hudPolicy = html.indexOf(`<script src="./hud-policy.js?v=${packageJson.version}"></script>`);
   const helpers = html.indexOf(`<script src="./biomes/helpers.js?v=${packageJson.version}"></script>`);
   const desert = html.indexOf('<script src="./biomes/desert.js"></script>');
   const floating = html.indexOf('<script src="./biomes/floating.js"></script>');
   const registry = html.indexOf(`<script src="./map-gen.js?v=${packageJson.version}"></script>`);
-  assert.ok(minimap >= 0 && minimap < helpers);
+  assert.ok(hudPolicy >= 0 && hudPolicy < helpers);
+  assert.doesNotMatch(html, /arena-minimap\.js/);
   assert.ok(helpers < desert);
   assert.ok(desert < floating && floating < registry);
   assert.match(html, /import \{ buildBiomeEnvironment, terrainCollisionAtPoint \} from '\.\/biome-visuals\.js';/);

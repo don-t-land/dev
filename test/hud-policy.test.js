@@ -4,7 +4,7 @@ const test = require('node:test');
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
   approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
-  respawnPresentation, advancePaperFragment
+  respawnPresentation, authoritativeCrashAction, advancePaperFragment
 } = require('../public/hud-policy.js');
 
 function close(actual, expected, message) {
@@ -102,6 +102,15 @@ test('thermal screen intensity eases toward a clamped target and decays cleanly'
   const falling = approachThermalIntensity(0.8, 0, 0.1);
   assert.ok(falling >= 0 && falling < 0.8);
   assert.equal(approachThermalIntensity(0.4, 0.8, 0), 0.4);
+});
+
+test('authoritative local crash reconciles an already-visible respawn modal', () => {
+  assert.equal(authoritativeCrashAction({ localPlayer: false, alive: true, live: true, respawnOpen: false }), null);
+  assert.equal(authoritativeCrashAction({ localPlayer: true, alive: true, live: true, respawnOpen: false }), 'die-and-show');
+  assert.equal(authoritativeCrashAction({ localPlayer: true, alive: true, live: false, respawnOpen: false }), 'die');
+  assert.equal(authoritativeCrashAction({ localPlayer: true, alive: false, live: true, respawnOpen: true }), 'reconcile');
+  assert.equal(authoritativeCrashAction({ localPlayer: true, alive: false, live: true, respawnOpen: false }), null);
+  assert.equal(authoritativeCrashAction({ localPlayer: true, alive: false, live: false, respawnOpen: true }), null);
 });
 
 test('respawn modal distinguishes collision from an enemy takedown', () => {

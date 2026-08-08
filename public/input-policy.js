@@ -35,11 +35,12 @@
     gameplay = false,
     pauseOpen = false,
     respawnOpen = false,
-    resultsOpen = false
+    resultsOpen = false,
+    suppressPauseOpen = false
   } = {}) {
     const blockingModalOpen = pauseOpen || respawnOpen || resultsOpen;
     if (pointerLocked && blockingModalOpen) return 'release';
-    if (!pointerLocked && gameplay && !blockingModalOpen) return 'open-pause';
+    if (!pointerLocked && gameplay && !blockingModalOpen && !suppressPauseOpen) return 'open-pause';
     return null;
   }
 

@@ -109,6 +109,12 @@
         };
   }
 
+  function authoritativeCrashAction({ localPlayer, alive, live, respawnOpen } = {}) {
+    if (!localPlayer) return null;
+    if (alive) return live ? 'die-and-show' : 'die';
+    return live && respawnOpen ? 'reconcile' : null;
+  }
+
   function announcementSpec(kind, pilotName) {
     const pilot = String(pilotName || '').trim() || '조종사';
     if (kind === 'kill') return {
@@ -145,6 +151,6 @@
   return {
     toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
     approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
-    respawnPresentation, advancePaperFragment
+    respawnPresentation, authoritativeCrashAction, advancePaperFragment
   };
 });

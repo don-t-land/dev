@@ -953,7 +953,7 @@
           <p>온라인 경기는 메뉴를 연 동안에도 계속 진행됩니다.</p>
         </header>
         <div class="settings-layout">
-          <nav class="settings-sidebar" role="tablist" aria-label="설정 섹션">
+          <nav class="settings-sidebar" role="tablist" aria-label="설정 섹션" aria-orientation="vertical">
             <button id="settings-tab-controls" data-settings-tab="controls" role="tab" aria-selected="true" aria-controls="settings-panel-controls" class="settings-tab" type="button">
               <span class="settings-tab-icon" aria-hidden="true">⌨</span><span><strong>조작</strong><small>HUD · 시야 설정</small></span>
             </button>
@@ -1164,8 +1164,8 @@
   }
 }
 </script>
-<script src="./input-policy.js?v=1.7.1"></script>
-<script src="./hud-policy.js?v=1.7.1"></script>
+<script src="./input-policy.js?v=1.7.2"></script>
+<script src="./hud-policy.js?v=1.7.2"></script>
 <script src="./mobile-controls.js"></script>
 
 <script src="./room-state.js"></script>
@@ -1178,13 +1178,13 @@
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
-<script src="./biomes/helpers.js?v=1.7.1"></script>
+<script src="./biomes/helpers.js?v=1.7.2"></script>
 <script src="./biomes/desert.js"></script>
 <script src="./biomes/pillars.js"></script>
 <script src="./biomes/glacier.js"></script>
 <script src="./biomes/lava.js"></script>
 <script src="./biomes/floating.js"></script>
-<script src="./map-gen.js?v=1.7.1"></script>
+<script src="./map-gen.js?v=1.7.2"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./costume-showroom-3d.js"></script>
@@ -1215,7 +1215,7 @@ const {
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
   approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
-  respawnPresentation, advancePaperFragment
+  respawnPresentation, authoritativeCrashAction, advancePaperFragment
 } = window.hudPolicy;
 const { createCombinedKeyState, createTouchKeyState, createTouchLookState } = window.mobileControls;
 
@@ -1637,11 +1637,18 @@ function handle(m) {
     }
 
     case 'crashed': {
+      const crashAction = authoritativeCrashAction({
+        localPlayer: m.id === net.id,
+        alive: me.alive,
+        live: net.room?.phase === 'live',
+        respawnOpen: !$('respawn-overlay').classList.contains('hide')
+      });
       if (m.id === net.id) {
-        if (me.alive) {
+        if (crashAction === 'die-and-show') {
           dieLocal(false);
-          if (net.room?.phase === 'live') showRespawnOverlay(m.by);
-        }
+          showRespawnOverlay(m.by);
+        } else if (crashAction === 'die') dieLocal(false);
+        else if (crashAction === 'reconcile') updateRespawnPresentation(m.by);
         if (net.room?.phase !== 'live' && m.by) showAnnouncement('death', m.by);
       } else {
         const player = net.players.get(m.id);
@@ -3907,10 +3914,7 @@ function dieLocal(report = true) {
 function showRespawnOverlay(byName) {
   clearFlightKeys();
   closePauseMenu();
-  const presentation = respawnPresentation(byName, me.surv);
-  $('respawn-kicker').textContent = presentation.kicker;
-  $('respawn-title').textContent = presentation.title;
-  $('respawn-detail').textContent = presentation.detail;
+  updateRespawnPresentation(byName);
   $('respawn-status').textContent = '';
   $('respawn-overlay').classList.remove('hide');
   $('respawn-now-btn').disabled = false;
@@ -3918,6 +3922,13 @@ function showRespawnOverlay(byName) {
   setUnderlyingGameUiInert(true, 'respawn-overlay');
   releaseFlightPointerLock();
   $('respawn-now-btn').focus();
+}
+
+function updateRespawnPresentation(byName) {
+  const presentation = respawnPresentation(byName, me.surv);
+  $('respawn-kicker').textContent = presentation.kicker;
+  $('respawn-title').textContent = presentation.title;
+  $('respawn-detail').textContent = presentation.detail;
 }
 
 /* ---- 중앙 메시지 ---- */
@@ -4030,9 +4041,12 @@ let freeLook = { yaw: 0, pitch: 0 };
 let mouseInvertY = mouseInvertYFromStorage(localStorage.getItem('pp_mouse_invert_y'));
 let pauseReturnFocus = null;
 let resultsReturnFocus = null;
+let escapeKeyDown = false;
+let suppressPauseOnPointerUnlock = false;
 
 function clearFlightKeys() {
   for (const code of Object.keys(keyboardKeys)) keyboardKeys[code] = false;
+  escapeKeyDown = false;
   touchFlightKeys?.clear();
   touchLook?.clear();
 }
@@ -4098,6 +4112,15 @@ function setSettingsSection(section, { focusTab = false } = {}) {
   const panelScroller = document.querySelector('.settings-panels');
   if (panelScroller) panelScroller.scrollTop = 0;
 }
+
+function syncSettingsTabOrientation(mediaQuery) {
+  document.querySelector('.settings-sidebar')
+    ?.setAttribute('aria-orientation', mediaQuery.matches ? 'horizontal' : 'vertical');
+}
+
+const settingsTabMediaQuery = matchMedia('(max-width: 640px)');
+syncSettingsTabOrientation(settingsTabMediaQuery);
+settingsTabMediaQuery.addEventListener?.('change', () => syncSettingsTabOrientation(settingsTabMediaQuery));
 
 for (const tab of document.querySelectorAll('[data-settings-tab]')) {
   tab.addEventListener('click', () => setSettingsSection(tab.dataset.settingsTab));
@@ -4188,6 +4211,7 @@ function openPauseMenu() {
 }
 
 function resumeFlight() {
+  suppressPauseOnPointerUnlock = true;
   closePauseMenu();
   if (game.phase === 'playing' || game.phase === 'countdown') requestFlightPointerLock();
 }
@@ -4283,18 +4307,22 @@ document.addEventListener('mousemove', event => {
 });
 
 document.addEventListener('pointerlockchange', () => {
+  const pointerLocked = document.pointerLockElement === $('c');
+  if (pointerLocked && !escapeKeyDown) suppressPauseOnPointerUnlock = false;
   const pointerAction = pointerLockAction({
-    pointerLocked: document.pointerLockElement === $('c'),
+    pointerLocked: pointerLocked,
     gameplay: game.phase === 'playing' || game.phase === 'countdown',
     pauseOpen: isPauseMenuOpen(),
     respawnOpen: !$('respawn-overlay').classList.contains('hide'),
-    resultsOpen: !$('results').classList.contains('hide')
+    resultsOpen: !$('results').classList.contains('hide'),
+    suppressPauseOpen: suppressPauseOnPointerUnlock
   });
   if (pointerAction === 'release') releaseFlightPointerLock();
   else if (pointerAction === 'open-pause') openPauseMenu();
 });
 
 addEventListener('keydown', e => {
+  if (e.code === 'Escape') escapeKeyDown = true;
   if (activateModalButtonOnSpace(e, $('pause-menu'), $('resume-btn')) ||
       activateModalButtonOnSpace(e, $('respawn-overlay'), $('respawn-now-btn')) ||
       activateModalButtonOnSpace(e, $('results'), $('results-ready-btn'))) return;
@@ -4330,6 +4358,10 @@ addEventListener('keydown', e => {
   if (e.code === 'Space' && !e.repeat) shoot();
 });
 addEventListener('keyup', e => {
+  if (e.code === 'Escape') {
+    escapeKeyDown = false;
+    if (document.pointerLockElement === $('c')) suppressPauseOnPointerUnlock = false;
+  }
   if (e.code in keyboardKeys) keyboardKeys[e.code] = false;
 });
 addEventListener('blur', clearFlightKeys);

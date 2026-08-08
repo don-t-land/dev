@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.2 - 2026-08-08
+
+### Fixed
+
+- ESC로 설정 메뉴를 닫으며 요청한 pointer lock이 같은 ESC 입력에 의해 거부·취소되어도 `pointerlockchange`가 메뉴를 즉시 다시 열지 않도록 상태 전이를 수정했습니다.
+- 로컬 지형 충돌과 서버 격추 판정이 거의 동시에 발생해도 열린 respawn modal을 서버의 authoritative 공격자 정보로 재조정하도록 수정했습니다.
+- 설정 sidebar의 ARIA orientation이 desktop에서는 `vertical`, 작은 화면에서는 실제 가로 tab rail에 맞춰 `horizontal`로 동기화되도록 수정했습니다.
+- browser asset cache key를 앱 버전 `1.7.2`와 일치시켰습니다.
+
 ## 1.7.1 - 2026-08-08
 
 ### Added

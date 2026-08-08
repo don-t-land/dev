@@ -82,6 +82,13 @@ test('join, kill, and death use typed, accessible impact announcements', () => {
   assert.match(html, /freeze\(value = true\)\s*\{[\s\S]*const wasFrozen = graphicsQaFrozen[\s\S]*!graphicsQaFrozen && wasFrozen && announcementActive && !announcementTimer[\s\S]*playNextAnnouncement\(\)/);
 });
 
+test('authoritative takedown reconciles a local collision overlay without replaying death effects', () => {
+  assert.match(html, /const\s+crashAction\s*=\s*authoritativeCrashAction\(\{[\s\S]*localPlayer:\s*m\.id\s*===\s*net\.id[\s\S]*alive:\s*me\.alive[\s\S]*live:[\s\S]*respawnOpen:/s);
+  assert.match(html, /if\s*\(crashAction\s*===\s*'die-and-show'\)[\s\S]*dieLocal\(false\)[\s\S]*showRespawnOverlay\(m\.by\)/s);
+  assert.match(html, /else if\s*\(crashAction\s*===\s*'reconcile'\)\s*updateRespawnPresentation\(m\.by\)/);
+  assert.match(html, /function\s+updateRespawnPresentation\(byName\)[\s\S]*respawnPresentation\(byName,\s*me\.surv\)/s);
+});
+
 test('respawn modal labels self-collision separately from an enemy takedown', () => {
   assert.match(html, /id="respawn-kicker"/);
   assert.match(html, /id="respawn-title"/);

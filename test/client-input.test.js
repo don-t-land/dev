@@ -58,6 +58,24 @@ test('pointer lock never survives a blocking modal', () => {
   assert.equal(pointerLockAction({ pointerLocked: false, gameplay: false }), null);
 });
 
+test('Escape resume does not immediately reopen the pause menu when pointer lock is rejected', () => {
+  const { pointerLockAction } = require('../public/input-policy.js');
+
+  assert.equal(pointerLockAction({
+    pointerLocked: false, gameplay: true, suppressPauseOpen: true
+  }), null);
+  assert.equal(pointerLockAction({
+    pointerLocked: false, gameplay: true, suppressPauseOpen: false
+  }), 'open-pause');
+
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+  assert.match(html, /let\s+suppressPauseOnPointerUnlock\s*=\s*false/);
+  assert.match(html, /function\s+resumeFlight\(\)\s*\{[\s\S]*suppressPauseOnPointerUnlock\s*=\s*true[\s\S]*closePauseMenu\(\)/s);
+  assert.match(html, /pointerLockAction\(\{[\s\S]*suppressPauseOpen:\s*suppressPauseOnPointerUnlock/s);
+  assert.match(html, /if\s*\(pointerLocked\s*&&\s*!escapeKeyDown\)\s*suppressPauseOnPointerUnlock\s*=\s*false/);
+  assert.match(html, /function\s+clearFlightKeys\(\)\s*\{[\s\S]*escapeKeyDown\s*=\s*false/s);
+});
+
 test('Space activates the focused or default button in every blocking modal', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
@@ -255,7 +273,10 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
   assert.match(html, /class="modal-card settings-modal-card"/);
-  assert.match(html, /class="settings-sidebar"[^>]*role="tablist"[^>]*aria-label="설정 섹션"/);
+  assert.match(html, /class="settings-sidebar"[^>]*role="tablist"[^>]*aria-label="설정 섹션"[^>]*aria-orientation="vertical"/);
+  assert.match(html, /function\s+syncSettingsTabOrientation\(/);
+  assert.match(html, /matchMedia\('\(max-width:\s*640px\)'\)/);
+  assert.match(html, /setAttribute\('aria-orientation',\s*mediaQuery\.matches\s*\?\s*'horizontal'\s*:\s*'vertical'\)/);
   for (const section of ['controls', 'graphics', 'audio']) {
     assert.match(html, new RegExp(`id="settings-tab-${section}"[^>]*data-settings-tab="${section}"[^>]*role="tab"`));
     assert.match(html, new RegExp(`id="settings-panel-${section}"[^>]*data-settings-panel="${section}"[^>]*role="tabpanel"`));
@@ -421,7 +442,7 @@ test('ARENA death releases the mouse and offers a direct lobby exit', () => {
   assert.match(html, /id="respawn-leave-btn"[^>]*>로비로 나가기<\/button>/);
   assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}requestRoundLeave\(\)/);
   assert.match(html, /function showRespawnOverlay\(byName\) \{[\s\S]*clearFlightKeys\(\);[\s\S]*releaseFlightPointerLock\(\);/);
-  assert.match(html, /pointerlockchange[\s\S]{0,280}respawn-overlay'\)\.classList\.contains\('hide'\)/);
+  assert.match(html, /pointerlockchange[\s\S]{0,420}respawn-overlay'\)\.classList\.contains\('hide'\)/);
   assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,320}respawn-overlay'\)\.classList\.add\('hide'\)/);
   assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);\s*if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*const pauseAction = pauseMenuAction\(/);
   assert.match(flowCss, /#respawn-leave-btn\s*\{[^}]*flex-basis:\s*100%/s);

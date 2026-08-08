@@ -17,7 +17,7 @@
   function getLaunchPose(progress) {
     const value = clamp01(progress);
     const dropAt = 0.68;
-    const bodyTransition = smoothstep(value, 0.72, 0.94);
+    const bodyTransition = smoothstep(value, 0.56, 0.76);
     const poofProgress = value < dropAt ? 0 : smoothstep(value, dropAt, 0.86);
     const poofOpacity = value < dropAt ? 0 : 1 - smoothstep(value, 0.78, 0.9);
     return {
@@ -25,7 +25,54 @@
       legsVisible: value < dropAt,
       poofProgress,
       poofOpacity,
-      showFlightCraft: value >= 1
+      showFlightCraft: value >= 0.76
+    };
+  }
+
+  function getLaunchMotion(progress) {
+    const value = clamp01(progress);
+    const runStart = 0.08;
+    const runEnd = 0.64;
+    const running = value >= runStart && value < runEnd;
+    const runTime = clamp01((value - runStart) / (runEnd - runStart));
+    const runProgress = runTime * runTime * (2 - runTime);
+    const airTime = clamp01((value - runEnd) / (1 - runEnd));
+    const airProgress = airTime * (2 - airTime);
+    const stridePhase = (value - runStart) / (runEnd - runStart);
+    return {
+      runProgress,
+      airProgress,
+      stride: running ? Math.sin(stridePhase * Math.PI * 7) : 0
+    };
+  }
+
+  function getLaunchCameraPlan(start, edge) {
+    const sx = Number(start?.x) || 0;
+    const sy = Number(start?.y) || 0;
+    const sz = Number(start?.z) || 0;
+    const ex = Number(edge?.x) || 0;
+    const ey = Number(edge?.y) || 0;
+    const ez = Number(edge?.z) || 0;
+    const dx = ex - sx;
+    const dz = ez - sz;
+    const pathLength = Math.hypot(dx, dz);
+    const dirX = pathLength > 0 ? dx / pathLength : 0;
+    const dirZ = pathLength > 0 ? dz / pathLength : -1;
+    const sideX = -dirZ;
+    const sideZ = dirX;
+    const target = {
+      x: (sx + ex) / 2 + dirX * 2.5,
+      y: (sy + ey) / 2 + 2,
+      z: (sz + ez) / 2 + dirZ * 2.5
+    };
+    return {
+      target,
+      position: {
+        x: sx - dirX * 4.5 + sideX * 3.8,
+        y: target.y + 10.5,
+        z: sz - dirZ * 4.5 + sideZ * 3.8
+      },
+      pathLength
     };
   }
 
@@ -48,5 +95,12 @@
     return `${mode === 'ARENA' ? 'ARENA' : 'DIST'}:${Number(seed) || 0}:${count}`;
   }
 
-  return { getLaunchPose, localDeadline, shouldReuseFoldedVisual, getLaunchLayoutKey };
+  return {
+    getLaunchPose,
+    getLaunchMotion,
+    getLaunchCameraPlan,
+    localDeadline,
+    shouldReuseFoldedVisual,
+    getLaunchLayoutKey
+  };
 });

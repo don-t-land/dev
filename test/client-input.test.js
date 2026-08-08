@@ -340,7 +340,7 @@ test('ARENA death releases the mouse and offers a direct lobby exit', () => {
 
   assert.match(html, /id="respawn-overlay"[^>]*aria-modal="true"/);
   assert.match(html, /id="respawn-leave-btn"[^>]*>로비로 나가기<\/button>/);
-  assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}send\(\{ t: 'leave' \}\)/);
+  assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}requestRoundLeave\(\)/);
   assert.match(html, /function showRespawnOverlay\(byName\) \{[\s\S]*clearFlightKeys\(\);[\s\S]*releaseFlightPointerLock\(\);/);
   assert.match(html, /pointerlockchange[\s\S]{0,280}respawn-overlay'\)\.classList\.contains\('hide'\)/);
   assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,320}respawn-overlay'\)\.classList\.add\('hide'\)/);

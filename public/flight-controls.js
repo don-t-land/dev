@@ -78,18 +78,22 @@
     return value === '1';
   }
 
-  function updateEnergy(value, dt, wantsDash) {
+  function updateEnergy(value, dt, wantsDash, overheated = false) {
     const step = Math.max(0, Math.min(Number(dt) || 0, 0.1));
     let energy = Math.max(0, Math.min(MAX_ENERGY, Number(value) || 0));
+    const cooling = Boolean(overheated) || energy === 0;
+    if (cooling) {
+      energy = Math.min(MAX_ENERGY, energy + ENERGY_REGEN_PER_SECOND * step);
+      return { energy, dashRatio: 0, overheated: energy < MAX_ENERGY };
+    }
     if (!wantsDash || step === 0) {
       energy = Math.min(MAX_ENERGY, energy + ENERGY_REGEN_PER_SECOND * step);
-      return { energy, dashRatio: 0 };
+      return { energy, dashRatio: 0, overheated: false };
     }
-    if (energy === 0) return { energy, dashRatio: 0 };
 
     const activeSeconds = Math.min(step, energy / DASH_ENERGY_PER_SECOND);
     energy = Math.max(0, energy - DASH_ENERGY_PER_SECOND * activeSeconds);
-    return { energy, dashRatio: activeSeconds / step };
+    return { energy, dashRatio: activeSeconds / step, overheated: energy === 0 };
   }
 
   function consumeDartEnergy(value) {

@@ -289,7 +289,8 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
   assert.match(html, /panel\.hidden\s*=\s*panel\.dataset\.settingsPanel\s*!==\s*section/);
   assert.match(html, /tab\.setAttribute\('aria-selected',\s*String\(selected\)\)/);
   assert.match(html, /document\.querySelectorAll\('\[data-settings-tab\]'\)/);
-  assert.match(html, /openPauseMenu\(\)[\s\S]*setSettingsSection\('controls'\)[\s\S]*\$\('settings-tab-controls'\)\.focus\(\)/s);
+  assert.match(html, /function openPauseMenu\(\)[\s\S]*openSettingsMenu\('controls'\)/s);
+  assert.match(html, /settings-quick-toggle'\)\.addEventListener\('click',[\s\S]*openSettingsMenu\('audio'\)/);
 });
 
 test('the client loads free-flight controls and exposes the ESC settings menu', () => {
@@ -443,8 +444,8 @@ test('ARENA death releases the mouse and offers a direct lobby exit', () => {
   assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}requestRoundLeave\(\)/);
   assert.match(html, /function showRespawnOverlay\(byName\) \{[\s\S]*clearFlightKeys\(\);[\s\S]*releaseFlightPointerLock\(\);/);
   assert.match(html, /pointerlockchange[\s\S]{0,420}respawn-overlay'\)\.classList\.contains\('hide'\)/);
-  assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,320}respawn-overlay'\)\.classList\.add\('hide'\)/);
-  assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);\s*if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*const pauseAction = pauseMenuAction\(/);
+  assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,420}respawn-overlay'\)\.classList\.add\('hide'\)/);
+  assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);[\s\S]{0,260}if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*const pauseAction = pauseMenuAction\(/);
   assert.match(flowCss, /#respawn-leave-btn\s*\{[^}]*flex-basis:\s*100%/s);
 });
 
@@ -457,11 +458,11 @@ test('pause and result overlays isolate focus and suspend flight input', () => {
   assert.match(html, /function hideResults\([\s\S]*resultsReturnFocus\s*!==\s*document\.body/);
   assert.match(html, /function trapModalFocus\(/);
   assert.match(html, /const focusable = \[\.\.\.layer\.querySelectorAll\([\s\S]*\.filter\(element => element\.tabIndex >= 0 && !element\.closest\('\[hidden\]'\) && !element\.closest\('\.hide'\)\)/);
-  assert.match(html, /function openPauseMenu\([\s\S]*setSettingsSection\('controls'\)/);
-  assert.match(html, /\$\(['"]settings-tab-controls['"]\)\.focus\(\)/);
+  assert.match(html, /function openSettingsMenu\([\s\S]*setSettingsSection\(section\)/);
+  assert.match(html, /function openPauseMenu\(\)[\s\S]*openSettingsMenu\('controls'\)/);
   assert.match(html, /function enterLobby\([\s\S]*\$\(['"]lob-name['"]\)\.focus\(\)/);
   assert.match(html, /id="results"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="r-title"/);
-  assert.match(html, /if\s*\(pauseOpen\)\s*return/);
+  assert.match(html, /if\s*\(pauseOpen\s*&&\s*e\.code\s*===\s*'Escape'/);
 });
 
 test('result and mobile HUD layouts remain scrollable without overlap', () => {

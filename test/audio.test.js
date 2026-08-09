@@ -111,7 +111,7 @@ test('client loads audio before the game module and wires scenes, cues, actions,
   const moduleIndex = html.indexOf('<script type="module">');
 
   assert.ok(policyIndex >= 0 && engineIndex > policyIndex && moduleIndex > engineIndex);
-  for (const id of ['audio-quick-toggle', 'audio-muted', 'audio-master', 'audio-music', 'audio-sfx', 'audio-reduced']) {
+  for (const id of ['audio-quick-toggle', 'settings-quick-toggle', 'audio-muted', 'audio-master', 'audio-music', 'audio-sfx', 'audio-reduced']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /function updateAudioQuickToggle/);

@@ -103,6 +103,24 @@ test('energy regenerates normally and drains continuously while dash is held', (
   const depleted = updateEnergy(1, 0.1, true);
   assert.equal(depleted.energy, 0);
   assert.ok(depleted.dashRatio > 0 && depleted.dashRatio < 1);
+  assert.equal(depleted.overheated, true);
+});
+
+test('an overheated engine ignores held dash until energy is fully restored', () => {
+  let state = { energy: 0, overheated: true };
+  for (let step = 0; step < 49; step++) {
+    state = updateEnergy(state.energy, 0.1, true, state.overheated);
+    assert.equal(state.dashRatio, 0);
+    assert.equal(state.overheated, true);
+  }
+  state = updateEnergy(state.energy, 0.1, true, state.overheated);
+  assert.equal(state.energy, MAX_ENERGY);
+  assert.equal(state.dashRatio, 0);
+  assert.equal(state.overheated, false);
+
+  const resumed = updateEnergy(state.energy, 0.1, true, state.overheated);
+  assert.equal(resumed.dashRatio, 1);
+  assert.ok(resumed.energy < MAX_ENERGY);
 });
 
 test('darts consume the shared energy pool and fail without enough energy', () => {

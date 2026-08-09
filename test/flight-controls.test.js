@@ -192,14 +192,14 @@ test('distance rings grant a strong bounded speed and energy reward', () => {
   });
 });
 
-test('distance ring speed hold prevents deceleration for 1.5 seconds without blocking acceleration', () => {
-  assert.equal(DIST_RING_SPEED_HOLD_SECONDS, 1.5);
-  const held = maintainDistanceRingSpeed(38, 44, 1.5, .1);
-  assert.deepEqual(held, { speed: 44, remaining: 1.4 });
+test('distance ring speed hold prevents deceleration for 3 seconds without blocking acceleration', () => {
+  assert.equal(DIST_RING_SPEED_HOLD_SECONDS, 3);
+  const held = maintainDistanceRingSpeed(38, 44, 3, .1);
+  assert.deepEqual(held, { speed: 44, remaining: 2.9 });
 
-  const faster = maintainDistanceRingSpeed(51, 44, 1.4, .1);
+  const faster = maintainDistanceRingSpeed(51, 44, 2.9, .1);
   assert.equal(faster.speed, 51);
-  assert.ok(Math.abs(faster.remaining - 1.3) < 1e-9);
+  assert.ok(Math.abs(faster.remaining - 2.8) < 1e-9);
 
   const expired = maintainDistanceRingSpeed(38, 44, 0, .1);
   assert.deepEqual(expired, { speed: 38, remaining: 0 });

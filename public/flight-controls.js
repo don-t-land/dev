@@ -16,7 +16,7 @@
   const DART_ENERGY_COST = 20;
   const DIST_RING_SPEED_BONUS = 12;
   const DIST_RING_ENERGY_BONUS = 30;
-  const DIST_RING_SPEED_HOLD_SECONDS = 1.5;
+  const DIST_RING_SPEED_HOLD_SECONDS = 3;
 
   function normalizeAngle(angle) {
     let normalized = (Number(angle) + Math.PI) % PI2;

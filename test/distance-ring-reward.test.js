@@ -18,13 +18,9 @@ test('distance ring clear grants speed and energy through the bounded reward pol
   assert.match(html, /maintainDistanceRingSpeed\(me\.speed, me\.ringSpeedFloor, me\.ringSpeedHoldRemaining, dt\)/);
 });
 
-test('distance ring clear presents an accessible reward callout and impact feedback', () => {
-  assert.match(html, /id="ring-reward"[^>]*role="status"[^>]*aria-live="polite"/);
-  assert.match(html, /function showRingReward\(reward\)/);
-  assert.match(html, /ring-reward-speed/);
-  assert.match(html, /ring-reward-energy/);
-  assert.match(html, /속도 유지 · 1\.5초/);
+test('distance ring clear keeps impact feedback without a popup', () => {
+  assert.doesNotMatch(html, /id="ring-reward"/);
+  assert.doesNotMatch(html, /showRingReward/);
+  assert.match(html, /function triggerRingImpact\(\)/);
   assert.match(html, /vortex\.classList\.add\('ring-clear'\)/);
-  assert.match(html, /@keyframes ring-reward-pop/);
-  assert.match(html, /prefers-reduced-motion:[\s]*reduce[\s\S]*#ring-reward\.show/);
 });

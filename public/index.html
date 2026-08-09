@@ -334,34 +334,6 @@
   #center .msg { font-size: 15px; letter-spacing: .24em; color: #b9c7da; }
   #center .sub2 { margin-top: 8px; font-size: 11px; letter-spacing: .1em; color: #8496ad; }
 
-  #ring-reward {
-    position: absolute; z-index: 4; top: 24%; left: 50%; width: min(430px, calc(100vw - 36px));
-    opacity: 0; transform: translate(-50%, 18px) scale(.82); pointer-events: none; text-align: center;
-  }
-  #ring-reward .ring-reward-frame {
-    position: relative; overflow: hidden; padding: 13px 28px 15px;
-    border-block: 1px solid rgba(102,224,255,.82);
-    background: linear-gradient(90deg, transparent, rgba(3,24,43,.9) 18%, rgba(3,24,43,.94) 82%, transparent);
-    filter: drop-shadow(0 12px 28px rgba(0,0,0,.34));
-  }
-  #ring-reward .ring-reward-frame::before {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(105deg, transparent 34%, rgba(255,220,93,.3) 48%, transparent 62%);
-    transform: translateX(-115%);
-  }
-  #ring-reward .ring-reward-kicker { display: block; color: #79e8ff; font: 900 10px/1 ui-monospace, monospace; letter-spacing: .32em; }
-  #ring-reward .ring-reward-title { display: block; margin-top: 5px; color: #fff; font-size: clamp(24px, 3vw, 39px); font-style: italic; letter-spacing: .08em; text-shadow: 0 0 22px rgba(72,205,255,.72); }
-  #ring-reward .ring-reward-gains { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 18px; margin-top: 7px; color: #ffe06c; font: 900 11px/1.3 ui-monospace, monospace; letter-spacing: .08em; }
-  #ring-reward .ring-reward-hold { flex-basis: 100%; color: #8deaff; font-size: 9px; letter-spacing: .16em; }
-  #ring-reward.show { animation: ring-reward-pop 1.25s cubic-bezier(.16,.8,.2,1) both; }
-  #ring-reward.show .ring-reward-frame::before { animation: ring-reward-scan .72s .05s ease-out both; }
-  @keyframes ring-reward-pop {
-    0% { opacity: 0; transform: translate(-50%, 22px) scale(.72); filter: blur(5px); }
-    22%, 72% { opacity: 1; transform: translate(-50%, 0) scale(1); filter: blur(0); }
-    100% { opacity: 0; transform: translate(-50%, -10px) scale(.97); }
-  }
-  @keyframes ring-reward-scan { to { transform: translateX(115%); } }
-
   #announcement {
     position: absolute; top: 54px; left: 50%; width: min(520px, calc(100vw - 32px));
     transform: translate(-50%, -18px) scale(.96); opacity: 0; text-align: center;
@@ -802,8 +774,6 @@
     #announcement { transition: none; }
     #announcement.show, #announcement.show .announcement-frame::before { animation: none; }
     #announcement.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
-    #ring-reward.show, #ring-reward.show .ring-reward-frame::before { animation: none; }
-    #ring-reward.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
   }
 </style>
 </head>
@@ -1160,13 +1130,6 @@
         <small aria-hidden="true">COOLING · 냉각 <span id="overheat-cooling-value">0</span>%</small>
         <span id="overheat-cooling-track" aria-hidden="true"><i id="overheat-cooling-fill"></i></span>
       </span>
-    </div>
-    <div id="ring-reward" role="status" aria-live="polite" aria-atomic="true">
-      <div class="ring-reward-frame">
-        <span class="ring-reward-kicker">FLIGHT RING</span>
-        <strong class="ring-reward-title">RING CLEAR</strong>
-        <span class="ring-reward-gains"><b id="ring-reward-speed">속도 +0 KM/H</b><b id="ring-reward-energy">에너지 +0%</b><b class="ring-reward-hold">속도 유지 · 1.5초</b></span>
-      </div>
     </div>
     <div id="announcement" role="status" aria-live="polite" aria-atomic="true">
       <div class="announcement-frame">
@@ -1999,7 +1962,6 @@ const announcementQueue = [];
 const MAX_ANNOUNCEMENT_QUEUE = 6;
 let announcementTimer = null;
 let announcementActive = false;
-let ringRewardTimer = null;
 let ringImpactTimer = null;
 
 function enterHome(msg) {
@@ -4404,18 +4366,7 @@ function showCenter(cd, msg, sub) {
 }
 function hideCenter() { $('center').classList.add('hide'); }
 
-function showRingReward(reward) {
-  const layer = $('ring-reward');
-  const speedKmh = Math.round(reward.speedGain * 3.6);
-  const energyPercent = Math.round(reward.energyGain);
-  $('ring-reward-speed').textContent = speedKmh > 0 ? `속도 +${speedKmh} KM/H` : '최고속도 유지';
-  $('ring-reward-energy').textContent = energyPercent > 0 ? `에너지 +${energyPercent}%` : '에너지 충전 완료';
-  layer.classList.remove('show');
-  void layer.offsetWidth;
-  layer.classList.add('show');
-  clearTimeout(ringRewardTimer);
-  ringRewardTimer = setTimeout(() => layer.classList.remove('show'), 1280);
-
+function triggerRingImpact() {
   const vortex = $('dash-vortex');
   clearTimeout(ringImpactTimer);
   vortex.classList.add('ring-clear');
@@ -4455,11 +4406,8 @@ function clearAnnouncements() {
   announcementTimer = null;
   announcementActive = false;
   $('announcement')?.classList.remove('show');
-  clearTimeout(ringRewardTimer);
   clearTimeout(ringImpactTimer);
-  ringRewardTimer = null;
   ringImpactTimer = null;
-  $('ring-reward')?.classList.remove('show');
   $('dash-vortex')?.classList.remove('ring-clear');
 }
 
@@ -5063,7 +5011,7 @@ function physics(dt) {
         if (me.energy >= MAX_ENERGY) me.engineOverheated = false;
         rapierFlight?.boostSpeed(reward.speedGain);
         audioDirector.play('score');
-        showRingReward(reward);
+        triggerRingImpact();
       }
     }
     me.speed = THREE.MathUtils.clamp(me.speed, 3, aeroProfile.maxSpeed);

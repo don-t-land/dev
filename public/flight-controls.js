@@ -14,9 +14,8 @@
   const ENERGY_REGEN_PER_SECOND = 20;
   const DASH_ENERGY_PER_SECOND = 18;
   const DART_ENERGY_COST = 20;
-  const DIST_RING_SPEED_BONUS = 12;
   const DIST_RING_ENERGY_BONUS = 30;
-  const DIST_RING_SPEED_HOLD_SECONDS = 3;
+  const DIST_RING_SPEED_HOLD_SECONDS = 4;
 
   function normalizeAngle(angle) {
     let normalized = (Number(angle) + Math.PI) % PI2;
@@ -139,7 +138,7 @@
     const currentSpeed = Math.max(0, Number(speed) || 0);
     const currentEnergy = Math.max(0, Math.min(MAX_ENERGY, Number(energy) || 0));
     const speedLimit = Math.max(currentSpeed, Number(maxSpeed) || currentSpeed);
-    const rewardedSpeed = Math.min(speedLimit, currentSpeed + DIST_RING_SPEED_BONUS);
+    const rewardedSpeed = speedLimit;
     const rewardedEnergy = Math.min(MAX_ENERGY, currentEnergy + DIST_RING_ENERGY_BONUS);
     return {
       speed: rewardedSpeed,
@@ -192,7 +191,6 @@
     ENERGY_REGEN_PER_SECOND,
     DASH_ENERGY_PER_SECOND,
     DART_ENERGY_COST,
-    DIST_RING_SPEED_BONUS,
     DIST_RING_ENERGY_BONUS,
     DIST_RING_SPEED_HOLD_SECONDS
   };

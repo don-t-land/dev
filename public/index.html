@@ -261,8 +261,8 @@
     --ring-clear-edge: rgba(119,220,255,.68);
     --ring-clear-glow: rgba(119,220,255,.34);
     position: absolute; left: 50%; top: 50%; z-index: 8;
-    display: flex; align-items: center; gap: 5px;
-    padding: 5px 8px 5px 9px;
+    display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 5px;
+    min-width: 116px; padding: 6px 8px 6px 9px;
     color: #f4fcff; border: 1px solid var(--ring-clear-edge);
     border-left: 2px solid var(--ring-clear-color); border-radius: 4px;
     background: linear-gradient(100deg, rgba(8,20,35,.86), rgba(8,20,35,.42));
@@ -271,7 +271,7 @@
     transform: translate(clamp(42px, 6vw, 76px), -54px) scale(.82);
     transform-origin: left center;
     font-family: 'Noto Sans KR', system-ui, sans-serif;
-    font-size: 9px; font-weight: 900; line-height: 1; letter-spacing: .11em;
+    font-size: 9px; font-weight: 900; line-height: 1; letter-spacing: .1em;
     text-shadow: 0 0 7px var(--ring-clear-edge);
   }
   #ring-clear-feedback[data-mode="ARENA"] {
@@ -284,13 +284,19 @@
     background: linear-gradient(90deg, transparent, var(--ring-clear-color));
     box-shadow: 0 0 6px var(--ring-clear-color);
   }
-  #ring-clear-feedback strong { color: var(--ring-clear-color); font-size: 12px; line-height: .7; }
-  #ring-clear-feedback.show { animation: ring-clear-flyby .92s cubic-bezier(.16,.72,.25,1) both; }
+  #ring-clear-feedback .ring-clear-title { color: #f4fcff; }
+  #ring-clear-feedback .ring-clear-plus { color: var(--ring-clear-color); font-size: 12px; line-height: .7; }
+  #ring-clear-feedback .ring-clear-effect {
+    grid-column: 1 / -1; color: var(--ring-clear-color);
+    font-size: 7px; line-height: 1.25; letter-spacing: .08em; white-space: nowrap;
+  }
+  #ring-clear-feedback .ring-clear-effect + .ring-clear-effect { color: #f4fcff; opacity: .92; }
+  #ring-clear-feedback.show { animation: ring-clear-flyby var(--ring-clear-duration, 1200ms) cubic-bezier(.16,.72,.25,1) both; }
   @keyframes ring-clear-flyby {
-    0% { opacity: 0; transform: translate(32px, -48px) scale(.7); }
-    16%, 68% { opacity: 1; }
-    42% { transform: translate(clamp(42px, 6vw, 76px), -54px) scale(1); }
-    100% { opacity: 0; transform: translate(clamp(50px, 7vw, 88px), -62px) scale(.94); }
+    0% { opacity: 0; transform: translate(32px, -48px) scale(.76); }
+    2%, 93% { opacity: 1; }
+    7% { transform: translate(clamp(42px, 6vw, 76px), -54px) scale(1); }
+    100% { opacity: 0; transform: translate(clamp(50px, 7vw, 88px), -60px) scale(.95); }
   }
 
   #overheat-vortex {
@@ -1169,7 +1175,9 @@
       <span id="dash-callout"><strong>DASH BOOST</strong><small>WIND RUSH</small></span>
     </div>
     <div id="ring-clear-feedback" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
-      <span>RING CLEAR</span><strong aria-hidden="true">+</strong>
+      <span class="ring-clear-title" aria-hidden="true">RING CLEAR</span><strong class="ring-clear-plus" aria-hidden="true">+</strong>
+      <span id="ring-clear-energy-effect" class="ring-clear-effect" aria-hidden="true">ENERGY CHARGE</span>
+      <span id="ring-clear-speed-effect" class="ring-clear-effect hide" aria-hidden="true">MAX SPEED · <b id="ring-clear-speed-seconds">4.0</b>s</span>
     </div>
     <div id="overheat-vortex" role="status" aria-live="assertive" aria-atomic="true" aria-hidden="true">
       <span id="overheat-callout">
@@ -3400,6 +3408,10 @@ function triggerDashImpact() {
   vortex.classList.add('burst');
 }
 
+function isDistanceRingBoostActive() {
+  return game.mode === 'DIST' && me.ringSpeedHoldRemaining > 0;
+}
+
 function updateOverheatScreenEffect(dt) {
   overheatVisualStrength = approachDashIntensity(overheatVisualStrength, overheatVisualTarget, dt);
   const vortex = $('overheat-vortex');
@@ -4372,10 +4384,24 @@ function showCenter(cd, msg, sub) {
 }
 function hideCenter() { $('center').classList.add('hide'); }
 
-function showRingClearFeedback() {
+function showRingClearFeedback(energyGain) {
   const feedback = $('ring-clear-feedback');
+  const distanceBoost = game.mode === 'DIST';
+  const roundedEnergyGain = Math.max(0, Math.round(Number(energyGain) || 0));
+  const durationMs = distanceBoost ? DIST_RING_SPEED_HOLD_SECONDS * 1000 + 300 : 1200;
   clearTimeout(ringClearFeedbackTimer);
   feedback.dataset.mode = game.mode;
+  feedback.style.setProperty('--ring-clear-duration', `${durationMs}ms`);
+  const energyCopy = roundedEnergyGain > 0 ? `ENERGY CHARGE +${roundedEnergyGain}` : 'ENERGY FULL';
+  $('ring-clear-energy-effect').textContent = energyCopy;
+  $('ring-clear-speed-effect').classList.toggle('hide', !distanceBoost);
+  $('ring-clear-speed-seconds').textContent = DIST_RING_SPEED_HOLD_SECONDS.toFixed(1);
+  feedback.setAttribute(
+    'aria-label',
+    distanceBoost
+      ? `링 클리어. 에너지 ${roundedEnergyGain} 충전. 최고 속도 ${DIST_RING_SPEED_HOLD_SECONDS}초.`
+      : `링 클리어. 에너지 ${roundedEnergyGain} 충전.`
+  );
   feedback.setAttribute('aria-hidden', 'true');
   feedback.classList.remove('show');
   void feedback.offsetWidth;
@@ -4384,7 +4410,13 @@ function showRingClearFeedback() {
   ringClearFeedbackTimer = setTimeout(() => {
     feedback.classList.remove('show');
     feedback.setAttribute('aria-hidden', 'true');
-  }, 920);
+  }, durationMs);
+}
+
+function updateRingClearFeedback() {
+  const feedback = $('ring-clear-feedback');
+  if (feedback.dataset.mode !== 'DIST' || !feedback.classList.contains('show')) return;
+  $('ring-clear-speed-seconds').textContent = Math.max(0, me.ringSpeedHoldRemaining).toFixed(1);
 }
 
 function showAnnouncement(kind, pilotName) {
@@ -4887,9 +4919,10 @@ function physics(dt) {
   me.dashing = energyStep.dashRatio > 0;
   me.engineOverheated = energyStep.overheated;
   overheatVisualTarget = me.engineOverheated ? 1 : 0;
+  const ringBoostActive = isDistanceRingBoostActive();
   dashVisualTarget = me.dashing
     ? THREE.MathUtils.clamp(.58 + energyStep.dashRatio * .42, 0, 1)
-    : 0;
+    : (ringBoostActive ? .9 : 0);
   if (!wasDashing && me.dashing) {
     audioDirector.play('dash');
     triggerDashImpact();
@@ -5012,11 +5045,16 @@ function physics(dt) {
       ring.userData.taken = true;
       ring.visible = false;
       audioDirector.play('pickup');
-      if (game.mode === 'ARENA') me.energy = Math.min(MAX_ENERGY, me.energy + 35);
-      else {
+      let ringEnergyGain = 0;
+      if (game.mode === 'ARENA') {
+        const previousEnergy = me.energy;
+        me.energy = Math.min(MAX_ENERGY, me.energy + 35);
+        ringEnergyGain = me.energy - previousEnergy;
+      } else {
         const reward = applyDistanceRingReward(me.speed, me.energy, aeroProfile.maxSpeed);
         me.speed = reward.speed;
         me.energy = reward.energy;
+        ringEnergyGain = reward.energyGain;
         me.ringSpeedFloor = Math.max(
           me.ringSpeedHoldRemaining > 0 ? me.ringSpeedFloor : 0,
           reward.speed
@@ -5025,8 +5063,9 @@ function physics(dt) {
         if (me.energy >= MAX_ENERGY) me.engineOverheated = false;
         rapierFlight?.boostSpeed(reward.speedGain);
         audioDirector.play('score');
+        triggerDashImpact();
       }
-      showRingClearFeedback();
+      showRingClearFeedback(ringEnergyGain);
     }
     me.speed = THREE.MathUtils.clamp(me.speed, 3, aeroProfile.maxSpeed);
     rapierFlight?.limitSpeed(aeroProfile.maxSpeed);
@@ -5147,7 +5186,8 @@ renderer.setAnimationLoop(timestamp => {
     }
     const orbitYaw = followYaw + freeLook.yaw;
     const speedCameraAmount = THREE.MathUtils.clamp((me.speed - 22) / 48, 0, 1);
-    const orbitRadius = (16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0)) * 1.3;
+    const speedBoostVisualActive = me.dashing || isDistanceRingBoostActive();
+    const orbitRadius = (16 + speedCameraAmount * 3 + (speedBoostVisualActive ? 1.2 : 0)) * 1.3;
     // 기체를 구의 중심에 두어 어느 방향으로 돌려도 거리와 상하 대칭이 유지됩니다.
     const orbitOffset = orbitCameraOffset(orbitYaw, freeLook.pitch, orbitRadius);
     camPos.set(
@@ -5166,7 +5206,7 @@ renderer.setAnimationLoop(timestamp => {
     lookAt.copy(followPos);
     camera.lookAt(lookAt);
   }
-  const targetFov = speedFov(me.speed, me.dashing && me.alive);
+  const targetFov = speedFov(me.speed, (me.dashing || isDistanceRingBoostActive()) && me.alive);
   const nextFov = graphicsQaFrozen
     ? targetFov
     : THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.pow(0.025, dt));
@@ -5228,7 +5268,12 @@ renderer.setAnimationLoop(timestamp => {
   $('energy').setAttribute('aria-valuenow', String(Math.ceil(me.energy)));
   $('gauge').setAttribute('aria-valuemax', String(maxSpeedKmh));
   $('gauge').setAttribute('aria-valuenow', String(Math.min(maxSpeedKmh, speedKmh)));
-  audioDirector.setFlight({ speed: me.speed, dashing: me.dashing, alive: me.alive && game.phase === 'playing' });
+  updateRingClearFeedback();
+  audioDirector.setFlight({
+    speed: me.speed,
+    dashing: me.dashing || isDistanceRingBoostActive(),
+    alive: me.alive && game.phase === 'playing'
+  });
   drawMinimap(timestamp);
 
   if (game.phase === 'playing' || game.phase === 'countdown' || game.phase === 'launch') {

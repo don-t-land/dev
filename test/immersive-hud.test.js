@@ -148,3 +148,42 @@ test('stall zone and speed fill share one maximum-speed scale', () => {
   assert.match(html, /fill\.style\.width = Math\.min\(100, \(me\.speed \/ aeroProfile\.maxSpeed\) \* 100\)/);
   assert.doesNotMatch(html, /aeroProfile\.stallSpeed \/ 70/);
 });
+
+test('in-flight stats panel shows only the primary metric and altitude', () => {
+  // 승수와 기체 스펙은 비행 중 판단에 쓰이지 않아 HUD에서 뺍니다.
+  assert.doesNotMatch(html, /id="s-wins"/);
+  assert.doesNotMatch(html, /id="s-aero"/);
+  assert.doesNotMatch(html, /승수 <b>/);
+  assert.doesNotMatch(html, /기체 <b>/);
+
+  // 남는 두 지표는 두 모드 모두에서 계속 갱신되어야 합니다.
+  assert.match(html, /id="s-main"/);
+  assert.match(html, /id="s-alt"/);
+  assert.match(html, /\$\('s-main'\)\.textContent = game\.mode === 'ARENA' \? Math\.floor\(me\.surv\) : Math\.floor\(me\.dist\)/);
+  assert.match(html, /\$\('s-alt'\)\.textContent = Math\.floor\(craft\.position\.y\)/);
+  assert.match(html, /\$\('s-cap'\)\.textContent = arena \? '생존 시간' : '직선 거리'/);
+});
+
+test('removing the aero readout leaves the stall gauge update intact', () => {
+  // updateAeroHud는 속도 막대의 실속 구간도 갱신하므로 함수는 남아야 합니다.
+  assert.match(html, /function updateAeroHud\(\)/);
+  assert.match(html, /\$\('s-stall'\)\.style\.width/);
+  assert.doesNotMatch(html, /\$\('s-aero'\)/);
+  assert.doesNotMatch(html, /\$\('s-wins'\)/);
+});
+
+test('live ranking board adopts the same panel language as the flight bars', () => {
+  // 좌하단 게이지가 이 게임의 HUD 언어입니다. 랭킹만 둥근 카드로 남으면 겉돕니다.
+  // 선언 블록 안만 봐야 다른 패널의 값이 섞여 들어오지 않습니다.
+  const boardBlock = html.match(/#board \{[^}]*\}/)?.[0] || '';
+  assert.match(boardBlock, /border-radius: 4px 14px 4px 14px/);
+  assert.match(boardBlock, /linear-gradient\(112deg/);
+  assert.doesNotMatch(boardBlock, /border-radius: 14px;/);
+  assert.match(html, /#board::before \{[\s\S]*background: currentColor/);
+});
+
+test('rank badges use skewed plates instead of competing yellow circles', () => {
+  // 1위 배지가 원형 노랑이면 좌하단 에너지 바의 노랑과 충돌합니다.
+  assert.match(html, /#board \.rank \{[\s\S]*transform: skewX\(-12deg\)/);
+  assert.doesNotMatch(html, /#board \.row:nth-child\(1\) \.rank \{ background:#f7cf62/);
+});

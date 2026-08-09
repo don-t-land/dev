@@ -184,7 +184,8 @@ test('fold-derived aerodynamic profile drives the actual flight loop and HUD', (
   assert.match(html, /aeroProfile\.stability/);
   assert.match(html, /aeroProfile\.rollBias/);
   assert.match(html, /aeroProfile\.pitchBias/);
-  assert.match(html, /id="s-aero"/);
+  // 기체 스펙 문구는 HUD에서 뺐지만, 프로필은 여전히 속도 막대의 실속 구간을 구동합니다.
+  assert.match(html, /\$\('s-stall'\)\.style\.width = `\$\{Math\.min\(100, aeroProfile\.stallSpeed \/ aeroProfile\.maxSpeed \* 100\)\}%`/);
 });
 
 test('Rapier cache identity includes the authoritative aerodynamic profile', () => {

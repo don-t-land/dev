@@ -99,20 +99,36 @@
     position: absolute; inset: 20px 30px 30px auto; width: min(340px, calc(100vw - 44px)); min-height: 0;
     display: grid; grid-template-rows: minmax(96px, 1fr) auto auto; gap: 12px; pointer-events: none;
   }
+  /* 좌하단 게이지와 같은 패널 언어(비대칭 모서리·코너 액센트·네온 테두리)를 씁니다. */
   #board {
-    padding: 13px; background: rgba(7,16,28,.86); border: 1px solid rgba(174,215,255,.2);
-    border-radius: 14px; backdrop-filter: blur(12px); font-size: 12px;
-    box-shadow: 0 12px 34px rgba(0,0,0,.24);
+    position: relative; padding: 11px 13px 12px; color: #5fe0c6;
+    background: linear-gradient(112deg, rgba(4,15,26,.92), rgba(8,30,44,.8));
+    border: 1px solid rgba(95,224,198,.42); border-radius: 4px 14px 4px 14px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.3), inset 0 0 20px rgba(50,180,220,.05);
+    backdrop-filter: blur(12px); font-size: 12px; overflow: hidden;
+  }
+  #board::before {
+    content: ""; position: absolute; top: 0; left: 0; width: 48px; height: 2px;
+    background: currentColor; box-shadow: 0 0 9px currentColor;
   }
   #hud-right-rail > #board {
     position: relative; inset: auto; width: 100%; min-height: 0; max-height: 100%; overflow-y: auto; align-self: start;
   }
-  #board .board-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:9px; }
-  #board .h { font-size: 10px; font-weight: 800; letter-spacing: .16em; color: #dcecff; }
-  #board .board-count { color:#91a9c0; font-size:10px; white-space:nowrap; }
-  #board .row { display:grid; grid-template-columns:28px minmax(0,1fr) auto; align-items:center; gap:9px; min-height:42px; padding:7px 8px; border-top:1px solid rgba(255,255,255,.08); }
+  #board .board-head {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin-bottom:8px; padding-bottom:7px; border-bottom:1px solid rgba(95,224,198,.2);
+  }
+  #board .h { font-size: 10px; font-weight: 800; letter-spacing: .16em; color: #d9f4ec; }
+  #board .board-count { color:#7fa8b8; font-size:9px; font-weight:700; letter-spacing:.1em; white-space:nowrap; }
+  #board .row { display:grid; grid-template-columns:28px minmax(0,1fr) auto; align-items:center; gap:9px; min-height:40px; padding:6px 7px; border-top:1px solid rgba(140,190,215,.12); }
   #board .row:first-child { border-top:0; }
-  #board .rank { display:grid; place-items:center; width:24px; height:24px; border-radius:8px; background:rgba(255,255,255,.08); color:#aebfd0; font-size:11px; font-weight:900; }
+  /* 좌하단 게이지 트랙과 같은 기울기를 써서 배지가 같은 계열로 읽힙니다. */
+  #board .rank {
+    display:grid; place-items:center; width:24px; height:22px; transform:skewX(-12deg);
+    background:rgba(140,190,215,.12); border:1px solid rgba(140,190,215,.28);
+    color:#b8cddc; font-size:11px; font-weight:900; font-variant-numeric:tabular-nums;
+  }
+  #board .rank > span { display:block; transform:skewX(12deg); }
   #board .pilot { min-width:0; display:flex; flex-direction:column; gap:2px; }
   #board .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#f5f9ff; font-weight:750; }
   #board .state { color:#6ee7b7; font-size:9px; letter-spacing:.04em; }
@@ -121,12 +137,16 @@
   #board .metrics strong { font-size:14px; font-variant-numeric:tabular-nums; }
   #board .metrics small { margin-right:5px; color:#91a9c0; font-size:9px; }
   #board .metrics small:last-child { margin-right:0; }
-  #board .row.me { margin-inline:-1px; border-radius:9px; background:rgba(82,220,180,.13); box-shadow:inset 3px 0 #65e1bd; }
+  #board .row.me { margin-inline:-1px; background:rgba(82,220,180,.12); box-shadow:inset 3px 0 #65e1bd; }
   #board .row.me .nm { color:#93f2d2; }
   #board .row.dead { background:rgba(255,173,92,.035); }
-  #board .row:nth-child(1) .rank { background:#f7cf62; color:#332600; }
-  #board .row:nth-child(2) .rank { background:#b9c8d8; color:#22303d; }
-  #board .row:nth-child(3) .rank { background:#ca8c60; color:#2f190d; }
+  /* 선두는 팀 시안 계열로 강조합니다. 노랑은 좌하단 에너지 바가 이미 쓰고 있습니다. */
+  #board .row:nth-child(1) .rank {
+    background:linear-gradient(120deg, #2fd4b4, #7ff0d6); border-color:#8ff5dd;
+    color:#04241d; box-shadow:0 0 10px rgba(79,229,196,.5);
+  }
+  #board .row:nth-child(2) .rank { background:rgba(178,204,222,.24); border-color:rgba(190,214,230,.6); color:#e8f3fb; }
+  #board .row:nth-child(3) .rank { background:rgba(196,146,108,.22); border-color:rgba(206,158,120,.55); color:#f2d9c4; }
 
   #gauge, #energy {
     position: absolute; left: 22px; width: 270px; padding: 9px 13px 11px;
@@ -1054,9 +1074,7 @@
       <div class="cap" id="s-cap">직선 거리</div>
       <div class="big"><span id="s-main">0</span><small id="s-unit">m</small></div>
       <div class="sub">
-        고도 <b><span id="s-alt">0</span>m</b><br>
-        승수 <b><span id="s-wins">0</span></b><br>
-        기체 <b><span id="s-aero">양력 100% · 항력 117%</span></b>
+        고도 <b><span id="s-alt">0</span>m</b>
       </div>
     </div>
 
@@ -1687,7 +1705,6 @@ function handle(m) {
       net.helloSent = true;
       myName = m.name;
       localStorage.setItem('pp_token', m.token);
-      $('s-wins').textContent = m.wins;
       const action = net.pendingAction;
       net.pendingAction = null;
       if (action) action();
@@ -1702,8 +1719,6 @@ function handle(m) {
     case 'room': {
       net.room = m;
       game.mode = m.mode;
-      const self = (m.players || []).find(player => player.id === net.id);
-      if (self) $('s-wins').textContent = self.wins;
       syncRoomPlayers(m.players || []);
       if (m.phase === 'live') {
         const alreadyInWorld = Number(m.seed) === Number(game.seed) &&
@@ -2768,15 +2783,25 @@ applyGraphicsSettings(graphicsSettings, false);
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(16000, 16000),
-  registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0x5f7a4e, roughness: 1, transparent: true }))
+  registerLitMaterial(new THREE.MeshStandardMaterial({
+    color: 0x5f7a4e,
+    roughness: 1,
+    transparent: true,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1
+  }))
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
+ground.renderOrder = -2;
 scene.add(ground);
 
 const grid = new THREE.GridHelper(12000, 300, 0x7a9468, 0x6d8a5c);
 grid.material.transparent = true;
 grid.material.opacity = 0.35;
+grid.material.depthWrite = false;
+grid.renderOrder = -1;
 scene.add(grid);
 
 /* ============================================================
@@ -2968,8 +2993,6 @@ let rapierApi = null;
 let rapierFlight = null;
 
 function updateAeroHud() {
-  const engine = rapierFlight ? ' · Rapier' : '';
-  $('s-aero').textContent = `양력 ${Math.round(aeroProfile.liftScale * 100)}% · 항력 ${Math.round(aeroProfile.dragScale * 100)}%${engine}`;
   // 실속 구간은 속도 막대와 같은 최대속도 기준이라야 두 눈금이 겹쳐 읽힙니다.
   $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / aeroProfile.maxSpeed * 100)}%`;
 }
@@ -4400,7 +4423,7 @@ function refreshBoard() {
   $('b-count').textContent = `${rows.length}명`;
   $('b-rows').innerHTML = rows.map((player, index) =>
     `<div class="row ${player.alive ? '' : 'dead'} ${player.id === net.id ? 'me' : ''}" role="listitem">` +
-    `<span class="rank">${index + 1}</span>` +
+    `<span class="rank"><span>${index + 1}</span></span>` +
     `<span class="pilot"><span class="nm">${escapeHtml(player.name)}</span>` +
     `<span class="state">${player.alive ? '비행 중' : (isLive ? '재출격 준비' : '비행 종료')}</span></span>` +
     (isLive
@@ -5109,13 +5132,13 @@ renderer.setAnimationLoop(timestamp => {
   sky.position.copy(camera.position);
   if (game.mode === 'DIST') {
     ground.position.set(0, 0, followPos.z);
-    grid.position.set(0, 0.05, Math.round(followPos.z / 40) * 40);
+    grid.position.set(0, 0.18, Math.round(followPos.z / 40) * 40);
     if (game.phase === 'playing' || game.phase === 'launch' || game.phase === 'launch_done') {
       updateDistanceBiomeVisuals(craft.position.z);
     }
   } else {
     ground.position.set(0, 0, 0);
-    grid.position.set(0, 0.05, 0);
+    grid.position.set(0, 0.18, 0);
   }
   if (!csm) {
     const lightPosition = sunPositionForTarget(followPos);

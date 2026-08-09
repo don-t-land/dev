@@ -760,9 +760,6 @@
   }
   .ui-icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
   .ui-icon { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  #audio-quick-toggle .audio-icon-off { display: none; }
-  #audio-quick-toggle[aria-pressed="true"] .audio-icon-on { display: none; }
-  #audio-quick-toggle[aria-pressed="true"] .audio-icon-off { display: block; }
   #settings-quick-toggle { right: calc(max(14px, env(safe-area-inset-right)) + 56px); }
   #audio-quick-toggle:hover, #settings-quick-toggle:hover { border-color: #8fe3c4; transform: translateY(-1px); }
   #audio-quick-toggle:focus-visible, #settings-quick-toggle:focus-visible { outline: 3px solid #8fe3c4; outline-offset: 3px; }
@@ -790,7 +787,7 @@
   <symbol id="ui-icon-audio" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M5 13h2v7H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Zm14 0h-2v7h2a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2Z"/></symbol>
 </svg>
 <canvas id="c" tabindex="-1" aria-label="3D 종이비행기 비행 장면"></canvas>
-<button id="audio-quick-toggle" type="button" aria-label="전체 음소거" aria-pressed="false" title="오디오 켜기/끄기"><svg class="ui-icon audio-icon-on" aria-hidden="true"><use href="#ui-icon-volume-on"></use></svg><svg class="ui-icon audio-icon-off" aria-hidden="true"><use href="#ui-icon-volume-off"></use></svg></button>
+<button id="audio-quick-toggle" type="button" aria-label="전체 음소거" aria-pressed="false" title="오디오 켜기/끄기"><svg class="ui-icon" aria-hidden="true"><use id="audio-quick-icon-use" href="#ui-icon-volume-on"></use></svg></button>
 <button id="settings-quick-toggle" type="button" aria-label="오디오 설정 열기" title="설정"><svg class="ui-icon" aria-hidden="true"><use href="#ui-icon-settings"></use></svg></button>
 
 <section id="home-screen" aria-labelledby="home-title">
@@ -2330,6 +2327,7 @@ $('audio-reduced').checked = Boolean(audioSettings.reducedAudio);
 function updateAudioQuickToggle() {
   const muted = Boolean(audioDirector.getSettings().muted);
   const button = $('audio-quick-toggle');
+  $('audio-quick-icon-use').setAttribute('href', muted ? '#ui-icon-volume-off' : '#ui-icon-volume-on');
   button.setAttribute('aria-pressed', String(muted));
   button.setAttribute('aria-label', muted ? '오디오 켜기' : '전체 음소거');
   button.title = muted ? '오디오 켜기' : '오디오 끄기';

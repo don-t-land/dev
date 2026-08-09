@@ -137,7 +137,10 @@ test('settings use a shared web font, vector icons, and platform-neutral form co
   for (const icon of ['volume-on', 'volume-off', 'settings', 'controls', 'graphics', 'audio']) {
     assert.match(html, new RegExp(`id="ui-icon-${icon}"`));
   }
-  assert.match(html, /id="audio-quick-toggle"[\s\S]*href="#ui-icon-volume-on"/);
+  const audioButtonMarkup = html.match(/<button id="audio-quick-toggle"[\s\S]*?<\/button>/)?.[0] || '';
+  assert.match(audioButtonMarkup, /id="audio-quick-icon-use"[^>]*href="#ui-icon-volume-on"/);
+  assert.equal((audioButtonMarkup.match(/<svg\b/g) || []).length, 1, 'quick audio button must render exactly one icon slot');
+  assert.match(html, /\$\('audio-quick-icon-use'\)\.setAttribute\('href', muted \? '#ui-icon-volume-off' : '#ui-icon-volume-on'\)/);
   assert.doesNotMatch(html, /id="audio-quick-toggle"[^>]*>\s*[🔊🔇]/u);
   assert.doesNotMatch(html, /id="settings-quick-toggle"[^>]*>\s*⚙/u);
   assert.doesNotMatch(html, /button\.textContent\s*=\s*muted\s*\?\s*'🔇'/u);

@@ -454,9 +454,21 @@ test('ARENA death releases the mouse and offers a direct lobby exit', () => {
   assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}requestRoundLeave\(\)/);
   assert.match(html, /function showRespawnOverlay\(byName\) \{[\s\S]*clearFlightKeys\(\);[\s\S]*releaseFlightPointerLock\(\);/);
   assert.match(html, /pointerlockchange[\s\S]{0,420}respawn-overlay'\)\.classList\.contains\('hide'\)/);
-  assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,320}respawn-overlay'\)\.classList\.add\('hide'\)/);
+  assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,400}respawn-overlay'\)\.classList\.add\('hide'\)/);
   assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);\s*if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*const pauseAction = pauseMenuAction\(/);
   assert.match(flowCss, /#respawn-leave-btn\s*\{[^}]*flex-basis:\s*100%/s);
+});
+
+test('direct respawn automatically retries cooldown errors and cancels stale work', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /createRespawnRetryController/);
+  assert.match(html, /const respawnRetry = createRespawnRetryController\(\{[\s\S]*send,[\s\S]*maxRetries:\s*3[\s\S]*retryDelayMs:\s*700/);
+  assert.match(html, /respawn-now-btn'\)\.addEventListener\('click',[\s\S]{0,180}respawnRetry\.start\(\)/);
+  assert.match(html, /case 'error':[\s\S]{0,180}respawnRetry\.handleError\(m\.code\)/);
+  assert.match(html, /case 'spawned':[\s\S]{0,180}m\.id === net\.id[\s\S]{0,180}respawnRetry\.succeed\(\)/);
+  assert.match(html, /respawn-refold-btn'\)\.addEventListener\('click',[\s\S]{0,180}respawnRetry\.cancel\(\)/);
+  assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,180}respawnRetry\.cancel\(\)/);
 });
 
 test('pause and result overlays isolate focus and suspend flight input', () => {

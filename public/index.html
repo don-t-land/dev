@@ -1167,8 +1167,8 @@
   }
 }
 </script>
-<script src="./input-policy.js?v=1.7.4"></script>
-<script src="./hud-policy.js?v=1.7.4"></script>
+<script src="./input-policy.js?v=1.7.5"></script>
+<script src="./hud-policy.js?v=1.7.5"></script>
 <script src="./mobile-controls.js"></script>
 
 <script src="./room-state.js"></script>
@@ -1181,13 +1181,13 @@
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
-<script src="./biomes/helpers.js?v=1.7.4"></script>
+<script src="./biomes/helpers.js?v=1.7.5"></script>
 <script src="./biomes/desert.js"></script>
 <script src="./biomes/pillars.js"></script>
 <script src="./biomes/glacier.js"></script>
 <script src="./biomes/lava.js"></script>
 <script src="./biomes/floating.js"></script>
-<script src="./map-gen.js?v=1.7.4"></script>
+<script src="./map-gen.js?v=1.7.5"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./costume-showroom-3d.js"></script>
@@ -1218,7 +1218,8 @@ const {
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
   approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
-  respawnPresentation, authoritativeCrashAction, advancePaperFragment
+  respawnPresentation, authoritativeCrashAction, advancePaperFragment,
+  createRespawnRetryController
 } = window.hudPolicy;
 const { createCombinedKeyState, createTouchKeyState, createTouchLookState } = window.mobileControls;
 
@@ -1371,6 +1372,17 @@ function connect() {
 function send(obj) {
   if (net.ws && net.ws.readyState === WebSocket.OPEN) net.ws.send(JSON.stringify(obj));
 }
+
+const respawnRetry = createRespawnRetryController({
+  send,
+  maxRetries: 3,
+  retryDelayMs: 700,
+  onStatus: status => { $('respawn-status').textContent = status; },
+  onExhausted: () => {
+    $('respawn-status').textContent = '부활 요청에 실패했습니다. 다시 눌러 주세요.';
+    $('respawn-now-btn').disabled = false;
+  }
+});
 
 function sendHello() {
   if (net.helloSent || !net.pendingAction || !net.ws || net.ws.readyState !== WebSocket.OPEN) return;
@@ -1552,6 +1564,7 @@ function handle(m) {
 
     case 'spawned': {
       if (m.id === net.id) {
+        respawnRetry.succeed();
         window.paperFoldingStage?.leave();
         $('respawn-overlay').classList.add('hide');
         setUnderlyingGameUiInert(false);
@@ -1676,9 +1689,12 @@ function handle(m) {
       break;
 
     case 'error':
-      if (m.code === 'RESPAWN_COOLDOWN' && !$('respawn-overlay').classList.contains('hide')) {
-        $('respawn-status').textContent = m.message || '잠시 후 다시 시도해 주세요';
-        setTimeout(() => { $('respawn-now-btn').disabled = false; }, 1000);
+      if (respawnRetry.handleError(m.code)) {
+        break;
+      } else if (respawnRetry.active && !$('respawn-overlay').classList.contains('hide')) {
+        respawnRetry.cancel();
+        $('respawn-status').textContent = m.message || '부활 요청을 처리할 수 없습니다';
+        $('respawn-now-btn').disabled = false;
       } else if (m.code === 'RESPAWN_COOLDOWN') {
         // 접기 화면이 떠 있는 상태(빠른 재접기)에서 쿨다운에 걸린 경우: 안내만 하고
         // 쿨다운이 끝난 뒤 자동으로 스폰을 재시도합니다.
@@ -1702,6 +1718,7 @@ let announcementTimer = null;
 let announcementActive = false;
 
 function enterHome(msg) {
+  respawnRetry.cancel();
   audioDirector.setScene('HOME');
   clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
@@ -2026,10 +2043,10 @@ $('results-ready-btn').addEventListener('click', event => {
 });
 $('respawn-now-btn').addEventListener('click', () => {
   $('respawn-now-btn').disabled = true;
-  $('respawn-status').textContent = '부활 요청 중…';
-  send({ t: 'spawn' });
+  respawnRetry.start();
 });
 $('respawn-refold-btn').addEventListener('click', () => {
+  respawnRetry.cancel();
   $('respawn-overlay').classList.add('hide');
   enterFolding();
   window.paperFoldingStage?.enter({
@@ -2043,6 +2060,7 @@ $('respawn-refold-btn').addEventListener('click', () => {
   });
 });
 $('respawn-leave-btn').addEventListener('click', event => {
+  respawnRetry.cancel();
   event.currentTarget.disabled = true;
   $('respawn-status').textContent = '로비로 이동 중…';
   requestRoundLeave();
@@ -3915,6 +3933,7 @@ function dieLocal(report = true) {
 }
 
 function showRespawnOverlay(byName) {
+  respawnRetry.cancel();
   clearFlightKeys();
   closePauseMenu();
   updateRespawnPresentation(byName);

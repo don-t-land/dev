@@ -115,6 +115,68 @@
     return live && respawnOpen ? 'reconcile' : null;
   }
 
+  function createRespawnRetryController(options = {}) {
+    const send = typeof options.send === 'function' ? options.send : () => {};
+    const schedule = typeof options.schedule === 'function' ? options.schedule : setTimeout;
+    const cancelSchedule = typeof options.cancelSchedule === 'function' ? options.cancelSchedule : clearTimeout;
+    const onStatus = typeof options.onStatus === 'function' ? options.onStatus : () => {};
+    const onExhausted = typeof options.onExhausted === 'function' ? options.onExhausted : () => {};
+    const retryDelayMs = Math.max(0, finite(options.retryDelayMs, 700));
+    const maxRetries = Math.max(0, Math.floor(finite(options.maxRetries, 3)));
+    let active = false;
+    let retries = 0;
+    let timer = null;
+    let generation = 0;
+
+    function clearTimer() {
+      if (timer === null) return;
+      cancelSchedule(timer);
+      timer = null;
+    }
+
+    function request() {
+      if (!active) return;
+      onStatus(retries === 0 ? '부활 요청 중…' : `부활 재시도 중… (${retries}/${maxRetries})`);
+      send({ t: 'spawn' });
+    }
+
+    function cancel() {
+      clearTimer();
+      active = false;
+      generation += 1;
+    }
+
+    return {
+      get active() { return active; },
+      start() {
+        cancel();
+        active = true;
+        retries = 0;
+        request();
+      },
+      handleError(code) {
+        if (!active || code !== 'RESPAWN_COOLDOWN') return false;
+        clearTimer();
+        if (retries >= maxRetries) {
+          active = false;
+          onExhausted(code);
+          return true;
+        }
+        retries += 1;
+        onStatus(`부활 재시도 대기 중… (${retries}/${maxRetries})`);
+        const scheduledGeneration = generation;
+        timer = schedule(() => {
+          if (scheduledGeneration !== generation) return;
+          timer = null;
+          request();
+        }, retryDelayMs);
+        return true;
+      },
+      succeed: cancel,
+      cancel
+    };
+  }
+
   function announcementSpec(kind, pilotName) {
     const pilot = String(pilotName || '').trim() || '조종사';
     if (kind === 'kill') return {
@@ -151,6 +213,7 @@
   return {
     toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
     approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
-    respawnPresentation, authoritativeCrashAction, advancePaperFragment
+    respawnPresentation, authoritativeCrashAction, advancePaperFragment,
+    createRespawnRetryController
   };
 });

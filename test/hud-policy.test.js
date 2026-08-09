@@ -4,7 +4,8 @@ const test = require('node:test');
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
   approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
-  respawnPresentation, authoritativeCrashAction, advancePaperFragment
+  respawnPresentation, authoritativeCrashAction, advancePaperFragment,
+  createRespawnRetryController
 } = require('../public/hud-policy.js');
 
 function close(actual, expected, message) {
@@ -137,6 +138,80 @@ test('join, kill, and death announcements provide distinct immersive copy and to
     tone: 'death', kicker: 'SHOT DOWN', title: '기체 손실',
     detail: '에이스에게 격추되었습니다', duration: 2800
   });
+});
+
+test('respawn retries cooldown failures three times and stops after success', () => {
+  const sent = [];
+  const scheduled = [];
+  const statuses = [];
+  const controller = createRespawnRetryController({
+    send: message => sent.push(message),
+    schedule: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
+    cancelSchedule: () => {},
+    onStatus: status => statuses.push(status),
+    retryDelayMs: 700,
+    maxRetries: 3
+  });
+
+  controller.start();
+  assert.deepEqual(sent, [{ t: 'spawn' }]);
+  for (let retry = 1; retry <= 3; retry += 1) {
+    assert.equal(controller.handleError('RESPAWN_COOLDOWN'), true);
+    const task = scheduled.shift();
+    assert.equal(task.delay, 700);
+    task.callback();
+    assert.equal(sent.length, retry + 1);
+  }
+
+  controller.succeed();
+  assert.equal(controller.active, false);
+  assert.equal(controller.handleError('RESPAWN_COOLDOWN'), false);
+  assert.equal(sent.length, 4, 'one initial request plus three retries');
+  assert.match(statuses.at(-2), /3\/3/);
+});
+
+test('respawn does not retry permanent errors and reports exhausted cooldown retries', () => {
+  const sent = [];
+  const scheduled = [];
+  const exhausted = [];
+  const controller = createRespawnRetryController({
+    send: message => sent.push(message),
+    schedule: callback => { scheduled.push(callback); return scheduled.length; },
+    cancelSchedule: () => {},
+    onExhausted: code => exhausted.push(code),
+    maxRetries: 1
+  });
+
+  controller.start();
+  assert.equal(controller.handleError('FOLD_REQUIRED'), false);
+  assert.equal(scheduled.length, 0);
+
+  controller.start();
+  assert.equal(controller.handleError('RESPAWN_COOLDOWN'), true);
+  scheduled.shift()();
+  assert.equal(controller.handleError('RESPAWN_COOLDOWN'), true);
+  assert.equal(controller.active, false);
+  assert.deepEqual(exhausted, ['RESPAWN_COOLDOWN']);
+});
+
+test('respawn ignores a stale queued retry after cancel and restart', () => {
+  const sent = [];
+  const scheduled = [];
+  const controller = createRespawnRetryController({
+    send: message => sent.push(message),
+    schedule: callback => { scheduled.push(callback); return scheduled.length; },
+    cancelSchedule: () => {},
+    maxRetries: 3
+  });
+
+  controller.start();
+  controller.handleError('RESPAWN_COOLDOWN');
+  const staleRetry = scheduled.shift();
+  controller.cancel();
+  controller.start();
+  staleRetry();
+
+  assert.equal(sent.length, 2, 'stale callback must not send inside the new respawn generation');
 });
 
 test('paper fragments tumble, drag, fall, and expire after a bounded step', () => {

@@ -104,3 +104,12 @@ test('ground treatment follows biome palette and nearly disappears in floating i
   assert.match(html, /ground\.material\.color\.copy\(baseWorldPalette\.ground\)/);
   assert.match(html, /ground\.material\.opacity = THREE\.MathUtils\.lerp/);
 });
+
+test('ground grid has stable transparent ordering and avoids depth fighting', () => {
+  assert.match(html, /polygonOffset: true/);
+  assert.match(html, /polygonOffsetFactor: 1/);
+  assert.match(html, /ground\.renderOrder = -2/);
+  assert.match(html, /grid\.material\.depthWrite = false/);
+  assert.match(html, /grid\.renderOrder = -1/);
+  assert.equal((html.match(/grid\.position\.set\(0, 0\.18,/g) || []).length, 2);
+});

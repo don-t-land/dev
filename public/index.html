@@ -3507,7 +3507,8 @@ const thermalMat = new THREE.ShaderMaterial({
     }`
 });
 const thermalRingMat = new THREE.MeshBasicMaterial({ color: 0x4fd6a4, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
-const ringMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x1d4ed8, emissiveIntensity: 2.4, roughness: 0.4 }));
+const distanceRingMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x1d4ed8, emissiveIntensity: 2.4, roughness: 0.4 }));
+const survivalRingMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 2.4, roughness: 0.4 }));
 
 function clearWorld() {
   clearDarts();
@@ -3550,8 +3551,8 @@ function addThermal(x, z, strength = 1) {
   thermals.push(g);
 }
 
-function addRing(x, y, z, rng) {
-  const m = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.65, 10, 36), ringMat);
+function addRing(x, y, z, rng, material) {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.65, 10, 36), material);
   m.position.set(x, y, z);
   m.rotation.y = (rng() - 0.5) * 0.6;
   m.userData.taken = false;
@@ -3587,7 +3588,7 @@ function buildDistance(seed) {
 
   // 상승기류 · 부스트 링
   layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z, thermal.strength));
-  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng));
+  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng, distanceRingMat));
 
   // 중앙선
   const line = new THREE.Mesh(
@@ -3622,7 +3623,7 @@ function buildArena(seed) {
 
   installBiomeLayout(layout);
   layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z, thermal.strength));
-  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng));
+  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng, survivalRingMat));
 
   // 경계 표시 링
   const bound = new THREE.Mesh(

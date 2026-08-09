@@ -9,6 +9,7 @@ const {
   updateEnergy,
   consumeDartEnergy,
   applyDistanceRingReward,
+  maintainDistanceRingSpeed,
   dashAcceleration,
   speedFov,
   orbitCameraOffset,
@@ -16,7 +17,8 @@ const {
   isFreeLookCentered,
   LOOK_PITCH_LIMIT,
   MAX_ENERGY,
-  DART_ENERGY_COST
+  DART_ENERGY_COST,
+  DIST_RING_SPEED_HOLD_SECONDS
 } = require('../public/flight-controls.js');
 
 test('DIST keeps free pitch while its roll self-levels like ARENA', () => {
@@ -188,6 +190,19 @@ test('distance rings grant a strong bounded speed and energy reward', () => {
     speedGain: 5,
     energyGain: 10
   });
+});
+
+test('distance ring speed hold prevents deceleration for 1.5 seconds without blocking acceleration', () => {
+  assert.equal(DIST_RING_SPEED_HOLD_SECONDS, 1.5);
+  const held = maintainDistanceRingSpeed(38, 44, 1.5, .1);
+  assert.deepEqual(held, { speed: 44, remaining: 1.4 });
+
+  const faster = maintainDistanceRingSpeed(51, 44, 1.4, .1);
+  assert.equal(faster.speed, 51);
+  assert.ok(Math.abs(faster.remaining - 1.3) < 1e-9);
+
+  const expired = maintainDistanceRingSpeed(38, 44, 0, .1);
+  assert.deepEqual(expired, { speed: 38, remaining: 0 });
 });
 
 test('dash acceleration eases at high physical speeds and speed widens the camera FOV', () => {

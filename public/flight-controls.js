@@ -16,6 +16,7 @@
   const DART_ENERGY_COST = 20;
   const DIST_RING_SPEED_BONUS = 12;
   const DIST_RING_ENERGY_BONUS = 30;
+  const DIST_RING_SPEED_HOLD_SECONDS = 1.5;
 
   function normalizeAngle(angle) {
     let normalized = (Number(angle) + Math.PI) % PI2;
@@ -148,6 +149,17 @@
     };
   }
 
+  function maintainDistanceRingSpeed(speed, holdSpeed, remainingSeconds, dt) {
+    const currentSpeed = Math.max(0, Number(speed) || 0);
+    const floor = Math.max(0, Number(holdSpeed) || 0);
+    const remaining = Math.max(0, Number(remainingSeconds) || 0);
+    const step = Math.max(0, Math.min(Number(dt) || 0, .1));
+    return {
+      speed: remaining > 0 ? Math.max(currentSpeed, floor) : currentSpeed,
+      remaining: Math.max(0, remaining - step)
+    };
+  }
+
   function dashAcceleration(speed) {
     const currentSpeed = Math.max(0, Number(speed) || 0);
     // 실제 물리 속도가 높을수록 가속을 완만하게 줄여 급격한 속도 점프를 막습니다.
@@ -172,6 +184,7 @@
     updateEnergy,
     consumeDartEnergy,
     applyDistanceRingReward,
+    maintainDistanceRingSpeed,
     dashAcceleration,
     speedFov,
     LOOK_PITCH_LIMIT,
@@ -180,6 +193,7 @@
     DASH_ENERGY_PER_SECOND,
     DART_ENERGY_COST,
     DIST_RING_SPEED_BONUS,
-    DIST_RING_ENERGY_BONUS
+    DIST_RING_ENERGY_BONUS,
+    DIST_RING_SPEED_HOLD_SECONDS
   };
 });

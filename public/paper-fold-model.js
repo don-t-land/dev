@@ -546,19 +546,19 @@
   const reference = values => Object.freeze(values);
   const PRESET_INFO = Object.freeze({
     dart: Object.freeze({
-      label: 'Basic Dart', tagline: '균형 잡힌 속도와 선회 · 기본형', role: '기본',
+      label: 'Basic Dart', tagline: '균형 잡힌 비행 성능 · 밸런스', role: '밸런스',
       reference: reference({ sourceUrl: 'https://www.foldnfly.com/1d.html', folds: 5, distanceM: 12.5, timeAloftS: 1.4, lengthCm: 29.5, wingspanCm: 11.1, wingChordCm: 15.2, wingAreaCm2: 168.5 })
     }),
     stable: Object.freeze({
-      label: 'The Stable', tagline: '저속에서도 날카로운 선회 · 고기동', role: '기동',
+      label: 'The Stable', tagline: '가장 빠른 피치와 롤 반응 · 기동성', role: '기동성',
       reference: reference({ sourceUrl: 'https://www.foldnfly.com/2d.html', folds: 7, distanceM: 5.5, timeAloftS: 2.5, lengthCm: 17, wingspanCm: 12.5, wingChordCm: 10.3, wingAreaCm2: 129.2 })
     }),
     stealth: Object.freeze({
-      label: 'Stealth Glider', tagline: '느리고 둔하지만 실속에 강한 활공', role: '체공',
+      label: 'Stealth Glider', tagline: '낮은 실속 속도와 안정적인 활공 · 저속 안정성', role: '저속 안정성',
       reference: reference({ sourceUrl: 'https://www.foldnfly.com/43.html', folds: 10, distanceM: 11.5, timeAloftS: 4.7, lengthCm: 14.1, wingspanCm: 16.4, wingChordCm: 12.6, wingAreaCm2: 206.8 })
     }),
     jet: Object.freeze({
-      label: 'Jet Fighter', tagline: '최고속도 · 기본형보다 빠른 선회', role: '고속',
+      label: 'Jet Fighter', tagline: '가장 높은 최고속도 · 최대속도', role: '최대속도',
       reference: reference({ sourceUrl: 'https://www.foldnfly.com/24d.html', folds: 9, distanceM: 6.4, timeAloftS: 2, lengthCm: 19.1, wingspanCm: 16, wingChordCm: 11.2, wingAreaCm2: 179.1 })
     })
   });

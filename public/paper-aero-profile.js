@@ -24,7 +24,7 @@
     stable: Object.freeze({
       liftScale: 1.15, dragScale: 1.7, stallSpeed: 9.5, pitchBias: .02,
       maxSpeed: 45, maxPitchDown: 1.08, maxPitchUp: .88, maxRoll: 1.18,
-      pitchRateScale: 1.28, rollRateScale: 1.42
+      pitchRateScale: 1.5, rollRateScale: 1.65
     }),
     // 저속 활공형: 실속에는 가장 강하지만 자세 범위와 선회 반응은 가장 낮다.
     stealth: Object.freeze({

@@ -45,6 +45,18 @@ test('프리셋은 Fold N Fly 공식 측정값과 출처를 그대로 보존한�
   });
 });
 
+test('프리셋 선택 화면은 각 기체의 메인 특장점을 명확히 표시한다', () => {
+  assert.deepStrictEqual(Object.fromEntries(ALL_PRESETS.map(name => [name, {
+    role: PRESET_INFO[name].role,
+    tagline: PRESET_INFO[name].tagline
+  }])), {
+    dart: { role: '밸런스', tagline: '균형 잡힌 비행 성능 · 밸런스' },
+    stable: { role: '기동성', tagline: '가장 빠른 피치와 롤 반응 · 기동성' },
+    stealth: { role: '저속 안정성', tagline: '낮은 실속 속도와 안정적인 활공 · 저속 안정성' },
+    jet: { role: '최대속도', tagline: '가장 높은 최고속도 · 최대속도' }
+  });
+});
+
 for (const name of ALL_PRESETS) {
   test(`${name} 프리셋은 서버에서 재생 가능한 대칭 모델이다`, () => {
     const commands = getPresetCommands(name);
@@ -167,7 +179,7 @@ test('프리셋은 역할별 최대속도·자세 제한·조종률 envelope를 
     stable: {
       liftScale: 1.15, dragScale: 1.7, stallSpeed: 9.5, maxSpeed: 45,
       maxPitchDown: 1.08, maxPitchUp: .88, maxRoll: 1.18,
-      pitchRateScale: 1.28, rollRateScale: 1.42
+      pitchRateScale: 1.5, rollRateScale: 1.65
     },
     stealth: {
       liftScale: 1.3, dragScale: 2.2, stallSpeed: 8.5, maxSpeed: 42,

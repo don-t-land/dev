@@ -326,6 +326,8 @@ test('the client loads free-flight controls and exposes the ESC settings menu', 
   assert.match(html, /id="key-guide-toggle"/);
   assert.match(html, /requestPointerLock\(/);
   assert.match(html, /movementX/);
+  assert.match(html, /const\s*\{[^}]*recenterFreeLook[^}]*isFreeLookCentered[^}]*\}\s*=\s*window\.flightControls/s);
+  assert.match(html, /e\.code\s*===\s*'KeyC'[\s\S]*isFreeLookCentered\(freeLook\)/s);
   assert.doesNotMatch(html, /const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT/);
 });
 

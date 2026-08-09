@@ -813,17 +813,21 @@ wss.on('connection', (ws) => {
     /* -- 아레나 live 방에서 개인 스폰(입장·리스폰) -- */
     if (m.t === 'spawn') {
       if (room.phase !== 'live') return;
+      const spawnRequestId = typeof m.requestId === 'string' && /^[A-Za-z0-9._:-]{1,64}$/.test(m.requestId)
+        ? m.requestId
+        : undefined;
+      const spawnResponseMeta = spawnRequestId ? { requestId: spawnRequestId } : {};
       if (me.alive) {
-        sendJson(ws, { t: 'error', code: 'ALREADY_ALIVE', message: '이미 비행 중입니다' });
+        sendJson(ws, { t: 'error', code: 'ALREADY_ALIVE', message: '이미 비행 중입니다', ...spawnResponseMeta });
         return;
       }
       if (!me.foldDone) {
-        sendJson(ws, { t: 'error', code: 'FOLD_REQUIRED', message: '비행기를 먼저 접어 주세요' });
+        sendJson(ws, { t: 'error', code: 'FOLD_REQUIRED', message: '비행기를 먼저 접어 주세요', ...spawnResponseMeta });
         return;
       }
       const spawnNow = Date.now();
       if (me.diedAt && spawnNow - me.diedAt < RESPAWN_COOLDOWN_MS) {
-        sendJson(ws, { t: 'error', code: 'RESPAWN_COOLDOWN', message: '잠시 후 다시 시도해 주세요' });
+        sendJson(ws, { t: 'error', code: 'RESPAWN_COOLDOWN', message: '잠시 후 다시 시도해 주세요', ...spawnResponseMeta });
         return;
       }
       const occupiedSpawns = [...room.players.values()]
@@ -850,7 +854,7 @@ wss.on('connection', (ws) => {
         t: 'spawned', id: me.id, name: me.name, angle: me.spawnAngle,
         position: me.spawnPosition,
         profile: me.aeroProfile, commands: me.foldCommands, kills: me.kills,
-        costume: normalizeCostume(me.costume)
+        costume: normalizeCostume(me.costume), ...spawnResponseMeta
       });
       return;
     }

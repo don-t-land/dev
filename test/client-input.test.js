@@ -465,7 +465,8 @@ test('direct respawn automatically retries cooldown errors and cancels stale wor
   assert.match(html, /createRespawnRetryController/);
   assert.match(html, /const respawnRetry = createRespawnRetryController\(\{[\s\S]*send,[\s\S]*maxRetries:\s*3[\s\S]*retryDelayMs:\s*700/);
   assert.match(html, /respawn-now-btn'\)\.addEventListener\('click',[\s\S]{0,180}respawnRetry\.start\(\)/);
-  assert.match(html, /case 'error':[\s\S]{0,180}respawnRetry\.handleError\(m\.code\)/);
+  assert.match(html, /case 'error':[\s\S]{0,180}respawnRetry\.handleError\(m\.code, m\.requestId\)/);
+  assert.match(html, /respawnRetry\.matches\(m\.requestId\)/);
   assert.match(html, /case 'spawned':[\s\S]{0,180}m\.id === net\.id[\s\S]{0,180}respawnRetry\.succeed\(\)/);
   assert.match(html, /respawn-refold-btn'\)\.addEventListener\('click',[\s\S]{0,180}respawnRetry\.cancel\(\)/);
   assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,180}respawnRetry\.cancel\(\)/);

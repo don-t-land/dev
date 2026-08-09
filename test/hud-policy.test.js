@@ -146,6 +146,7 @@ test('respawn retries cooldown failures three times and stops after success', ()
   const statuses = [];
   const controller = createRespawnRetryController({
     send: message => sent.push(message),
+    createRequestId: () => 'respawn-retry-1',
     schedule: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
     cancelSchedule: () => {},
     onStatus: status => statuses.push(status),
@@ -154,9 +155,9 @@ test('respawn retries cooldown failures three times and stops after success', ()
   });
 
   controller.start();
-  assert.deepEqual(sent, [{ t: 'spawn' }]);
+  assert.deepEqual(sent, [{ t: 'spawn', requestId: 'respawn-retry-1' }]);
   for (let retry = 1; retry <= 3; retry += 1) {
-    assert.equal(controller.handleError('RESPAWN_COOLDOWN'), true);
+    assert.equal(controller.handleError('RESPAWN_COOLDOWN', 'respawn-retry-1'), true);
     const task = scheduled.shift();
     assert.equal(task.delay, 700);
     task.callback();
@@ -165,7 +166,7 @@ test('respawn retries cooldown failures three times and stops after success', ()
 
   controller.succeed();
   assert.equal(controller.active, false);
-  assert.equal(controller.handleError('RESPAWN_COOLDOWN'), false);
+  assert.equal(controller.handleError('RESPAWN_COOLDOWN', 'respawn-retry-1'), false);
   assert.equal(sent.length, 4, 'one initial request plus three retries');
   assert.match(statuses.at(-2), /3\/3/);
 });
@@ -176,6 +177,7 @@ test('respawn does not retry permanent errors and reports exhausted cooldown ret
   const exhausted = [];
   const controller = createRespawnRetryController({
     send: message => sent.push(message),
+    createRequestId: () => 'respawn-permanent-1',
     schedule: callback => { scheduled.push(callback); return scheduled.length; },
     cancelSchedule: () => {},
     onExhausted: code => exhausted.push(code),
@@ -183,29 +185,50 @@ test('respawn does not retry permanent errors and reports exhausted cooldown ret
   });
 
   controller.start();
-  assert.equal(controller.handleError('FOLD_REQUIRED'), false);
+  assert.equal(controller.handleError('FOLD_REQUIRED', 'respawn-permanent-1'), false);
   assert.equal(scheduled.length, 0);
 
   controller.start();
-  assert.equal(controller.handleError('RESPAWN_COOLDOWN'), true);
+  assert.equal(controller.handleError('RESPAWN_COOLDOWN', 'respawn-permanent-1'), true);
   scheduled.shift()();
-  assert.equal(controller.handleError('RESPAWN_COOLDOWN'), true);
+  assert.equal(controller.handleError('RESPAWN_COOLDOWN', 'respawn-permanent-1'), true);
   assert.equal(controller.active, false);
   assert.deepEqual(exhausted, ['RESPAWN_COOLDOWN']);
+});
+
+test('respawn ignores errors that do not match its active request ID', () => {
+  const sent = [];
+  const scheduled = [];
+  const controller = createRespawnRetryController({
+    send: message => sent.push(message),
+    createRequestId: () => 'respawn-current',
+    schedule: callback => { scheduled.push(callback); return scheduled.length; },
+    cancelSchedule: () => {}
+  });
+
+  controller.start();
+  assert.deepEqual(sent, [{ t: 'spawn', requestId: 'respawn-current' }]);
+  assert.equal(controller.handleError('RESPAWN_COOLDOWN', 'other-request'), false);
+  assert.equal(controller.matches('other-request'), false);
+  assert.equal(controller.matches('respawn-current'), true);
+  assert.equal(scheduled.length, 0);
+  assert.equal(controller.active, true);
 });
 
 test('respawn ignores a stale queued retry after cancel and restart', () => {
   const sent = [];
   const scheduled = [];
+  let requestSequence = 0;
   const controller = createRespawnRetryController({
     send: message => sent.push(message),
+    createRequestId: () => `respawn-stale-${++requestSequence}`,
     schedule: callback => { scheduled.push(callback); return scheduled.length; },
     cancelSchedule: () => {},
     maxRetries: 3
   });
 
   controller.start();
-  controller.handleError('RESPAWN_COOLDOWN');
+  controller.handleError('RESPAWN_COOLDOWN', 'respawn-stale-1');
   const staleRetry = scheduled.shift();
   controller.cancel();
   controller.start();

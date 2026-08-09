@@ -238,24 +238,28 @@ test('live 방 접기 → fold_ok → 안전한 랜덤 위치 spawn → spawned 
 test('spawn 가드: 미접기 FOLD_REQUIRED, 생존 중 ALREADY_ALIVE, 사망 직후 RESPAWN_COOLDOWN', async () => {
   const { host, guest } = await createAndJoinLiveArena('방장', '손님');
   try {
-    guest.send({ t: 'spawn' });
+    guest.send({ t: 'spawn', requestId: 'fold-required-1' });
     const foldRequired = await guest.next(message => message.t === 'error');
     assert.equal(foldRequired.code, 'FOLD_REQUIRED');
+    assert.equal(foldRequired.requestId, 'fold-required-1');
 
     guest.send({ t: 'fold_done', commands: DART_COMMANDS });
     await guest.next(message => message.t === 'fold_ok');
-    guest.send({ t: 'spawn' });
-    await guest.next(message => message.t === 'spawned');
+    guest.send({ t: 'spawn', requestId: 'spawn-ok-1' });
+    const initialSpawn = await guest.next(message => message.t === 'spawned');
+    assert.equal(initialSpawn.requestId, 'spawn-ok-1');
 
-    guest.send({ t: 'spawn' });
+    guest.send({ t: 'spawn', requestId: 'already-alive-1' });
     const alreadyAlive = await guest.next(message => message.t === 'error');
     assert.equal(alreadyAlive.code, 'ALREADY_ALIVE');
+    assert.equal(alreadyAlive.requestId, 'already-alive-1');
 
     guest.send({ t: 'crash' });
     await host.next(message => message.t === 'crashed');
-    guest.send({ t: 'spawn' });
+    guest.send({ t: 'spawn', requestId: 'cooldown-1' });
     const cooldown = await guest.next(message => message.t === 'error');
     assert.equal(cooldown.code, 'RESPAWN_COOLDOWN');
+    assert.equal(cooldown.requestId, 'cooldown-1');
 
     await new Promise(resolve => setTimeout(resolve, 2_100));
     guest.send({ t: 'spawn' });

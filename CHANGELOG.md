@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.6 - 2026-08-09
+
+### Fixed
+
+- direct respawn 요청마다 고유 `requestId`를 부여하고 서버가 spawn 성공·오류에 이를 echo하도록 해 다른 protocol 오류가 자동 재시도 상태를 취소하거나 소모하지 않게 했습니다.
+- request correlation 및 unrelated error 무시 동작에 대한 client/server 회귀 테스트를 추가했습니다.
+- browser asset cache key를 앱 버전 `1.7.6`과 일치시켰습니다.
+
 ## 1.7.5 - 2026-08-09
 
 ### Fixed

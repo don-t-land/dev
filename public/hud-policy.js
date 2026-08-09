@@ -121,12 +121,17 @@
     const cancelSchedule = typeof options.cancelSchedule === 'function' ? options.cancelSchedule : clearTimeout;
     const onStatus = typeof options.onStatus === 'function' ? options.onStatus : () => {};
     const onExhausted = typeof options.onExhausted === 'function' ? options.onExhausted : () => {};
+    const createRequestId = typeof options.createRequestId === 'function'
+      ? options.createRequestId
+      : () => globalThis.crypto?.randomUUID?.()
+        || `respawn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     const retryDelayMs = Math.max(0, finite(options.retryDelayMs, 700));
     const maxRetries = Math.max(0, Math.floor(finite(options.maxRetries, 3)));
     let active = false;
     let retries = 0;
     let timer = null;
     let generation = 0;
+    let requestId = null;
 
     function clearTimer() {
       if (timer === null) return;
@@ -137,25 +142,32 @@
     function request() {
       if (!active) return;
       onStatus(retries === 0 ? '부활 요청 중…' : `부활 재시도 중… (${retries}/${maxRetries})`);
-      send({ t: 'spawn' });
+      send({ t: 'spawn', requestId });
     }
 
     function cancel() {
       clearTimer();
       active = false;
+      requestId = null;
       generation += 1;
+    }
+
+    function matches(candidateRequestId) {
+      return active && typeof candidateRequestId === 'string' && candidateRequestId === requestId;
     }
 
     return {
       get active() { return active; },
+      matches,
       start() {
         cancel();
         active = true;
         retries = 0;
+        requestId = String(createRequestId()).slice(0, 64);
         request();
       },
-      handleError(code) {
-        if (!active || code !== 'RESPAWN_COOLDOWN') return false;
+      handleError(code, candidateRequestId) {
+        if (!matches(candidateRequestId) || code !== 'RESPAWN_COOLDOWN') return false;
         clearTimer();
         if (retries >= maxRetries) {
           active = false;

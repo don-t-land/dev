@@ -42,15 +42,25 @@
     };
   }
 
+  const BALLOON_ASSETS = Object.freeze([
+    'hot-air-balloon-a',
+    'hot-air-balloon-b',
+    'hot-air-balloon-c'
+  ]);
+  const AIRSHIP_ASSETS = Object.freeze(['airship-g', 'airship-h']);
+
   function buildArenaFlyObjects(seed, arenaRadius) {
     const radius = Math.max(100, Number(arenaRadius) || 720);
     const rng = mulberry32((Number(seed) ^ 0xb41100af) >>> 0);
     return Array.from({ length: 7 }, (_, index) => {
       const type = index % 3 === 2 ? 'balloon-airship' : 'hot-air-balloon';
+      const assets = type === 'balloon-airship' ? AIRSHIP_ASSETS : BALLOON_ASSETS;
+      const assetKey = assets[Math.floor(rng() * assets.length)];
       const angle = rng() * Math.PI * 2;
       const orbitRadius = radius * (.38 + rng() * .42);
       return {
         type,
+        assetKey,
         x: Math.cos(angle) * orbitRadius,
         y: 115 + rng() * 155,
         z: Math.sin(angle) * orbitRadius,

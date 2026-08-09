@@ -1,4 +1,77 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const FLIGHT_ASSETS = Object.freeze({
+  'hot-air-balloon-a': Object.freeze({ url: './assets/flight/hot-air-balloon-a.glb', rotation: [0, 0, 0], targetAxis: 'y', targetSize: 26 }),
+  'hot-air-balloon-b': Object.freeze({ url: './assets/flight/hot-air-balloon-b.glb', rotation: [-Math.PI / 2, 0, 0], targetAxis: 'y', targetSize: 26 }),
+  'hot-air-balloon-c': Object.freeze({ url: './assets/flight/hot-air-balloon-c.glb', rotation: [0, 0, 0], targetAxis: 'y', targetSize: 26 }),
+  'airship-g': Object.freeze({ url: './assets/flight/airship-g.glb', rotation: [0, Math.PI / 2, 0], targetAxis: 'x', targetSize: 42 }),
+  'airship-h': Object.freeze({ url: './assets/flight/airship-h.glb', rotation: [0, Math.PI / 2, 0], targetAxis: 'x', targetSize: 42 })
+});
+
+const flightAssetLoader = new GLTFLoader();
+const flightAssetPromises = new Map();
+
+function normalizeLoadedFlightModel(source, config) {
+  const normalized = new THREE.Group();
+  source.rotation.set(...config.rotation);
+  normalized.add(source);
+  normalized.updateMatrixWorld(true);
+
+  let bounds = new THREE.Box3().setFromObject(normalized);
+  const size = bounds.getSize(new THREE.Vector3());
+  normalized.scale.setScalar(config.targetSize / Math.max(.001, size[config.targetAxis]));
+  normalized.updateMatrixWorld(true);
+
+  bounds = new THREE.Box3().setFromObject(normalized);
+  normalized.position.sub(bounds.getCenter(new THREE.Vector3()));
+  normalized.updateMatrixWorld(true);
+  return normalized;
+}
+
+function loadFlightAsset(assetKey) {
+  const config = FLIGHT_ASSETS[assetKey];
+  if (!config) return Promise.reject(new Error(`Unknown flight asset: ${assetKey}`));
+  if (!flightAssetPromises.has(assetKey)) {
+    const promise = flightAssetLoader.loadAsync(config.url)
+      .then(gltf => normalizeLoadedFlightModel(gltf.scene, config))
+      .catch(error => {
+        if (flightAssetPromises.get(assetKey) === promise) flightAssetPromises.delete(assetKey);
+        throw error;
+      });
+    flightAssetPromises.set(assetKey, promise);
+  }
+  return flightAssetPromises.get(assetKey);
+}
+
+function cloneFlightModel(template, assetKey) {
+  const clone = template.clone(true);
+  clone.name = assetKey;
+  clone.traverse(child => {
+    if (!child.isMesh) return;
+    child.geometry = child.geometry.clone();
+    child.material = Array.isArray(child.material)
+      ? child.material.map(material => material.clone())
+      : child.material.clone();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach(material => { material.userData.flightAssetOwned = true; });
+    child.castShadow = true;
+    child.receiveShadow = true;
+  });
+  return clone;
+}
+
+function disposeFlightFallback(object) {
+  const geometries = new Set();
+  const materials = new Set();
+  object.traverse(child => {
+    if (child.geometry) geometries.add(child.geometry);
+    const childMaterials = Array.isArray(child.material) ? child.material : child.material ? [child.material] : [];
+    childMaterials.forEach(material => materials.add(material));
+  });
+  geometries.forEach(geometry => geometry.dispose());
+  materials.forEach(material => material.dispose());
+}
 
 function standard(color, roughness = .72, emissive = 0x000000, emissiveIntensity = 0) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: .08, emissive, emissiveIntensity });
@@ -300,18 +373,35 @@ function makeBalloonAirship(index = 0) {
   return group;
 }
 
-export function createArenaFlyObjects(descriptors) {
+export function createArenaFlyObjects(descriptors, onAssetSwap) {
   const root = new THREE.Group();
   root.name = 'arena-fly-objects';
   descriptors.forEach((descriptor, index) => {
-    const object = descriptor.type === 'balloon-airship'
+    const object = new THREE.Group();
+    const fallback = descriptor.type === 'balloon-airship'
       ? makeBalloonAirship(index)
       : makeHotAirBalloon(index);
+    object.add(fallback);
     object.position.set(descriptor.x, descriptor.y, descriptor.z);
     object.scale.setScalar(descriptor.scale);
     object.rotation.y = -descriptor.angle + Math.PI / 2;
     object.userData.flight = descriptor;
+    object.userData.assetKey = descriptor.assetKey;
+    object.userData.propellers = fallback.userData.propellers || [];
     root.add(object);
+
+    loadFlightAsset(descriptor.assetKey).then(template => {
+      if (!root.parent || object.parent !== root) return;
+      const loaded = cloneFlightModel(template, descriptor.assetKey);
+      object.remove(fallback);
+      object.add(loaded);
+      object.userData.assetLoaded = true;
+      object.userData.propellers = [];
+      onAssetSwap?.({ loaded, fallback });
+      disposeFlightFallback(fallback);
+    }).catch(error => {
+      console.warn(`Unable to load ${descriptor.assetKey}; keeping procedural fallback.`, error);
+    });
   });
   return root;
 }

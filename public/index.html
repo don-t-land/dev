@@ -2534,6 +2534,12 @@ function detachObjectMaterials(object) {
   });
 }
 
+function disposeOwnedFlightMaterials(object) {
+  forEachObjectMaterial(object, material => {
+    if (material.userData.flightAssetOwned) unregisterLitMaterial(material);
+  });
+}
+
 function setGameplayCostume(owner, value, layout = 'flight') {
   if (!owner) return null;
   const normalized = window.costumeState.normalize(value);
@@ -3588,6 +3594,7 @@ function clearWorld() {
   detachObjectMaterials(arenaFlyObjects);
   detachObjectMaterials(finishLine);
   detachObjectMaterials(previousEnvironment);
+  disposeOwnedFlightMaterials(arenaFlyObjects);
   previousEnvironment?.userData.dispose?.();
   world.traverse(o => {
     if (o.isMesh && !previousEnvironment?.getObjectById(o.id)) o.geometry.dispose?.();
@@ -3701,7 +3708,13 @@ function buildArena(seed) {
   bound.position.y = 0.15;
   world.add(bound);
 
-  arenaFlyObjects = createArenaFlyObjects(window.flightWorldState.buildArenaFlyObjects(seed, ARENA_R));
+  arenaFlyObjects = createArenaFlyObjects(
+    window.flightWorldState.buildArenaFlyObjects(seed, ARENA_R),
+    ({ loaded, fallback }) => {
+      detachObjectMaterials(fallback);
+      registerObjectMaterials(loaded);
+    }
+  );
   registerObjectMaterials(arenaFlyObjects);
   world.add(arenaFlyObjects);
   worldTimeElapsed = 0;

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.3 - 2026-08-09
+
+### Changed
+
+- ESC 설정 modal을 viewport 정중앙에 배치하고 최대 크기, 내부 padding, tab rail, 설정 row와 footer 간격을 줄여 더 컴팩트하게 조정했습니다.
+- 421~640px 화면에서는 설정 row를 좌우 배치해 불필요한 세로 길이를 줄이고, 420px 이하에서만 세로 stacking하도록 responsive breakpoint를 세분화했습니다.
+- browser asset cache key를 앱 버전 `1.7.3`과 일치시켰습니다.
+
 ## 1.7.2 - 2026-08-08
 
 ### Fixed

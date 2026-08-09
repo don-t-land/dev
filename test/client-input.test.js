@@ -281,7 +281,7 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
     assert.match(html, new RegExp(`id="settings-tab-${section}"[^>]*data-settings-tab="${section}"[^>]*role="tab"`));
     assert.match(html, new RegExp(`id="settings-panel-${section}"[^>]*data-settings-panel="${section}"[^>]*role="tabpanel"`));
   }
-  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*176px\s+minmax\(0,\s*1fr\)[^}]*min-height:\s*0/s);
+  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*156px\s+minmax\(0,\s*1fr\)[^}]*min-height:\s*0/s);
   assert.match(html, /\.settings-panels\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(html, /\.settings-panels\s*\{[^}]*min-height:\s*0/s);
   assert.match(html, /@media\s*\(max-width:\s*640px\)[\s\S]*\.settings-layout\s*\{[^}]*grid-template-columns:\s*1fr[^}]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)/s);
@@ -290,6 +290,17 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
   assert.match(html, /tab\.setAttribute\('aria-selected',\s*String\(selected\)\)/);
   assert.match(html, /document\.querySelectorAll\('\[data-settings-tab\]'\)/);
   assert.match(html, /openPauseMenu\(\)[\s\S]*setSettingsSection\('controls'\)[\s\S]*\$\('settings-tab-controls'\)\.focus\(\)/s);
+});
+
+test('ESC settings modal stays centered with compact controls', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /#pause-menu\s*\{[^}]*align-items:\s*center[^}]*padding-block:\s*16px/s);
+  assert.match(html, /\.settings-modal-card\s*\{[^}]*width:\s*min\(740px,[^}]*height:\s*min\(520px,[^}]*padding:\s*22px[^}]*gap:\s*12px/s);
+  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*156px\s+minmax\(0,\s*1fr\)[^}]*gap:\s*12px/s);
+  assert.match(html, /\.settings-tab\s*\{[^}]*min-height:\s*44px[^}]*padding:\s*8px\s+10px/s);
+  assert.match(html, /\.setting-row\s*\{[^}]*margin-top:\s*8px[^}]*padding:\s*11px/s);
+  assert.match(html, /@media\s*\(max-width:\s*420px\)[\s\S]*\.settings-panel\s+\.setting-row\s*\{[^}]*flex-direction:\s*column/s);
 });
 
 test('the client loads free-flight controls and exposes the ESC settings menu', () => {

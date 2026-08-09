@@ -42,4 +42,7 @@ test('energy and speed use segmented game-style meter bars', () => {
   assert.match(html, /repeating-linear-gradient\(108deg/);
   assert.match(html, /id="energy" role="meter"/);
   assert.match(html, /id="gauge" role="meter"/);
+  assert.match(html, /const maxSpeedKmh = Math\.floor\(aeroProfile\.maxSpeed \* 3\.6\)/);
+  assert.match(html, /'gauge'\)\.setAttribute\('aria-valuemax', String\(maxSpeedKmh\)\)/);
+  assert.match(html, /'gauge'\)\.setAttribute\('aria-valuenow', String\(Math\.min\(maxSpeedKmh, speedKmh\)\)\)/);
 });

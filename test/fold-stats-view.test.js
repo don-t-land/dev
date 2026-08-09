@@ -9,11 +9,11 @@ const { deriveAerodynamicProfile } = require('../public/paper-aero-profile.js');
 const flatProfile = deriveAerodynamicProfile(createPaperModel());
 const dartProfile = deriveAerodynamicProfile(createPresetModel('dart'));
 
-test('다섯 개 스탯 행을 순서대로 만든다', () => {
+test('일곱 개 스탯 행에 최고속도와 선회력을 포함한다', () => {
   const rows = buildStatsRows(flatProfile, null);
   assert.deepStrictEqual(
     rows.map(row => row.key),
-    ['liftScale', 'dragScale', 'stability', 'stallSpeed', 'rollBias']
+    ['maxSpeed', 'liftScale', 'dragScale', 'rollRateScale', 'stability', 'stallSpeed', 'rollBias']
   );
   rows.forEach(row => {
     assert.ok(Number.isInteger(row.percent) && row.percent >= 0 && row.percent <= 100);
@@ -22,6 +22,8 @@ test('다섯 개 스탯 행을 순서대로 만든다', () => {
     assert.strictEqual(row.delta, 'same');
     assert.strictEqual(typeof row.good, 'boolean');
   });
+  assert.strictEqual(rows.find(row => row.key === 'maxSpeed').text, `${Math.round(flatProfile.maxSpeed * 3.6)} km/h`);
+  assert.strictEqual(rows.find(row => row.key === 'rollRateScale').text, `${Math.round(flatProfile.rollRateScale * 100)}%`);
 });
 
 test('직전 프로필 대비 증감을 표시한다', () => {

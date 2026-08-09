@@ -1256,29 +1256,29 @@
   }
 }
 </script>
-<script src="./input-policy.js?v=1.7.2"></script>
-<script src="./hud-policy.js?v=1.7.2"></script>
+<script src="./input-policy.js?v=1.8.0"></script>
+<script src="./hud-policy.js?v=1.8.0"></script>
 <script src="./mobile-controls.js"></script>
 
 <script src="./room-state.js"></script>
-<script src="./flight-controls.js"></script>
+<script src="./flight-controls.js?v=1.8.0"></script>
 <script src="./costume-template.js"></script>
 <script src="./costume-state.js"></script>
 <script src="./waiting-room-state.js"></script>
-<script src="./paper-fold-model.js"></script>
-<script src="./paper-aero-profile.js"></script>
-<script src="./fold-stats-view.js"></script>
+<script src="./paper-fold-model.js?v=1.8.0"></script>
+<script src="./paper-aero-profile.js?v=1.8.0"></script>
+<script src="./fold-stats-view.js?v=1.8.0"></script>
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
 <script src="./flight-world-state.js"></script>
-<script src="./biomes/helpers.js?v=1.7.2"></script>
+<script src="./biomes/helpers.js?v=1.8.0"></script>
 <script src="./biomes/desert.js"></script>
 <script src="./biomes/pillars.js"></script>
 <script src="./biomes/glacier.js"></script>
 <script src="./biomes/lava.js"></script>
 <script src="./biomes/floating.js"></script>
-<script src="./map-gen.js?v=1.7.2"></script>
+<script src="./map-gen.js?v=1.8.0"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./costume-showroom-3d.js"></script>
@@ -2885,7 +2885,7 @@ function syncRapierFromCraft() {
    다시 켜려면 USE_RAPIER_PHYSICS를 true로 변경하세요. */
 const USE_RAPIER_PHYSICS = false;
 if (USE_RAPIER_PHYSICS) {
-  void import('./flight-physics-rapier.mjs')
+  void import('./flight-physics-rapier.mjs?v=1.8.0')
     .then(async api => {
       rapierApi = api;
       rapierFlight = await api.createPaperFlightPhysics();
@@ -3002,7 +3002,9 @@ function setCraftFromFoldModel(model, authoritativeProfile = null, commandKey = 
   const derivedProfile = window.PaperAeroProfile.deriveAerodynamicProfile(sourceModel);
   const requiredAeroFields = [
     'liftScale', 'dragScale', 'stallSpeed', 'stability',
-    'rollBias', 'pitchBias', 'span', 'chord'
+    'rollBias', 'pitchBias', 'span', 'chord',
+    'maxSpeed', 'maxPitchDown', 'maxPitchUp', 'maxRoll',
+    'pitchRateScale', 'rollRateScale'
   ];
   const serverProfileIsValid = authoritativeProfile
     && requiredAeroFields.every(field => Number.isFinite(authoritativeProfile[field]));
@@ -3010,9 +3012,10 @@ function setCraftFromFoldModel(model, authoritativeProfile = null, commandKey = 
   activePaperModel = sourceModel;
   craft.userData.aeroProfile = aeroProfile;
   updateAeroHud();
-  if (rapierFlight && rapierApi && craft.userData.physicsCommandKey !== commandKey) {
+  const physicsProfileKey = `${commandKey}:${requiredAeroFields.map(field => aeroProfile[field]).join(',')}`;
+  if (rapierFlight && rapierApi && craft.userData.physicsCommandKey !== physicsProfileKey) {
     rapierFlight.configure(aeroProfile, rapierApi.makeColliderVertices(sourceModel));
-    craft.userData.physicsCommandKey = commandKey;
+    craft.userData.physicsCommandKey = physicsProfileKey;
   }
   setFoldedCraftVisual(craft, baseCraftVisual, model, new THREE.Color(0xfdfcf7), commandKey);
 }
@@ -4693,7 +4696,7 @@ function physics(dt) {
     me.speed = Math.max(3, state.speed);
   } else {
     const controlAuthority = THREE.MathUtils.clamp(1.35 - aeroProfile.stability * .25, .9, 1.3);
-    Object.assign(me, updateAttitude(me, keys, dt * controlAuthority, game.mode));
+    Object.assign(me, updateAttitude(me, keys, dt * controlAuthority, game.mode, aeroProfile));
 
     const stabilityRate = THREE.MathUtils.clamp(aeroProfile.stability, .2, 1.25);
     if (!keys.KeyA && !keys.KeyD) {
@@ -4710,18 +4713,15 @@ function physics(dt) {
       me.pitch += (pitchTarget - me.pitch) * (1 - Math.pow(.35, dt * stabilityRate));
     }
 
-    me.pitch = game.mode === 'DIST'
-      ? normalizeAngle(me.pitch)
-      : THREE.MathUtils.clamp(me.pitch, -.95, .75);
-    me.roll = THREE.MathUtils.clamp(me.roll, -.95, .95);
-
     const dragCoefficient = DRAG * aeroProfile.dragScale;
     me.speed += dashSpeedDelta;
     me.speed += (-Math.sin(me.pitch) * GRAVITY - dragCoefficient * me.speed * me.speed) * dt;
-    me.speed = Math.max(me.speed, 3);
+    me.speed = THREE.MathUtils.clamp(me.speed, 3, aeroProfile.maxSpeed);
     if (me.speed < aeroProfile.stallSpeed) {
       me.pitch -= (aeroProfile.stallSpeed - me.speed) * .34 * dt;
     }
+    me.pitch = THREE.MathUtils.clamp(me.pitch, -aeroProfile.maxPitchDown, aeroProfile.maxPitchUp);
+    me.roll = THREE.MathUtils.clamp(me.roll, -aeroProfile.maxRoll, aeroProfile.maxRoll);
 
     dir.set(
       -Math.sin(me.yaw) * Math.cos(me.pitch),
@@ -4792,6 +4792,8 @@ function physics(dt) {
         rapierFlight?.boostSpeed(6);
       }
     }
+    me.speed = THREE.MathUtils.clamp(me.speed, 3, aeroProfile.maxSpeed);
+    rapierFlight?.limitSpeed(aeroProfile.maxSpeed);
   }
 }
 
@@ -4973,9 +4975,10 @@ renderer.setAnimationLoop(timestamp => {
   $('s-main').textContent = game.mode === 'ARENA' ? Math.floor(me.surv) : Math.floor(me.dist);
   $('s-alt').textContent = Math.floor(craft.position.y);
   const speedKmh = Math.floor(me.speed * 3.6);
+  const maxSpeedKmh = Math.floor(aeroProfile.maxSpeed * 3.6);
   $('s-spd').textContent = speedKmh;
   const fill = $('s-fill');
-  fill.style.width = Math.min(100, (me.speed / 70) * 100) + '%';
+  fill.style.width = Math.min(100, (me.speed / aeroProfile.maxSpeed) * 100) + '%';
   fill.classList.toggle('stall', me.speed < aeroProfile.stallSpeed);
   $('s-energy').textContent = Math.ceil(me.energy);
   $('energy-fill').style.width = `${me.energy}%`;
@@ -4985,7 +4988,8 @@ renderer.setAnimationLoop(timestamp => {
   $('energy-label').textContent = me.engineOverheated ? 'ENGINE OVERHEAT · 냉각 중' : 'ENERGY · 에너지';
   $('energy').setAttribute('aria-label', me.engineOverheated ? '엔진 과열, 냉각 중' : '에너지');
   $('energy').setAttribute('aria-valuenow', String(Math.ceil(me.energy)));
-  $('gauge').setAttribute('aria-valuenow', String(Math.min(252, speedKmh)));
+  $('gauge').setAttribute('aria-valuemax', String(maxSpeedKmh));
+  $('gauge').setAttribute('aria-valuenow', String(Math.min(maxSpeedKmh, speedKmh)));
   audioDirector.setFlight({ speed: me.speed, dashing: me.dashing, alive: me.alive && game.phase === 'playing' });
   drawMinimap(timestamp);
 

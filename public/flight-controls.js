@@ -21,30 +21,41 @@
     return normalized - Math.PI;
   }
 
-  function updateAttitude(state, keys, dt, mode) {
+  function updateAttitude(state, keys, dt, mode, controlEnvelope = null) {
     let yaw = Number(state.yaw) || 0;
     let pitch = Number(state.pitch) || 0;
     let roll = Number(state.roll) || 0;
     const step = Math.max(0, Math.min(Number(dt) || 0, 0.1));
+    const envelope = controlEnvelope && typeof controlEnvelope === 'object' ? controlEnvelope : {};
+    const finitePositive = (value, fallback) => Number.isFinite(value) && value > 0 ? value : fallback;
+    const pitchRateScale = Math.max(.35, Math.min(2, finitePositive(envelope.pitchRateScale, 1)));
+    const rollRateScale = Math.max(.35, Math.min(2, finitePositive(envelope.rollRateScale, 1)));
+    const maxRoll = Math.max(.35, Math.min(1.4, finitePositive(envelope.maxRoll, .95)));
+    const hasPitchEnvelope = Number.isFinite(envelope.maxPitchDown) && envelope.maxPitchDown > 0
+      && Number.isFinite(envelope.maxPitchUp) && envelope.maxPitchUp > 0;
+    const maxPitchDown = Math.max(.35, Math.min(1.4, finitePositive(envelope.maxPitchDown, .95)));
+    const maxPitchUp = Math.max(.35, Math.min(1.4, finitePositive(envelope.maxPitchUp, .75)));
 
-    if (keys.KeyW) pitch -= 1.1 * step;
-    if (keys.KeyS) pitch += 1.1 * step;
-    if (keys.KeyA) roll += 2 * step;
-    if (keys.KeyD) roll -= 2 * step;
+    if (keys.KeyW) pitch -= 1.1 * pitchRateScale * step;
+    if (keys.KeyS) pitch += 1.1 * pitchRateScale * step;
+    if (keys.KeyA) roll += 2 * rollRateScale * step;
+    if (keys.KeyD) roll -= 2 * rollRateScale * step;
 
     // 두 모드는 동일한 제한 롤과 자동 수평 복원을 사용합니다.
     if (!keys.KeyA && !keys.KeyD) roll *= Math.pow(0.12, step);
-    roll = Math.max(-0.95, Math.min(0.95, roll));
+    roll = Math.max(-maxRoll, Math.min(maxRoll, roll));
 
     if (mode === 'DIST') {
-      pitch = normalizeAngle(pitch);
+      pitch = hasPitchEnvelope
+        ? Math.max(-maxPitchDown, Math.min(maxPitchUp, pitch))
+        : normalizeAngle(pitch);
       yaw = normalizeAngle(yaw + roll * 1.15 * step);
       return { yaw, pitch, roll };
     }
 
     if (!keys.KeyW && !keys.KeyS) pitch += (-0.09 - pitch) * (1 - Math.pow(0.35, step));
 
-    pitch = Math.max(-0.95, Math.min(0.75, pitch));
+    pitch = Math.max(-maxPitchDown, Math.min(maxPitchUp, pitch));
     yaw = normalizeAngle(yaw + roll * 1.15 * step);
     return { yaw, pitch, roll };
   }

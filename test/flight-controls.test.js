@@ -59,6 +59,46 @@ test('DIST and ARENA apply identical roll dynamics for both input and release', 
   }
 });
 
+test('aircraft control envelope scales pitch and roll input independently', () => {
+  const state = { yaw: 0, pitch: 0, roll: 0 };
+  const stable = updateAttitude(state, { KeyW: true, KeyA: true }, 0.05, 'ARENA', {
+    pitchRateScale: 1.28, rollRateScale: 1.42
+  });
+  const stealth = updateAttitude(state, { KeyW: true, KeyA: true }, 0.05, 'ARENA', {
+    pitchRateScale: .72, rollRateScale: .68
+  });
+
+  assert.ok(Math.abs(stable.pitch) > Math.abs(stealth.pitch));
+  assert.ok(Math.abs(stable.roll) > Math.abs(stealth.roll));
+  assert.ok(Math.abs(stable.roll) > Math.abs(stable.pitch));
+});
+
+test('aircraft control envelope clamps pitch and roll in both game modes', () => {
+  const envelope = {
+    maxPitchDown: .72, maxPitchUp: .5, maxRoll: .62,
+    pitchRateScale: 1, rollRateScale: 1
+  };
+  const noseDown = updateAttitude(
+    { yaw: 0, pitch: -.7, roll: .6 },
+    { KeyW: true, KeyA: true },
+    .1,
+    'DIST',
+    envelope
+  );
+  const noseUp = updateAttitude(
+    { yaw: 0, pitch: .48, roll: -.6 },
+    { KeyS: true, KeyD: true },
+    .1,
+    'ARENA',
+    envelope
+  );
+
+  assert.equal(noseDown.pitch, -.72);
+  assert.equal(noseDown.roll, .62);
+  assert.equal(noseUp.pitch, .5);
+  assert.equal(noseUp.roll, -.62);
+});
+
 test('mouse free-look rotates continuously and clamps only the vertical view', () => {
   const first = updateFreeLook({ yaw: 0, pitch: 0 }, 900, -900);
   const second = updateFreeLook(first, 900, 900);

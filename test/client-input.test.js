@@ -6,6 +6,28 @@ const { test } = require('node:test');
 const projectRoot = path.join(__dirname, '..');
 const packageJson = require('../package.json');
 
+test('active flight loop applies authoritative aircraft control envelope and maximum speed', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  for (const field of [
+    'maxSpeed', 'maxPitchDown', 'maxPitchUp', 'maxRoll',
+    'pitchRateScale', 'rollRateScale'
+  ]) {
+    assert.match(html, new RegExp(`requiredAeroFields[\\s\\S]*['\"]${field}['\"]`));
+  }
+  assert.match(html, /updateAttitude\(me,\s*keys,\s*dt\s*\*\s*controlAuthority,\s*game\.mode,\s*aeroProfile\)/);
+  assert.match(html, /me\.pitch\s*=\s*THREE\.MathUtils\.clamp\(me\.pitch,\s*-aeroProfile\.maxPitchDown,\s*aeroProfile\.maxPitchUp\)/);
+  assert.match(html, /me\.roll\s*=\s*THREE\.MathUtils\.clamp\(me\.roll,\s*-aeroProfile\.maxRoll,\s*aeroProfile\.maxRoll\)/);
+  assert.match(html, /me\.speed\s*=\s*THREE\.MathUtils\.clamp\(me\.speed,\s*3,\s*aeroProfile\.maxSpeed\)/);
+  assert.match(html, /me\.speed\s*\+=\s*6;[\s\S]*me\.speed\s*=\s*THREE\.MathUtils\.clamp\(me\.speed,\s*3,\s*aeroProfile\.maxSpeed\)/);
+  for (const asset of [
+    'flight-controls.js', 'paper-fold-model.js', 'paper-aero-profile.js', 'fold-stats-view.js'
+  ]) {
+    assert.match(html, new RegExp(`<script src="\\./${asset.replace('.', '\\.') }\\?v=1\\.8\\.0"><\\/script>`));
+  }
+  assert.match(html, /import\('\.\/flight-physics-rapier\.mjs\?v=1\.8\.0'\)/);
+});
+
 test('flight keys remain editable inside nickname inputs', () => {
   const { shouldCaptureGameKey, isEditableTarget } = require('../public/input-policy.js');
   const input = { tagName: 'INPUT', isContentEditable: false };
@@ -297,7 +319,7 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
 test('the client loads free-flight controls and exposes the ESC settings menu', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
-  assert.match(html, /<script\s+src=['"]\.\/flight-controls\.js['"]><\/script>/);
+  assert.match(html, /<script\s+src=['"]\.\/flight-controls\.js(?:\?v=\d+\.\d+\.\d+)?['"]><\/script>/);
   assert.match(html, /id="pause-menu"/);
   assert.match(html, /id="resume-btn"/);
   assert.match(html, /id="pause-leave-btn"/);

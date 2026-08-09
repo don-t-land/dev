@@ -292,11 +292,11 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
   assert.match(html, /openPauseMenu\(\)[\s\S]*setSettingsSection\('controls'\)[\s\S]*\$\('settings-tab-controls'\)\.focus\(\)/s);
 });
 
-test('ESC settings modal stays centered with compact controls', () => {
+test('ESC settings modal stays centered at a content-fit width with compact controls', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
   assert.match(html, /#pause-menu\s*\{[^}]*align-items:\s*center[^}]*padding-block:\s*16px/s);
-  assert.match(html, /\.settings-modal-card\s*\{[^}]*width:\s*min\(1110px,[^}]*height:\s*min\(780px,[^}]*padding:\s*22px[^}]*gap:\s*12px/s);
+  assert.match(html, /\.settings-modal-card\s*\{[^}]*width:\s*min\(760px,[^}]*height:\s*min\(780px,[^}]*padding:\s*22px[^}]*gap:\s*12px/s);
   assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*156px\s+minmax\(0,\s*1fr\)[^}]*gap:\s*12px/s);
   assert.match(html, /\.settings-tab\s*\{[^}]*min-height:\s*44px[^}]*padding:\s*8px\s+10px/s);
   assert.match(html, /\.setting-row\s*\{[^}]*margin-top:\s*8px[^}]*padding:\s*11px/s);

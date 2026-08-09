@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.7 - 2026-08-09
+
+### Changed
+
+- ESC 설정 modal의 데스크톱 선호 폭을 `1110px`에서 콘텐츠에 맞는 `760px`로 줄였습니다.
+- 기존 높이, 내부 padding·간격·sidebar·설정 row 밀도와 responsive 동작은 유지했습니다.
+- browser asset cache key를 앱 버전 `1.7.7`과 일치시켰습니다.
+
 ## 1.7.6 - 2026-08-09
 
 ### Fixed

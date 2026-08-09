@@ -261,18 +261,18 @@
     --ring-clear-edge: rgba(119,220,255,.68);
     --ring-clear-glow: rgba(119,220,255,.34);
     position: absolute; left: 50%; top: 50%; z-index: 8;
-    display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 5px;
-    min-width: 116px; padding: 6px 8px 6px 9px;
+    display: grid; grid-template-columns: auto auto; align-items: center; gap: 3px 7px;
+    min-width: 158px; padding: 9px 12px 9px 13px;
     color: #f4fcff; border: 1px solid var(--ring-clear-edge);
-    border-left: 2px solid var(--ring-clear-color); border-radius: 4px;
-    background: linear-gradient(100deg, rgba(8,20,35,.86), rgba(8,20,35,.42));
-    box-shadow: 0 0 12px var(--ring-clear-glow), inset 0 0 10px rgba(255,255,255,.04);
+    border-left: 3px solid var(--ring-clear-color); border-radius: 5px;
+    background: linear-gradient(100deg, rgba(4,13,24,.96), rgba(7,20,34,.9));
+    box-shadow: 0 0 16px var(--ring-clear-glow), 0 3px 14px rgba(0,0,0,.48), inset 0 0 12px rgba(255,255,255,.06);
     opacity: 0; pointer-events: none;
-    transform: translate(clamp(42px, 6vw, 76px), -54px) scale(.82);
+    transform: translate(clamp(58px, 6vw, 82px), -50%) scale(.86);
     transform-origin: left center;
     font-family: 'Noto Sans KR', system-ui, sans-serif;
-    font-size: 9px; font-weight: 900; line-height: 1; letter-spacing: .1em;
-    text-shadow: 0 0 7px var(--ring-clear-edge);
+    font-size: 11px; font-weight: 900; line-height: 1.1; letter-spacing: .07em;
+    text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 8px var(--ring-clear-edge);
   }
   #ring-clear-feedback[data-mode="ARENA"] {
     --ring-clear-color: #ffc861;
@@ -280,23 +280,23 @@
     --ring-clear-glow: rgba(255,174,70,.36);
   }
   #ring-clear-feedback::after {
-    content: ""; position: absolute; right: 100%; top: 50%; width: 18px; height: 1px;
+    content: ""; position: absolute; right: 100%; top: 50%; width: 24px; height: 2px;
     background: linear-gradient(90deg, transparent, var(--ring-clear-color));
     box-shadow: 0 0 6px var(--ring-clear-color);
   }
-  #ring-clear-feedback .ring-clear-title { color: #f4fcff; }
-  #ring-clear-feedback .ring-clear-plus { color: var(--ring-clear-color); font-size: 12px; line-height: .7; }
+  #ring-clear-feedback .ring-clear-title { color: #fff; font-size: 13px; }
+  #ring-clear-feedback .ring-clear-plus { color: var(--ring-clear-color); font-size: 17px; line-height: .7; }
   #ring-clear-feedback .ring-clear-effect {
     grid-column: 1 / -1; color: var(--ring-clear-color);
-    font-size: 7px; line-height: 1.25; letter-spacing: .08em; white-space: nowrap;
+    font-size: 10.5px; line-height: 1.35; letter-spacing: .045em; white-space: nowrap;
   }
   #ring-clear-feedback .ring-clear-effect + .ring-clear-effect { color: #f4fcff; opacity: .92; }
   #ring-clear-feedback.show { animation: ring-clear-flyby var(--ring-clear-duration, 1200ms) cubic-bezier(.16,.72,.25,1) both; }
   @keyframes ring-clear-flyby {
-    0% { opacity: 0; transform: translate(32px, -48px) scale(.76); }
+    0% { opacity: 0; transform: translate(44px, -50%) scale(.8); }
     2%, 93% { opacity: 1; }
-    7% { transform: translate(clamp(42px, 6vw, 76px), -54px) scale(1); }
-    100% { opacity: 0; transform: translate(clamp(50px, 7vw, 88px), -60px) scale(.95); }
+    7% { transform: translate(clamp(58px, 6vw, 82px), -50%) scale(1); }
+    100% { opacity: 0; transform: translate(clamp(64px, 7vw, 92px), -50%) scale(.96); }
   }
 
   #overheat-vortex {

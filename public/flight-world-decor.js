@@ -16,6 +16,154 @@ function addRopes(group, radius, top, bottom) {
   group.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x5a3823 })));
 }
 
+const AIRSHIP_PROFILE = [
+  [-20, .05], [-18, .5], [-14, .86], [-8, 1], [0, 1.04],
+  [8, 1], [14, .84], [18, .46], [20, .05]
+];
+
+function airshipRadiusAt(x) {
+  for (let index = 1; index < AIRSHIP_PROFILE.length; index++) {
+    const [nextX, nextRadius] = AIRSHIP_PROFILE[index];
+    const [previousX, previousRadius] = AIRSHIP_PROFILE[index - 1];
+    if (x <= nextX) {
+      const t = (x - previousX) / (nextX - previousX);
+      return THREE.MathUtils.lerp(previousRadius, nextRadius, t);
+    }
+  }
+  return AIRSHIP_PROFILE[AIRSHIP_PROFILE.length - 1][1];
+}
+
+function makeAirshipEnvelopeGeometry() {
+  const radialSegments = 16;
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  const top = new THREE.Color(0xfffbd0);
+  const side = new THREE.Color(0xb7b583);
+  const bottom = new THREE.Color(0x665632);
+  const tint = new THREE.Color();
+
+  AIRSHIP_PROFILE.forEach(([x, radius]) => {
+    for (let segment = 0; segment < radialSegments; segment++) {
+      const angle = segment / radialSegments * Math.PI * 2;
+      const vertical = Math.cos(angle);
+      positions.push(x, vertical * 6.9 * radius, Math.sin(angle) * 6.25 * radius);
+      if (vertical >= 0) tint.copy(side).lerp(top, vertical * .94);
+      else tint.copy(side).lerp(bottom, -vertical * .86);
+      const longitudinalHighlight = 1 - Math.abs(x) / 22;
+      tint.offsetHSL(0, 0, longitudinalHighlight * .045);
+      colors.push(tint.r, tint.g, tint.b);
+    }
+  });
+
+  const startCenter = positions.length / 3;
+  positions.push(AIRSHIP_PROFILE[0][0], 0, 0);
+  colors.push(side.r, side.g, side.b);
+  const endCenter = positions.length / 3;
+  positions.push(AIRSHIP_PROFILE[AIRSHIP_PROFILE.length - 1][0], 0, 0);
+  colors.push(side.r, side.g, side.b);
+
+  for (let ring = 0; ring < AIRSHIP_PROFILE.length - 1; ring++) {
+    for (let segment = 0; segment < radialSegments; segment++) {
+      const next = (segment + 1) % radialSegments;
+      const a = ring * radialSegments + segment;
+      const b = (ring + 1) * radialSegments + segment;
+      const c = (ring + 1) * radialSegments + next;
+      const d = ring * radialSegments + next;
+      indices.push(a, d, b, b, d, c);
+    }
+  }
+  const lastRing = (AIRSHIP_PROFILE.length - 1) * radialSegments;
+  for (let segment = 0; segment < radialSegments; segment++) {
+    const next = (segment + 1) % radialSegments;
+    indices.push(startCenter, next, segment);
+    indices.push(endCenter, lastRing + segment, lastRing + next);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function makeEllipticalRibGeometry(x, halfWidth = .27) {
+  const segments = 16;
+  const radius = airshipRadiusAt(x) + .025;
+  const positions = [];
+  const indices = [];
+  for (const offset of [-halfWidth, halfWidth]) {
+    for (let segment = 0; segment < segments; segment++) {
+      const angle = segment / segments * Math.PI * 2;
+      positions.push(x + offset, Math.cos(angle) * 6.9 * radius, Math.sin(angle) * 6.25 * radius);
+    }
+  }
+  for (let segment = 0; segment < segments; segment++) {
+    const next = (segment + 1) % segments;
+    indices.push(segment, next, segments + segment, segments + segment, next, segments + next);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addStrut(group, start, end, radius, material) {
+  const direction = end.clone().sub(start);
+  const strut = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, direction.length(), 6), material);
+  strut.position.copy(start).add(end).multiplyScalar(.5);
+  strut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  strut.castShadow = true;
+  group.add(strut);
+  return strut;
+}
+
+function makeTailFinGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(6.1, .3);
+  shape.lineTo(5.1, 3.25);
+  shape.lineTo(1.2, 1.65);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: .45, bevelEnabled: false, curveSegments: 1 });
+  geometry.translate(0, 0, -.225);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function makeEnginePod(side, materials) {
+  const pod = new THREE.Group();
+  pod.name = 'airship-engine-pod';
+  pod.position.set(7.5, -1.35, side * 4.3);
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.35, 5, 8), materials.metal);
+  body.rotation.z = Math.PI / 2;
+  body.castShadow = true;
+  pod.add(body);
+
+  const cowling = new THREE.Mesh(new THREE.TorusGeometry(1.12, .18, 5, 12), materials.trim);
+  cowling.rotation.y = Math.PI / 2;
+  cowling.position.x = -2.5;
+  pod.add(cowling);
+
+  const propeller = new THREE.Group();
+  propeller.name = 'airship-propeller';
+  propeller.position.x = 2.72;
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(.34, .34, .65, 8), materials.trim);
+  hub.rotation.z = Math.PI / 2;
+  propeller.add(hub);
+  for (const angle of [0, Math.PI / 2]) {
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(.18, 4.4, .44), materials.propeller);
+    blade.rotation.x = angle;
+    propeller.add(blade);
+  }
+  pod.add(propeller);
+  pod.userData.propeller = propeller;
+  return pod;
+}
+
 function makeHotAirBalloon(index = 0) {
   const group = new THREE.Group();
   const colors = [0xf05f4e, 0xffb238, 0x3bc5c9, 0x9b67d7];
@@ -44,31 +192,110 @@ function makeHotAirBalloon(index = 0) {
 
 function makeBalloonAirship(index = 0) {
   const group = new THREE.Group();
-  const hull = new THREE.Mesh(
-    new THREE.SphereGeometry(10, 22, 14),
-    standard(index % 2 ? 0x6e5bd4 : 0xe46d3f, .7)
-  );
-  hull.scale.set(1.8, .78, .78);
-  hull.position.y = 5;
-  hull.castShadow = true;
-  group.add(hull);
+  group.name = 'balloon-airship-high-detail';
+  const accentColor = index % 2 ? 0x5b3540 : 0x553326;
+  const materials = {
+    envelope: new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, vertexColors: true, roughness: .38, metalness: .04,
+      clearcoat: .48, clearcoatRoughness: .36, sheen: .22, sheenColor: new THREE.Color(0xfff3bd),
+      specularIntensity: .72, specularColor: new THREE.Color(0xe7f4ff), flatShading: true
+    }),
+    trim: new THREE.MeshPhysicalMaterial({ color: accentColor, roughness: .38, metalness: .34, clearcoat: .32, clearcoatRoughness: .28, side: THREE.DoubleSide }),
+    metal: new THREE.MeshPhysicalMaterial({ color: 0x3a2925, roughness: .3, metalness: .68, clearcoat: .22 }),
+    cabin: new THREE.MeshPhysicalMaterial({ color: 0x50352a, roughness: .52, metalness: .2, clearcoat: .22 }),
+    window: new THREE.MeshPhysicalMaterial({ color: 0xffd663, emissive: 0xff9b24, emissiveIntensity: 3.2, roughness: .2, metalness: .06, clearcoat: .7, clearcoatRoughness: .16 }),
+    propeller: new THREE.MeshStandardMaterial({ color: 0x251d1b, roughness: .48, metalness: .55 }),
+    fin: new THREE.MeshPhysicalMaterial({ color: 0x80624a, roughness: .46, metalness: .14, clearcoat: .3 })
+  };
 
-  const stripe = new THREE.Mesh(new THREE.TorusGeometry(7.7, .5, 7, 26), standard(0xffd75f, .58));
-  stripe.rotation.y = Math.PI / 2;
-  stripe.scale.y = 1.3;
-  stripe.position.y = 5;
-  group.add(stripe);
+  const envelope = new THREE.Mesh(makeAirshipEnvelopeGeometry(), materials.envelope);
+  envelope.name = 'airship-envelope';
+  envelope.position.y = 6;
+  envelope.castShadow = true;
+  envelope.receiveShadow = true;
+  group.add(envelope);
 
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(8.5, 3.1, 3.3), standard(0x764429, .9));
-  cabin.position.y = -3.1;
+  for (const x of [-14, -5, 5, 13.5, 17]) {
+    const rib = new THREE.Mesh(makeEllipticalRibGeometry(x), materials.trim);
+    rib.name = 'airship-envelope-rib';
+    rib.position.y = 6;
+    rib.castShadow = true;
+    group.add(rib);
+  }
+
+  for (const side of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(40.5, .48, .5), materials.trim);
+    rail.name = 'airship-side-keel';
+    rail.position.set(.4, 5.25, side * 6.22);
+    rail.castShadow = true;
+    group.add(rail);
+  }
+
+  const cabinRoof = new THREE.Mesh(new THREE.BoxGeometry(11.5, .55, 4.9), materials.metal);
+  cabinRoof.name = 'airship-gondola-roof';
+  cabinRoof.position.set(1.8, -.35, 0);
+  cabinRoof.castShadow = true;
+  group.add(cabinRoof);
+
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(9.8, 3.4, 4.2, 2, 1, 1), materials.cabin);
+  cabin.name = 'airship-gondola';
+  cabin.position.set(1.8, -2.15, 0);
   cabin.castShadow = true;
+  cabin.receiveShadow = true;
   group.add(cabin);
-  addRopes(group, 6.2, 1.8, -2.2);
 
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(4.2, 8, 4), standard(0xe9d9b8, .84));
-  tail.rotation.z = -Math.PI / 2;
-  tail.position.x = 20;
-  group.add(tail);
+  for (const side of [-1, 1]) {
+    for (const x of [-1.2, 1.55, 4.3]) {
+      const window = new THREE.Mesh(new THREE.BoxGeometry(2.05, 1.25, .16), materials.window);
+      window.name = 'airship-emissive-window';
+      window.position.set(x, -2.05, side * 2.15);
+      group.add(window);
+    }
+  }
+
+  for (const x of [-2.7, 6.1]) {
+    for (const side of [-1, 1]) {
+      addStrut(group, new THREE.Vector3(x, .4, side * 4.2), new THREE.Vector3(x, -.55, side * 1.85), .13, materials.trim);
+    }
+  }
+
+  const finGeometry = makeTailFinGeometry();
+  const dorsalFin = new THREE.Mesh(finGeometry, materials.fin);
+  dorsalFin.name = 'airship-tail-fin';
+  dorsalFin.position.set(13.2, 10.75, 0);
+  dorsalFin.castShadow = true;
+  group.add(dorsalFin);
+  for (const side of [-1, 1]) {
+    const sideFin = new THREE.Mesh(finGeometry, materials.fin);
+    sideFin.name = 'airship-tail-fin';
+    sideFin.rotation.x = side * Math.PI / 2;
+    sideFin.position.set(13.2, 6, side * 4.65);
+    sideFin.castShadow = true;
+    group.add(sideFin);
+  }
+
+  const propellers = [];
+  for (const side of [-1, 1]) {
+    const pod = makeEnginePod(side, materials);
+    group.add(pod);
+    propellers.push(pod.userData.propeller);
+  }
+
+  const warmReflection = new THREE.PointLight(0xffb04c, 24, 34, 2);
+  warmReflection.name = 'airship-cabin-reflection';
+  warmReflection.position.set(1.5, -2.7, 0);
+  group.add(warmReflection);
+  const coolReflection = new THREE.PointLight(0xbfe9ff, 13, 38, 2);
+  coolReflection.name = 'airship-sky-reflection';
+  coolReflection.position.set(-4, 17, -2);
+  group.add(coolReflection);
+
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(.42, 8, 6), new THREE.MeshStandardMaterial({ color: 0xff5d48, emissive: 0xff2818, emissiveIntensity: 4, roughness: .24 }));
+  beacon.name = 'airship-navigation-beacon';
+  beacon.position.set(8, 12.45, 0);
+  group.add(beacon);
+
+  group.userData.propellers = propellers;
   group.userData.kind = 'balloon-airship';
   return group;
 }
@@ -100,6 +327,9 @@ export function animateArenaFlyObjects(root, elapsedSeconds) {
     object.position.y = flight.y + Math.sin(elapsedSeconds * .42 + flight.phase) * 7;
     object.rotation.y = -angle + Math.PI / 2;
     object.rotation.z = Math.sin(elapsedSeconds * .28 + flight.phase) * .025;
+    for (let index = 0; index < (object.userData.propellers?.length || 0); index++) {
+      object.userData.propellers[index].rotation.x = elapsedSeconds * 13 + flight.phase + index * .7;
+    }
   }
 }
 

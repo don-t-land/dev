@@ -8,6 +8,7 @@ const {
   mouseInvertYFromStorage,
   updateEnergy,
   consumeDartEnergy,
+  applyDistanceRingReward,
   dashAcceleration,
   speedFov,
   orbitCameraOffset,
@@ -171,6 +172,21 @@ test('darts consume the shared energy pool and fail without enough energy', () =
   assert.deepEqual(consumeDartEnergy(DART_ENERGY_COST - 1), {
     energy: DART_ENERGY_COST - 1,
     fired: false
+  });
+});
+
+test('distance rings grant a strong bounded speed and energy reward', () => {
+  assert.deepEqual(applyDistanceRingReward(32, 40, 70), {
+    speed: 44,
+    energy: 70,
+    speedGain: 12,
+    energyGain: 30
+  });
+  assert.deepEqual(applyDistanceRingReward(65, 90, 70), {
+    speed: 70,
+    energy: 100,
+    speedGain: 5,
+    energyGain: 10
   });
 });
 

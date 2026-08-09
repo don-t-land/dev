@@ -14,6 +14,8 @@
   const ENERGY_REGEN_PER_SECOND = 20;
   const DASH_ENERGY_PER_SECOND = 18;
   const DART_ENERGY_COST = 20;
+  const DIST_RING_SPEED_BONUS = 12;
+  const DIST_RING_ENERGY_BONUS = 30;
 
   function normalizeAngle(angle) {
     let normalized = (Number(angle) + Math.PI) % PI2;
@@ -132,6 +134,20 @@
     return { energy: energy - DART_ENERGY_COST, fired: true };
   }
 
+  function applyDistanceRingReward(speed, energy, maxSpeed) {
+    const currentSpeed = Math.max(0, Number(speed) || 0);
+    const currentEnergy = Math.max(0, Math.min(MAX_ENERGY, Number(energy) || 0));
+    const speedLimit = Math.max(currentSpeed, Number(maxSpeed) || currentSpeed);
+    const rewardedSpeed = Math.min(speedLimit, currentSpeed + DIST_RING_SPEED_BONUS);
+    const rewardedEnergy = Math.min(MAX_ENERGY, currentEnergy + DIST_RING_ENERGY_BONUS);
+    return {
+      speed: rewardedSpeed,
+      energy: rewardedEnergy,
+      speedGain: rewardedSpeed - currentSpeed,
+      energyGain: rewardedEnergy - currentEnergy
+    };
+  }
+
   function dashAcceleration(speed) {
     const currentSpeed = Math.max(0, Number(speed) || 0);
     // 실제 물리 속도가 높을수록 가속을 완만하게 줄여 급격한 속도 점프를 막습니다.
@@ -155,12 +171,15 @@
     mouseInvertYFromStorage,
     updateEnergy,
     consumeDartEnergy,
+    applyDistanceRingReward,
     dashAcceleration,
     speedFov,
     LOOK_PITCH_LIMIT,
     MAX_ENERGY,
     ENERGY_REGEN_PER_SECOND,
     DASH_ENERGY_PER_SECOND,
-    DART_ENERGY_COST
+    DART_ENERGY_COST,
+    DIST_RING_SPEED_BONUS,
+    DIST_RING_ENERGY_BONUS
   };
 });

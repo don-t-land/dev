@@ -19,7 +19,7 @@ test('active flight loop applies authoritative aircraft control envelope and max
   assert.match(html, /me\.pitch\s*=\s*THREE\.MathUtils\.clamp\(me\.pitch,\s*-aeroProfile\.maxPitchDown,\s*aeroProfile\.maxPitchUp\)/);
   assert.match(html, /me\.roll\s*=\s*THREE\.MathUtils\.clamp\(me\.roll,\s*-aeroProfile\.maxRoll,\s*aeroProfile\.maxRoll\)/);
   assert.match(html, /me\.speed\s*=\s*THREE\.MathUtils\.clamp\(me\.speed,\s*3,\s*aeroProfile\.maxSpeed\)/);
-  assert.match(html, /me\.speed\s*\+=\s*6;[\s\S]*me\.speed\s*=\s*THREE\.MathUtils\.clamp\(me\.speed,\s*3,\s*aeroProfile\.maxSpeed\)/);
+  assert.match(html, /applyDistanceRingReward\(me\.speed,\s*me\.energy,\s*aeroProfile\.maxSpeed\)[\s\S]*me\.speed\s*=\s*reward\.speed[\s\S]*me\.speed\s*=\s*THREE\.MathUtils\.clamp\(me\.speed,\s*3,\s*aeroProfile\.maxSpeed\)/);
   for (const asset of [
     'flight-controls.js', 'paper-fold-model.js', 'paper-aero-profile.js', 'fold-stats-view.js'
   ]) {

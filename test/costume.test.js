@@ -70,12 +70,14 @@ test('standing costumes use the animated paper body as their shared attachment f
   assert.match(costumeSource, /target\.add\(group\)/);
 });
 
-test('selection cards render the same procedural costume meshes as rotating 3d previews', () => {
+test('selection cards render the same procedural costume meshes as static 3d previews', () => {
   const source = fs.readFileSync(path.join(projectRoot, 'public', 'costume-preview-3d.js'), 'utf8');
-  assert.match(source, /import \{ animateCostumes, costumeTemplates, createCostumeGroup \} from '\.\/costume-3d\.js'/);
+  assert.match(source, /import \{ costumeTemplates, createCostumeGroup \} from '\.\/costume-3d\.js'/);
   assert.match(source, /createCostumeGroup\(selectionFor\(id\)\)/);
-  assert.match(source, /preview\.object\.rotation\.y = seconds/);
-  assert.match(source, /preview\.renderer\.render\(preview\.scene, preview\.camera\)/);
+  assert.match(source, /object\.rotation\.set\(-\.08,\s*-\.42,\s*0\)/);
+  assert.match(source, /renderer\.render\(scene, camera\)/);
+  assert.doesNotMatch(source, /requestAnimationFrame\(/);
+  assert.doesNotMatch(source, /animateCostumes\(/);
 });
 
 test('costumes are persisted, rendered on local and remote craft, and sent to the server', () => {

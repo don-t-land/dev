@@ -18,7 +18,8 @@ test('right-side HUD uses one bounded rail so eight-player ranking, guide, and m
   assert.match(html, /id="hud-right-rail"[\s\S]*id="board"[\s\S]*id="keys"[\s\S]*id="minimap"[\s\S]*<\/aside>/);
   assert.match(html, /#hud-right-rail\s*\{[^}]*position:\s*absolute[^}]*display:\s*grid[^}]*grid-template-rows:\s*minmax\(96px,\s*1fr\)\s+auto\s+auto/s);
   assert.match(html, /#hud-right-rail\s*>\s*#board\s*\{[^}]*position:\s*relative[^}]*max-height:\s*100%[^}]*overflow-y:\s*auto[^}]*align-self:\s*start/s);
-  assert.match(html, /@media\s*\(max-height:\s*720px\)[\s\S]*#hud-right-rail\s*\{[^}]*grid-template-columns:\s*minmax\(190px,\s*250px\)\s+minmax\(220px,\s*340px\)[^}]*grid-template-rows:\s*minmax\(96px,\s*1fr\)\s+auto/s);
+  assert.match(html, /@media\s*\(max-height:\s*700px\)[\s\S]*#hud-right-rail\s*\{[^}]*grid-template-columns:\s*minmax\(190px,\s*250px\)\s+minmax\(220px,\s*340px\)[^}]*grid-template-rows:\s*minmax\(96px,\s*1fr\)\s+auto/s);
+  assert.doesNotMatch(html, /@media\s*\(max-height:\s*720px\)[\s\S]{0,260}grid-template-columns:\s*minmax\(190px,\s*250px\)\s+minmax\(220px,\s*340px\)/s);
 });
 
 test('key guide stays translucent but has a contrast-safe backing and documents minimap zoom', () => {

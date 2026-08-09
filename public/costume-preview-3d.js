@@ -1,7 +1,5 @@
 import * as THREE from 'three';
-import { animateCostumes, costumeTemplates, createCostumeGroup } from './costume-3d.js';
-
-const previews = [];
+import { costumeTemplates, createCostumeGroup } from './costume-3d.js';
 
 function selectionFor(id) {
   return costumeTemplates.selectionForItem(id);
@@ -41,6 +39,7 @@ function mountPreview(canvas) {
   if (!object) return;
   costume.remove(object);
   scene.add(object);
+  object.rotation.set(-.08, -.42, 0);
   const extent = centerObject(object);
   camera.position.set(0, extent * .15, extent * 3.25);
   camera.lookAt(0, 0, 0);
@@ -59,29 +58,14 @@ function mountPreview(canvas) {
     renderer.setSize(rect.width, rect.height, false);
     camera.aspect = rect.width / rect.height;
     camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
   }
   new ResizeObserver(resize).observe(canvas);
   resize();
-  previews.push({ canvas, renderer, scene, camera, object, phase: previews.length * .7 });
-}
-
-function render(now) {
-  const seconds = now * .001;
-  const panelVisible = !document.getElementById('costume-panel')?.classList.contains('hide');
-  if (panelVisible) {
-    previews.forEach(preview => {
-      preview.object.rotation.y = seconds * .72 + preview.phase;
-      preview.object.rotation.x = -.08 + Math.sin(seconds * 1.15 + preview.phase) * .05;
-      animateCostumes(preview.scene, seconds);
-      preview.renderer.render(preview.scene, preview.camera);
-    });
-  }
-  requestAnimationFrame(render);
 }
 
 function mountCostumePreviews() {
   document.querySelectorAll('canvas[data-costume-preview]').forEach(mountPreview);
-  requestAnimationFrame(render);
 }
 
 if (document.readyState === 'loading') {

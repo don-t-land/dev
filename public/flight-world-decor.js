@@ -77,18 +77,6 @@ function standard(color, roughness = .72, emissive = 0x000000, emissiveIntensity
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: .08, emissive, emissiveIntensity });
 }
 
-function addRopes(group, radius, top, bottom) {
-  const points = [];
-  for (const side of [-1, 1]) {
-    for (const depth of [-1, 1]) {
-      points.push(side * radius, top, depth * radius, side * radius * .42, bottom, depth * radius * .42);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-  group.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x5a3823 })));
-}
-
 const AIRSHIP_PROFILE = [
   [-20, .05], [-18, .5], [-14, .86], [-8, 1], [0, 1.04],
   [8, 1], [14, .84], [18, .46], [20, .05]
@@ -237,29 +225,233 @@ function makeEnginePod(side, materials) {
   return pod;
 }
 
+const BALLOON_PROFILE = [
+  [-1.55, .88], [-.6, 2.45], [1.4, 5.45], [4.6, 7.75], [8.2, 8.45],
+  [11.5, 7.85], [14.7, 5.95], [17, 3.25], [18.15, .36]
+];
+
+const BALLOON_PALETTES = [
+  [0xc9463a, 0xe87932, 0xf2c967, 0x8f3443],
+  [0xd8892f, 0xf0c94f, 0x237c82, 0xf1dfad],
+  [0x238b99, 0x54bcc3, 0xefd476, 0x315d8f],
+  [0x7450a5, 0xbe5d9c, 0xefa94f, 0xe8d4ba]
+];
+
+function makeBalloonEnvelopeGeometry(index) {
+  const radialSegments = 20;
+  const palette = BALLOON_PALETTES[index % BALLOON_PALETTES.length].map(color => new THREE.Color(color));
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  const shade = new THREE.Color();
+
+  for (let section = 0; section < BALLOON_PROFILE.length - 1; section++) {
+    const [lowerY, lowerRadius] = BALLOON_PROFILE[section];
+    const [upperY, upperRadius] = BALLOON_PROFILE[section + 1];
+    for (let segment = 0; segment < radialSegments; segment++) {
+      const angle = segment / radialSegments * Math.PI * 2;
+      const nextAngle = (segment + 1) / radialSegments * Math.PI * 2;
+      const vertex = positions.length / 3;
+      positions.push(
+        Math.cos(angle) * lowerRadius, lowerY, Math.sin(angle) * lowerRadius,
+        Math.cos(nextAngle) * lowerRadius, lowerY, Math.sin(nextAngle) * lowerRadius,
+        Math.cos(nextAngle) * upperRadius, upperY, Math.sin(nextAngle) * upperRadius,
+        Math.cos(angle) * upperRadius, upperY, Math.sin(angle) * upperRadius
+      );
+      const base = palette[segment % palette.length];
+      for (const y of [lowerY, lowerY, upperY, upperY]) {
+        const crownLight = THREE.MathUtils.clamp((y + 2) / 22, 0, 1) * .055;
+        shade.copy(base).offsetHSL(0, 0, crownLight);
+        colors.push(shade.r, shade.g, shade.b);
+      }
+      indices.push(vertex, vertex + 3, vertex + 1, vertex + 1, vertex + 3, vertex + 2);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function makeBalloonSeam(angle) {
+  const points = BALLOON_PROFILE.map(([y, radius]) => new THREE.Vector3(
+    Math.cos(angle) * (radius + .1), y, Math.sin(angle) * (radius + .1)
+  ));
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 28, .085, 4, false);
+}
+
+function makeBasketGeometry() {
+  const positions = [
+    -1.75, -1.5, -1.45, 1.75, -1.5, -1.45, 1.75, -1.5, 1.45, -1.75, -1.5, 1.45,
+    -2.15, 1.5, -1.8, 2.15, 1.5, -1.8, 2.15, 1.5, 1.8, -2.15, 1.5, 1.8
+  ];
+  const indices = [
+    0, 4, 1, 1, 4, 5, 1, 5, 2, 2, 5, 6,
+    2, 6, 3, 3, 6, 7, 3, 7, 0, 0, 7, 4,
+    0, 1, 3, 1, 2, 3
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addBasketBand(group, y, material) {
+  const halfWidth = THREE.MathUtils.lerp(1.75, 2.15, (y + 1.5) / 3);
+  const halfDepth = THREE.MathUtils.lerp(1.45, 1.8, (y + 1.5) / 3);
+  for (const depth of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2 + .2, .16, .16), material);
+    rail.position.set(0, y, depth * halfDepth);
+    group.add(rail);
+  }
+  for (const side of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(.16, .16, halfDepth * 2 + .2), material);
+    rail.position.set(side * halfWidth, y, 0);
+    group.add(rail);
+  }
+}
+
+function makeBurnerFlame(material) {
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(.43, 1.75, 8), material);
+  flame.name = 'balloon-burner-flame';
+  return flame;
+}
+
 function makeHotAirBalloon(index = 0) {
   const group = new THREE.Group();
-  const colors = [0xf05f4e, 0xffb238, 0x3bc5c9, 0x9b67d7];
-  const envelope = new THREE.Mesh(
-    new THREE.SphereGeometry(8.2, 18, 14),
-    standard(colors[index % colors.length], .78)
-  );
-  envelope.scale.set(1, 1.22, 1);
-  envelope.position.y = 8;
+  group.name = 'hot-air-balloon-high-detail';
+  const materials = {
+    fabric: new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, vertexColors: true, roughness: .64, metalness: 0,
+      sheen: .34, sheenColor: new THREE.Color(0xffedc7), clearcoat: .1,
+      clearcoatRoughness: .72, specularIntensity: .38, flatShading: true
+    }),
+    seam: new THREE.MeshPhysicalMaterial({ color: 0xffe5a3, roughness: .55, metalness: .05, clearcoat: .16 }),
+    skirt: new THREE.MeshStandardMaterial({ color: 0x503029, roughness: .82, side: THREE.DoubleSide }),
+    metal: new THREE.MeshPhysicalMaterial({ color: 0x382d29, roughness: .34, metalness: .7, clearcoat: .2 }),
+    wicker: new THREE.MeshPhysicalMaterial({
+      color: 0x8a552d, roughness: .88, metalness: 0, sheen: .12,
+      sheenColor: new THREE.Color(0xe3a863), side: THREE.DoubleSide
+    }),
+    wickerDark: new THREE.MeshStandardMaterial({ color: 0x4c2d1b, roughness: .9, metalness: .05 }),
+    sack: new THREE.MeshStandardMaterial({ color: 0xb98a52, roughness: .96, flatShading: true }),
+    flame: new THREE.MeshStandardMaterial({
+      color: 0xffe36a, emissive: 0xff5b16, emissiveIntensity: 4.2,
+      roughness: .2, transparent: true, opacity: .92
+    })
+  };
+
+  const envelope = new THREE.Mesh(makeBalloonEnvelopeGeometry(index), materials.fabric);
+  envelope.name = 'balloon-panel-envelope';
   envelope.castShadow = true;
+  envelope.receiveShadow = true;
   group.add(envelope);
 
-  const band = new THREE.Mesh(new THREE.TorusGeometry(6.9, .42, 6, 24), standard(0xffe69a, .68));
-  band.rotation.x = Math.PI / 2;
-  band.position.y = 9.4;
-  group.add(band);
+  for (let segment = 0; segment < 10; segment++) {
+    const seam = new THREE.Mesh(makeBalloonSeam(segment / 10 * Math.PI * 2), materials.seam);
+    seam.name = 'balloon-gore-seam';
+    seam.castShadow = true;
+    group.add(seam);
+  }
 
-  const basket = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.8, 3.2), standard(0x7a4928, .96));
-  basket.position.y = -4.2;
+  for (const [y, radius] of [[4.6, 7.75], [11.5, 7.85]]) {
+    const band = new THREE.Mesh(new THREE.TorusGeometry(radius + .08, .105, 5, 40), materials.seam);
+    band.name = 'balloon-horizontal-band';
+    band.rotation.x = Math.PI / 2;
+    band.position.y = y;
+    group.add(band);
+  }
+
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(.48, 10, 6), materials.metal);
+  crown.name = 'balloon-crown-cap';
+  crown.position.y = 18.22;
+  group.add(crown);
+
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(.85, 1.35, 1.9, 12, 1, true), materials.skirt);
+  skirt.name = 'balloon-burner-skirt';
+  skirt.position.y = -2.35;
+  skirt.castShadow = true;
+  group.add(skirt);
+
+  const basketRig = new THREE.Group();
+  basketRig.name = 'balloon-basket-rig';
+  basketRig.position.y = -6;
+
+  const basket = new THREE.Mesh(makeBasketGeometry(), materials.wicker);
+  basket.name = 'balloon-wicker-basket';
   basket.castShadow = true;
-  group.add(basket);
-  addRopes(group, 4.8, 1.5, -3.2);
+  basket.receiveShadow = true;
+  basketRig.add(basket);
+  for (const y of [-1.05, -.2, .65, 1.42]) addBasketBand(basketRig, y, materials.wickerDark);
+
+  for (const x of [-1, 1]) {
+    for (const z of [-1, 1]) {
+      addStrut(
+        basketRig,
+        new THREE.Vector3(x * 1.86, -1.42, z * 1.55),
+        new THREE.Vector3(x * 2.08, 1.42, z * 1.74),
+        .08,
+        materials.wickerDark
+      );
+      const sack = new THREE.Mesh(new THREE.IcosahedronGeometry(.48, 1), materials.sack);
+      sack.name = 'balloon-sandbag';
+      sack.scale.set(.78, 1.25, .74);
+      sack.position.set(x * 2.22, -.8, z * 1.82);
+      sack.rotation.set(z * .15, 0, x * .12);
+      sack.castShadow = true;
+      basketRig.add(sack);
+    }
+  }
+  group.add(basketRig);
+
+  for (const x of [-1, 1]) {
+    for (const z of [-1, 1]) {
+      addStrut(
+        group,
+        new THREE.Vector3(x * 1.9, -4.5, z * 1.55),
+        new THREE.Vector3(x * 1.35, -2.8, z * 1.08),
+        .1,
+        materials.metal
+      );
+      addStrut(
+        group,
+        new THREE.Vector3(x * 2.7, -.4, z * 2.45),
+        new THREE.Vector3(x * 1.9, -4.5, z * 1.72),
+        .075,
+        materials.wickerDark
+      );
+    }
+  }
+
+  for (const x of [-.62, .62]) {
+    const burner = new THREE.Mesh(new THREE.CylinderGeometry(.38, .5, .72, 10), materials.metal);
+    burner.name = 'balloon-burner';
+    burner.position.set(x, -4.15, 0);
+    burner.castShadow = true;
+    group.add(burner);
+  }
+
+  const flames = [];
+  for (const x of [-.58, .58]) {
+    const flame = makeBurnerFlame(materials.flame);
+    flame.position.set(x, -3.25, 0);
+    group.add(flame);
+    flames.push(flame);
+  }
+
+  const burnerGlow = new THREE.PointLight(0xff812d, 19, 24, 2);
+  burnerGlow.name = 'balloon-burner-glow';
+  burnerGlow.position.y = -3;
+  group.add(burnerGlow);
+
   group.userData.kind = 'hot-air-balloon';
+  group.userData.flames = flames;
+  group.userData.burnerGlow = burnerGlow;
+  group.userData.basketRig = basketRig;
   return group;
 }
 
@@ -388,6 +580,9 @@ export function createArenaFlyObjects(descriptors, onAssetSwap) {
     object.userData.flight = descriptor;
     object.userData.assetKey = descriptor.assetKey;
     object.userData.propellers = fallback.userData.propellers || [];
+    object.userData.flames = fallback.userData.flames || [];
+    object.userData.burnerGlow = fallback.userData.burnerGlow || null;
+    object.userData.basketRig = fallback.userData.basketRig || null;
     root.add(object);
 
     loadFlightAsset(descriptor.assetKey).then(template => {
@@ -397,6 +592,9 @@ export function createArenaFlyObjects(descriptors, onAssetSwap) {
       object.add(loaded);
       object.userData.assetLoaded = true;
       object.userData.propellers = [];
+      object.userData.flames = [];
+      object.userData.burnerGlow = null;
+      object.userData.basketRig = null;
       onAssetSwap?.({ loaded, fallback });
       disposeFlightFallback(fallback);
     }).catch(error => {
@@ -419,6 +617,18 @@ export function animateArenaFlyObjects(root, elapsedSeconds) {
     object.rotation.z = Math.sin(elapsedSeconds * .28 + flight.phase) * .025;
     for (let index = 0; index < (object.userData.propellers?.length || 0); index++) {
       object.userData.propellers[index].rotation.x = elapsedSeconds * 13 + flight.phase + index * .7;
+    }
+    const burnerPulse = .82 + Math.sin(elapsedSeconds * 8.5 + flight.phase) * .18;
+    for (let index = 0; index < (object.userData.flames?.length || 0); index++) {
+      const flame = object.userData.flames[index];
+      const width = .88 + burnerPulse * .12;
+      flame.scale.set(width, burnerPulse, width);
+      flame.position.y = -3.25 + Math.sin(elapsedSeconds * 11 + index) * .08;
+    }
+    if (object.userData.burnerGlow) object.userData.burnerGlow.intensity = 15 + burnerPulse * 7;
+    if (object.userData.basketRig) {
+      object.userData.basketRig.rotation.x = Math.sin(elapsedSeconds * .52 + flight.phase) * .018;
+      object.userData.basketRig.rotation.z = Math.sin(elapsedSeconds * .41 + flight.phase * .7) * .022;
     }
   }
 }

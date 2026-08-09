@@ -137,7 +137,8 @@ function makeStandingPlaneMascot(costume = null) {
   const rightLeg = makeLeg(1, materials);
   mascot.add(leftLeg, rightLeg);
 
-  mascot.userData = { body, leftLeg, rightLeg };
+  // standing 코스튬은 다리와 독립된 종이 몸체의 자세를 그대로 따라야 한다.
+  mascot.userData = { body, leftLeg, rightLeg, costumeMount: body };
   applyPaperSurface(body);
   if (costume) setCostumeOnObject(mascot, costume, 'standing');
   return mascot;

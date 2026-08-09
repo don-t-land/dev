@@ -185,12 +185,15 @@ function setCostumeOnObject(owner, value, layout = 'flight') {
   if (!owner) return null;
   const costume = normalizeCostume(value);
   const key = `${layout}:${(costumeTemplates?.SLOT_ORDER || ['hat', 'nose', 'wings']).map(slot => costume[slot]).join(':')}`;
-  const current = owner.getObjectByName(COSTUME_NAME);
+  const target = layout === 'standing' && owner.userData?.costumeMount?.isObject3D
+    ? owner.userData.costumeMount
+    : owner;
+  const current = target.getObjectByName(COSTUME_NAME);
   if (current?.userData.costumeKey === key) return current;
   disposeCostume(current);
   const group = createCostumeGroup(costume, layout);
   group.userData.costumeKey = key;
-  owner.add(group);
+  target.add(group);
   return group;
 }
 

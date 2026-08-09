@@ -932,7 +932,7 @@
 
       <div id="keys">
         <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 롤/선회 · <kbd>Shift</kbd> 대시</span><br>
-        <span><kbd>마우스</kbd> 자유 시점 · <kbd>ESC</kbd> 설정</span><br>
+        <span><kbd>마우스</kbd> 자유 시점 · <kbd>C</kbd> 시점 초기화 · <kbd>ESC</kbd> 설정</span><br>
         <span><kbd>N</kbd> 주변 지도</span><br>
         <span id="keys-fire" class="hide"><kbd>Space</kbd> 다트 발사</span>
       </div>
@@ -1590,6 +1590,7 @@ function handle(m) {
         me.yaw = Math.atan2(-center.x, -center.z);
         me.pitch = -0.05; me.roll = 0; me.speed = 22;
         freeLook = { yaw: 0, pitch: 0 };
+        recenteringView = false;
         me.alive = true;
         me.dist = 0; me.surv = 0; me.finished = false; me.lifeStartedAt = Date.now();
         me.energy = MAX_ENERGY;
@@ -2208,7 +2209,9 @@ const sky = new THREE.Mesh(
 );
 scene.add(sky);
 
-scene.add(new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5));
+// applyTimeOfDay가 시간대별 색·세기를 덮어쓰므로 참조를 유지해야 합니다.
+const hemisphere = new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5);
+scene.add(hemisphere);
 const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
 sun.shadow.bias = -0.00035;
 sun.shadow.normalBias = 0.035;
@@ -4008,6 +4011,7 @@ function spawnSelf() {
   }
   me.pitch = -0.05; me.roll = 0; me.speed = 22;
   freeLook = { yaw: 0, pitch: 0 };
+  recenteringView = false;
   me.alive = false;          // playing 페이즈에서 true
   me.dist = 0; me.surv = 0; me.finished = false;
   me.energy = MAX_ENERGY;
@@ -4180,6 +4184,7 @@ const keys = createCombinedKeyState(keyboardKeys, touchKeys);
 let touchFlightKeys = null;
 let touchLook = null;
 let freeLook = { yaw: 0, pitch: 0 };
+let recenteringView = false;
 let mouseInvertY = mouseInvertYFromStorage(localStorage.getItem('pp_mouse_invert_y'));
 let pauseReturnFocus = null;
 let settingsOpenedFromFlight = false;
@@ -4431,6 +4436,7 @@ $('mouse-invert-y-toggle').checked = mouseInvertY;
 const canvas = $('c');
 touchLook = createTouchLookState({
   onMove: (movementX, movementY) => {
+    recenteringView = false;
     freeLook = updateFreeLook(freeLook, movementX, movementY, 0.004, mouseInvertY);
   }
 });
@@ -4465,6 +4471,8 @@ canvas.addEventListener('click', event => {
 
 document.addEventListener('mousemove', event => {
   if (document.pointerLockElement !== $('c')) return;
+  // 직접 시점을 움직이면 복귀 중이던 애니메이션을 즉시 놓아줍니다.
+  if (event.movementX || event.movementY) recenteringView = false;
   freeLook = updateFreeLook(freeLook, event.movementX, event.movementY, 0.0022, mouseInvertY);
 });
 
@@ -4517,6 +4525,7 @@ addEventListener('keydown', e => {
   if (!shouldCaptureGameKey(e)) return;
   keyboardKeys[e.code] = true;
   e.preventDefault();
+  if (e.code === 'KeyC' && !e.repeat) recenteringView = !isFreeLookCentered(freeLook);
   if (e.code === 'KeyN' && !e.repeat) {
     minimapMode = toggleMinimapMode(minimapMode);
     updateMinimapModeLabel();
@@ -4789,9 +4798,16 @@ renderer.setAnimationLoop(timestamp => {
     );
     camera.lookAt(lookAt);
   } else {
+    if (recenteringView) {
+      freeLook = recenterFreeLook(freeLook, dt);
+      if (isFreeLookCentered(freeLook)) {
+        freeLook = { yaw: 0, pitch: 0 };
+        recenteringView = false;
+      }
+    }
     const orbitYaw = followYaw + freeLook.yaw;
     const speedCameraAmount = THREE.MathUtils.clamp((me.speed - 22) / 48, 0, 1);
-    const orbitRadius = 16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0);
+    const orbitRadius = (16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0)) * 1.3;
     // 기체를 구의 중심에 두어 어느 방향으로 돌려도 거리와 상하 대칭이 유지됩니다.
     const orbitOffset = orbitCameraOffset(orbitYaw, freeLook.pitch, orbitRadius);
     camPos.set(

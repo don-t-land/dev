@@ -12,7 +12,7 @@ test('flight keys remain editable inside nickname inputs', () => {
 
   assert.equal(isEditableTarget(input), true);
 
-  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyN', 'Space', 'ShiftLeft', 'ShiftRight']) {
+  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyN', 'Space', 'ShiftLeft', 'ShiftRight']) {
     assert.equal(shouldCaptureGameKey({ code, target: input }), false, `${code} should reach the input`);
   }
 });
@@ -24,6 +24,7 @@ test('game controls are still captured outside editable fields', () => {
   assert.equal(shouldCaptureGameKey({ code: 'KeyW', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'ShiftLeft', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'KeyN', target: canvas }), true);
+  assert.equal(shouldCaptureGameKey({ code: 'KeyC', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'Escape', target: canvas }), false);
 });
 

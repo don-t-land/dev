@@ -4,7 +4,7 @@
   if (root) root.inputPolicy = policy;
 })(typeof globalThis === 'object' ? globalThis : this, () => {
   const gameKeyCodes = new Set([
-    'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyN', 'Space', 'ShiftLeft', 'ShiftRight'
+    'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyN', 'Space', 'ShiftLeft', 'ShiftRight'
   ]);
 
   function isEditableTarget(target) {

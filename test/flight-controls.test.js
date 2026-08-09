@@ -11,6 +11,8 @@ const {
   dashAcceleration,
   speedFov,
   orbitCameraOffset,
+  recenterFreeLook,
+  isFreeLookCentered,
   LOOK_PITCH_LIMIT,
   MAX_ENERGY,
   DART_ENERGY_COST
@@ -185,4 +187,50 @@ test('orbit camera yaw sweeps a full circle in the horizontal plane', () => {
   assert.ok(Math.abs(front.z - radius) < 1e-9);
   assert.ok(Math.abs(back.z + radius) < 1e-9);
   assert.ok(Math.abs(side.x - radius) < 1e-9);
+});
+
+test('recentering eases the free look back toward the craft heading', () => {
+  const state = { yaw: 1.2, pitch: -0.8 };
+  const next = recenterFreeLook(state, 0.016);
+
+  assert.ok(Math.abs(next.yaw) < Math.abs(state.yaw), 'yaw should shrink toward zero');
+  assert.ok(Math.abs(next.pitch) < Math.abs(state.pitch), 'pitch should shrink toward zero');
+  // 한 프레임에 끝내지 않고 부드럽게 이동해야 합니다.
+  assert.ok(Math.abs(next.yaw) > 0, 'a single frame must not snap the view');
+  assert.equal(Math.sign(next.yaw), Math.sign(state.yaw), 'recentering must not overshoot past zero');
+  assert.equal(Math.sign(next.pitch), Math.sign(state.pitch), 'recentering must not overshoot past zero');
+});
+
+test('recentering converges to dead center and then reports completion', () => {
+  let state = { yaw: -2.4, pitch: LOOK_PITCH_LIMIT };
+  for (let i = 0; i < 240; i++) state = recenterFreeLook(state, 0.016);
+
+  assert.ok(isFreeLookCentered(state), `did not settle: ${JSON.stringify(state)}`);
+  assert.ok(Math.abs(state.yaw) < 1e-3);
+  assert.ok(Math.abs(state.pitch) < 1e-3);
+});
+
+test('recentering takes the short way around instead of unwinding the long arc', () => {
+  // 3.0rad은 -π 쪽 경계 근처라, 반대 방향으로 감으면 화면이 한 바퀴 도는 것처럼 보입니다.
+  const state = { yaw: 3.0, pitch: 0 };
+  const next = recenterFreeLook(state, 0.016);
+
+  assert.ok(next.yaw < state.yaw, `yaw ${next.yaw} should ease down toward 0, not wrap past π`);
+  assert.ok(next.yaw > 0, 'the short way to 0 from 3.0rad stays positive');
+});
+
+test('recentering is frame-rate independent over the same elapsed time', () => {
+  const start = { yaw: 1.5, pitch: 0.9 };
+  let fine = start;
+  for (let i = 0; i < 8; i++) fine = recenterFreeLook(fine, 0.0125);
+  const coarse = recenterFreeLook(start, 0.1);
+
+  assert.ok(Math.abs(fine.yaw - coarse.yaw) < 1e-9, `${fine.yaw} vs ${coarse.yaw}`);
+  assert.ok(Math.abs(fine.pitch - coarse.pitch) < 1e-9, `${fine.pitch} vs ${coarse.pitch}`);
+});
+
+test('a centered view is reported as centered and a turned one is not', () => {
+  assert.equal(isFreeLookCentered({ yaw: 0, pitch: 0 }), true);
+  assert.equal(isFreeLookCentered({ yaw: 0.4, pitch: 0 }), false);
+  assert.equal(isFreeLookCentered({ yaw: 0, pitch: -0.4 }), false);
 });

@@ -7,6 +7,9 @@
 
   const PI2 = Math.PI * 2;
   const LOOK_PITCH_LIMIT = 1.35;
+  // 1초에 남은 각도의 99.7%를 지우는 감쇠 — 카메라 추종과 비슷한 속도로 복귀합니다.
+  const RECENTER_DECAY = 0.003;
+  const RECENTER_EPSILON = 1e-3;
   const MAX_ENERGY = 100;
   const ENERGY_REGEN_PER_SECOND = 20;
   const DASH_ENERGY_PER_SECOND = 18;
@@ -70,6 +73,22 @@
     };
   }
 
+  // 자유 시점을 기체 정면으로 되돌립니다. yaw는 정규화된 최단 경로로 줄어들어
+  // 한 바퀴 돌아가는 것처럼 보이지 않고, 감쇠는 프레임률과 무관합니다.
+  function recenterFreeLook(state, dt) {
+    const step = Math.max(0, Math.min(Number(dt) || 0, 0.1));
+    const decay = Math.pow(RECENTER_DECAY, step);
+    return {
+      yaw: normalizeAngle(Number(state.yaw) || 0) * decay,
+      pitch: (Number(state.pitch) || 0) * decay
+    };
+  }
+
+  function isFreeLookCentered(state) {
+    return Math.abs(normalizeAngle(Number(state.yaw) || 0)) < RECENTER_EPSILON
+      && Math.abs(Number(state.pitch) || 0) < RECENTER_EPSILON;
+  }
+
   function keyGuideVisibleFromStorage(value) {
     return value !== '0';
   }
@@ -119,6 +138,8 @@
     updateAttitude,
     updateFreeLook,
     orbitCameraOffset,
+    recenterFreeLook,
+    isFreeLookCentered,
     keyGuideVisibleFromStorage,
     mouseInvertYFromStorage,
     updateEnergy,

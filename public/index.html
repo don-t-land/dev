@@ -236,6 +236,44 @@
     100% { opacity: 0; transform: translate(-50%, -50%) scale(8); }
   }
 
+  #overheat-vortex {
+    position: absolute; inset: 0; z-index: 3; --overheat-force: 0;
+    opacity: var(--overheat-force); overflow: hidden; pointer-events: none;
+    transition: opacity .1s linear;
+  }
+  #overheat-vortex::before {
+    content: ""; position: absolute; inset: 0;
+    border: clamp(3px, .45vw, 7px) solid rgba(255,72,50,.78);
+    background:
+      linear-gradient(180deg, rgba(255,50,31,.2), transparent 22%),
+      radial-gradient(circle at 50% 50%, transparent 0 42%, rgba(255,58,31,.09) 70%, rgba(255,39,24,.25) 100%);
+    box-shadow: inset 0 0 11vmax rgba(255,48,26,.24), 0 0 24px rgba(255,69,36,.48);
+  }
+  #overheat-vortex::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 15vmin; height: 15vmin;
+    border: 2px solid rgba(255,179,88,.9); border-radius: 50%; opacity: 0;
+    transform: translate(-50%, -50%) scale(.25); box-shadow: 0 0 24px rgba(255,62,33,.82);
+  }
+  #overheat-vortex.burst::after { animation: overheat-impact .52s cubic-bezier(.13,.62,.25,1) both; }
+  #overheat-vortex.active::before { animation: overheat-frame-pulse .72s ease-in-out infinite alternate; }
+  #overheat-callout {
+    position: absolute; left: 50%; top: 68%; display: grid; justify-items: center;
+    min-width: min(280px, 72vw); color: #fff7ed;
+    transform: translate(-50%, calc(-50% + (1 - var(--overheat-force)) * 12px)) scale(calc(.88 + var(--overheat-force) * .12));
+    text-align: center; text-shadow: 0 0 9px #ff3d29, 0 0 24px rgba(255,54,29,.92);
+  }
+  #overheat-callout strong { font-size: clamp(17px, 2vw, 27px); font-style: italic; letter-spacing: .18em; }
+  #overheat-callout strong::before { content: "» "; color: #ffcf57; }
+  #overheat-callout strong::after { content: " «"; color: #ffcf57; }
+  #overheat-callout small { margin-top: 3px; color: #ffb66b; font-size: 9px; font-weight: 900; letter-spacing: .24em; }
+  #overheat-cooling-track { width: min(220px, 56vw); height: 7px; margin-top: 8px; padding: 1px; transform: skewX(-12deg); border: 1px solid rgba(255,177,83,.78); background: rgba(35,5,5,.82); box-shadow: 0 0 12px rgba(255,66,35,.55); }
+  #overheat-cooling-fill { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #ff372b, #ff8c32 58%, #ffe167); box-shadow: 0 0 10px rgba(255,118,48,.72); transition: width .12s linear; }
+  @keyframes overheat-frame-pulse { to { filter: brightness(1.4); } }
+  @keyframes overheat-impact {
+    0% { opacity: .98; transform: translate(-50%, -50%) scale(.25); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(8.4); }
+  }
+
   #keys {
     padding: 13px 16px; text-align: right;
     color: #e5f0f8; background: rgba(9,18,29,.82); border: 1px solid rgba(200,225,245,.18);
@@ -734,6 +772,7 @@
     .lobby-plane, .cloud { animation: none; }
     #thermal-vortex .wind-streak { animation: none; opacity: 0; }
     #dash-vortex .dash-streak, #dash-vortex::after { animation: none; opacity: 0; }
+    #overheat-vortex::before, #overheat-vortex::after { animation: none; }
     #announcement { transition: none; }
     #announcement.show, #announcement.show .announcement-frame::before { animation: none; }
     #announcement.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
@@ -1086,6 +1125,13 @@
       <i class="dash-streak" style="--angle:324deg;--delay:-.34s;--speed:.63s"></i>
       <i class="dash-streak" style="--angle:342deg;--delay:-.65s;--speed:.69s"></i>
       <span id="dash-callout"><strong>DASH BOOST</strong><small>WIND RUSH</small></span>
+    </div>
+    <div id="overheat-vortex" role="status" aria-live="assertive" aria-atomic="true" aria-hidden="true">
+      <span id="overheat-callout">
+        <strong>ENGINE OVERHEAT</strong>
+        <small aria-hidden="true">COOLING · 냉각 <span id="overheat-cooling-value">0</span>%</small>
+        <span id="overheat-cooling-track" aria-hidden="true"><i id="overheat-cooling-fill"></i></span>
+      </span>
     </div>
     <div id="announcement" role="status" aria-live="polite" aria-atomic="true">
       <div class="announcement-frame">
@@ -3308,6 +3354,8 @@ let thermalVisualTarget = 0;
 let thermalVisualStrength = 0;
 let dashVisualTarget = 0;
 let dashVisualStrength = 0;
+let overheatVisualTarget = 0;
+let overheatVisualStrength = 0;
 
 function updateThermalScreenEffect(dt) {
   thermalVisualStrength = approachThermalIntensity(thermalVisualStrength, thermalVisualTarget, dt);
@@ -3324,6 +3372,25 @@ function updateDashScreenEffect(dt) {
 
 function triggerDashImpact() {
   const vortex = $('dash-vortex');
+  vortex.classList.remove('burst');
+  void vortex.offsetWidth;
+  vortex.classList.add('burst');
+}
+
+function updateOverheatScreenEffect(dt) {
+  overheatVisualStrength = approachDashIntensity(overheatVisualStrength, overheatVisualTarget, dt);
+  const vortex = $('overheat-vortex');
+  const active = overheatVisualTarget > 0;
+  const coolingPercent = Math.round(THREE.MathUtils.clamp(me.energy / MAX_ENERGY, 0, 1) * 100);
+  vortex.style.setProperty('--overheat-force', overheatVisualStrength.toFixed(3));
+  vortex.classList.toggle('active', active);
+  vortex.setAttribute('aria-hidden', String(!active));
+  $('overheat-cooling-value').textContent = String(coolingPercent);
+  $('overheat-cooling-fill').style.width = `${coolingPercent}%`;
+}
+
+function triggerOverheatImpact() {
+  const vortex = $('overheat-vortex');
   vortex.classList.remove('burst');
   void vortex.offsetWidth;
   vortex.classList.add('burst');
@@ -4753,6 +4820,7 @@ let sendAcc = 0, roundClock = 0;
 
 function physics(dt) {
   const wasDashing = me.dashing;
+  const wasOverheated = me.engineOverheated;
   let inTh = 0;
   for (const thermal of thermals) {
     const distance = Math.hypot(
@@ -4775,6 +4843,7 @@ function physics(dt) {
   me.energy = energyStep.energy;
   me.dashing = energyStep.dashRatio > 0;
   me.engineOverheated = energyStep.overheated;
+  overheatVisualTarget = me.engineOverheated ? 1 : 0;
   dashVisualTarget = me.dashing
     ? THREE.MathUtils.clamp(.58 + energyStep.dashRatio * .42, 0, 1)
     : 0;
@@ -4782,6 +4851,7 @@ function physics(dt) {
     audioDirector.play('dash');
     triggerDashImpact();
   }
+  if (!wasOverheated && me.engineOverheated) triggerOverheatImpact();
   const dashSpeedDelta = dashAcceleration(me.speed) * dt * energyStep.dashRatio;
 
   if (rapierFlight) {
@@ -4914,8 +4984,10 @@ renderer.setAnimationLoop(timestamp => {
   if (game.phase === 'lobby') {
     thermalVisualTarget = 0;
     dashVisualTarget = 0;
+    overheatVisualTarget = 0;
     updateThermalScreenEffect(dt);
     updateDashScreenEffect(dt);
+    updateOverheatScreenEffect(dt);
     renderScene(dt);
     return;
   }
@@ -4938,9 +5010,11 @@ renderer.setAnimationLoop(timestamp => {
   if (game.phase !== 'playing' || !me.alive) {
     thermalVisualTarget = 0;
     dashVisualTarget = 0;
+    overheatVisualTarget = 0;
   }
   updateThermalScreenEffect(dt);
   updateDashScreenEffect(dt);
+  updateOverheatScreenEffect(dt);
 
   if (!graphicsQaFrozen) {
     stepDarts(dt);

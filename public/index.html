@@ -142,11 +142,19 @@
   .bar-value { font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
   .bar-value small { margin-left: 3px; font-size: 8px; opacity: .7; }
   #gauge .track, #energy .track { position: relative; height: 13px; padding: 2px; overflow: hidden; transform: skewX(-12deg); background: rgba(1,8,14,.86); border: 1px solid currentColor; box-shadow: inset 0 0 7px rgba(0,0,0,.85), 0 0 8px currentColor; }
-  #gauge .track::after, #energy .track::after { content: ""; position: absolute; z-index: 3; inset: 2px; pointer-events: none; background: repeating-linear-gradient(108deg, transparent 0 8px, rgba(1,10,17,.74) 8px 11px); }
-  #gauge .fill, #energy .fill { position: relative; height: 100%; transition: width .12s linear, filter .18s; box-shadow: 0 0 12px currentColor; }
+  /* 격자는 눈금 역할이라 게이지를 덮되, 색이 탁해지지 않게 옅게 얹습니다. */
+  #gauge .track::after, #energy .track::after { content: ""; position: absolute; z-index: 3; inset: 2px; pointer-events: none; opacity: .55; background: repeating-linear-gradient(108deg, transparent 0 8px, rgba(1,10,17,.74) 8px 11px); }
+  #gauge .fill, #energy .fill { position: relative; z-index: 2; height: 100%; transition: width .12s linear, filter .18s; box-shadow: 0 0 12px currentColor; }
   #gauge .fill { background: linear-gradient(90deg, #0879dd, #19c8ef 58%, #8ef7ff); }
   #gauge .fill.stall { color: #ff655d; background: linear-gradient(90deg, #d92e47, #ff765b); }
-  #gauge .stallzone { position: absolute; z-index: 4; left: 22%; top: 0; bottom: 0; width: 2px; background: #ff715d; box-shadow: 0 0 7px #ff624e; }
+  /* 실속 구간은 게이지 뒤에 깔리는 위험 영역입니다. 속도 막대가 그 위를 지나가야
+     현재 속도와 실속 경계를 한눈에 비교할 수 있습니다. */
+  #gauge .stallzone {
+    position: absolute; z-index: 1; left: 2px; top: 2px; bottom: 2px;
+    background: repeating-linear-gradient(114deg, rgba(255,92,74,.5) 0 3px, rgba(255,92,74,.16) 3px 7px);
+    border-right: 1px solid #ff7161; box-shadow: 0 0 8px rgba(255,98,78,.55);
+    transition: width .12s linear;
+  }
   #energy .fill { width: 100%; background: linear-gradient(90deg, #ff8b2b, #ffd83d 66%, #fff4a5); }
   #energy.dashing .fill { animation: barPulse .45s ease-in-out infinite alternate; }
   #energy.low { color: #ff615c; }
@@ -2956,7 +2964,8 @@ let rapierFlight = null;
 function updateAeroHud() {
   const engine = rapierFlight ? ' · Rapier' : '';
   $('s-aero').textContent = `양력 ${Math.round(aeroProfile.liftScale * 100)}% · 항력 ${Math.round(aeroProfile.dragScale * 100)}%${engine}`;
-  $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / 70 * 100)}%`;
+  // 실속 구간은 속도 막대와 같은 최대속도 기준이라야 두 눈금이 겹쳐 읽힙니다.
+  $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / aeroProfile.maxSpeed * 100)}%`;
 }
 
 function syncRapierMap() {

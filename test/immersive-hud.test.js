@@ -128,3 +128,22 @@ test('remote crashes tear the folded paper craft into bounded, disposable world-
   assert.match(html, /case 'crashed':[\s\S]*if\s*\(player && m\.by\)\s*spawnPaperTearBurst\(player\.remote\.group, player\.remote\.color\)[\s\S]*player\.remote\.group\.visible = false/);
   assert.match(html, /stepDarts\(dt\);[\s\S]*stepPaperTears\(dt\);/);
 });
+
+test('speed gauge layers the stall zone behind the moving fill', () => {
+  // 실속 구간이 게이지 위에 그려지면 현재 속도를 가려 읽을 수 없습니다.
+  assert.match(html, /#gauge \.stallzone \{[\s\S]*z-index: 1;/);
+  assert.match(html, /#gauge \.fill, #energy \.fill \{[^}]*z-index: 2;/);
+  // 트랙 안쪽 여백을 지켜 막대와 같은 높이로 맞춥니다.
+  assert.match(html, /#gauge \.stallzone \{[\s\S]*left: 2px; top: 2px; bottom: 2px;/);
+  assert.doesNotMatch(html, /#gauge \.stallzone \{[\s\S]*width: 2px;/);
+});
+
+test('stall zone and speed fill share one maximum-speed scale', () => {
+  // 분모가 다르면 실속 경계가 실제 속도 눈금과 어긋납니다.
+  assert.match(
+    html,
+    /\$\('s-stall'\)\.style\.width = `\$\{Math\.min\(100, aeroProfile\.stallSpeed \/ aeroProfile\.maxSpeed \* 100\)\}%`/
+  );
+  assert.match(html, /fill\.style\.width = Math\.min\(100, \(me\.speed \/ aeroProfile\.maxSpeed\) \* 100\)/);
+  assert.doesNotMatch(html, /aeroProfile\.stallSpeed \/ 70/);
+});

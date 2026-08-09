@@ -18,9 +18,19 @@ test('distance ring clear grants speed and energy through the bounded reward pol
   assert.match(html, /maintainDistanceRingSpeed\(me\.speed, me\.ringSpeedFloor, me\.ringSpeedHoldRemaining, dt\)/);
 });
 
-test('distance ring clear keeps impact feedback without a popup', () => {
-  assert.doesNotMatch(html, /id="ring-reward"/);
-  assert.doesNotMatch(html, /showRingReward/);
-  assert.match(html, /function triggerRingImpact\(\)/);
-  assert.match(html, /vortex\.classList\.add\('ring-clear'\)/);
+test('ring clear uses a compact craft-side feedback badge without a full-screen burst', () => {
+  assert.match(html, /id="ring-clear-feedback"[^>]*role="status"/);
+  assert.match(html, /<span>RING CLEAR<\/span><strong[^>]*>\+<\/strong>/);
+  assert.match(html, /function showRingClearFeedback\(\)/);
+  assert.match(html, /feedback\.dataset\.mode = game\.mode/);
+  assert.match(html, /feedback\.classList\.add\('show'\)/);
+  assert.doesNotMatch(html, /dash-vortex\.ring-clear|vortex\.classList\.add\('ring-clear'\)/);
+});
+
+test('both distance and arena ring pickups trigger the compact feedback', () => {
+  assert.match(
+    html,
+    /if \(game\.mode === 'ARENA'\)[\s\S]*?else \{[\s\S]*?audioDirector\.play\('score'\);[\s\S]*?\}\s*showRingClearFeedback\(\);/
+  );
+  assert.match(html, /#ring-clear-feedback\[data-mode="ARENA"\]/);
 });

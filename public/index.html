@@ -226,7 +226,6 @@
     transform: translate(-50%, -50%) scale(.25); box-shadow: 0 0 22px rgba(83,204,255,.72);
   }
   #dash-vortex.burst::after { animation: dash-impact .48s cubic-bezier(.13,.62,.25,1) both; }
-  #dash-vortex.ring-clear { opacity: 1; }
   #dash-vortex .dash-streak {
     position: absolute; left: 50%; top: 50%; width: clamp(68px, 10vw, 180px); height: 2px;
     transform-origin: 0 50%; border-radius: 999px; opacity: 0;
@@ -255,6 +254,43 @@
   @keyframes dash-impact {
     0% { opacity: .95; transform: translate(-50%, -50%) scale(.25); }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(8); }
+  }
+
+  #ring-clear-feedback {
+    --ring-clear-color: #77dcff;
+    --ring-clear-edge: rgba(119,220,255,.68);
+    --ring-clear-glow: rgba(119,220,255,.34);
+    position: absolute; left: 50%; top: 50%; z-index: 8;
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 8px 5px 9px;
+    color: #f4fcff; border: 1px solid var(--ring-clear-edge);
+    border-left: 2px solid var(--ring-clear-color); border-radius: 4px;
+    background: linear-gradient(100deg, rgba(8,20,35,.86), rgba(8,20,35,.42));
+    box-shadow: 0 0 12px var(--ring-clear-glow), inset 0 0 10px rgba(255,255,255,.04);
+    opacity: 0; pointer-events: none;
+    transform: translate(clamp(42px, 6vw, 76px), -54px) scale(.82);
+    transform-origin: left center;
+    font-family: 'Noto Sans KR', system-ui, sans-serif;
+    font-size: 9px; font-weight: 900; line-height: 1; letter-spacing: .11em;
+    text-shadow: 0 0 7px var(--ring-clear-edge);
+  }
+  #ring-clear-feedback[data-mode="ARENA"] {
+    --ring-clear-color: #ffc861;
+    --ring-clear-edge: rgba(255,200,97,.72);
+    --ring-clear-glow: rgba(255,174,70,.36);
+  }
+  #ring-clear-feedback::after {
+    content: ""; position: absolute; right: 100%; top: 50%; width: 18px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--ring-clear-color));
+    box-shadow: 0 0 6px var(--ring-clear-color);
+  }
+  #ring-clear-feedback strong { color: var(--ring-clear-color); font-size: 12px; line-height: .7; }
+  #ring-clear-feedback.show { animation: ring-clear-flyby .92s cubic-bezier(.16,.72,.25,1) both; }
+  @keyframes ring-clear-flyby {
+    0% { opacity: 0; transform: translate(32px, -48px) scale(.7); }
+    16%, 68% { opacity: 1; }
+    42% { transform: translate(clamp(42px, 6vw, 76px), -54px) scale(1); }
+    100% { opacity: 0; transform: translate(clamp(50px, 7vw, 88px), -62px) scale(.94); }
   }
 
   #overheat-vortex {
@@ -1132,6 +1168,9 @@
       <i class="dash-streak" style="--angle:342deg;--delay:-.65s;--speed:.69s"></i>
       <span id="dash-callout"><strong>DASH BOOST</strong><small>WIND RUSH</small></span>
     </div>
+    <div id="ring-clear-feedback" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+      <span>RING CLEAR</span><strong aria-hidden="true">+</strong>
+    </div>
     <div id="overheat-vortex" role="status" aria-live="assertive" aria-atomic="true" aria-hidden="true">
       <span id="overheat-callout">
         <strong>ENGINE OVERHEAT</strong>
@@ -1965,7 +2004,7 @@ const announcementQueue = [];
 const MAX_ANNOUNCEMENT_QUEUE = 6;
 let announcementTimer = null;
 let announcementActive = false;
-let ringImpactTimer = null;
+let ringClearFeedbackTimer = null;
 
 function enterHome(msg) {
   audioDirector.setScene('HOME');
@@ -4333,12 +4372,19 @@ function showCenter(cd, msg, sub) {
 }
 function hideCenter() { $('center').classList.add('hide'); }
 
-function triggerRingImpact() {
-  const vortex = $('dash-vortex');
-  clearTimeout(ringImpactTimer);
-  vortex.classList.add('ring-clear');
-  triggerDashImpact();
-  ringImpactTimer = setTimeout(() => vortex.classList.remove('ring-clear'), 520);
+function showRingClearFeedback() {
+  const feedback = $('ring-clear-feedback');
+  clearTimeout(ringClearFeedbackTimer);
+  feedback.dataset.mode = game.mode;
+  feedback.setAttribute('aria-hidden', 'true');
+  feedback.classList.remove('show');
+  void feedback.offsetWidth;
+  feedback.classList.add('show');
+  feedback.setAttribute('aria-hidden', 'false');
+  ringClearFeedbackTimer = setTimeout(() => {
+    feedback.classList.remove('show');
+    feedback.setAttribute('aria-hidden', 'true');
+  }, 920);
 }
 
 function showAnnouncement(kind, pilotName) {
@@ -4373,9 +4419,10 @@ function clearAnnouncements() {
   announcementTimer = null;
   announcementActive = false;
   $('announcement')?.classList.remove('show');
-  clearTimeout(ringImpactTimer);
-  ringImpactTimer = null;
-  $('dash-vortex')?.classList.remove('ring-clear');
+  clearTimeout(ringClearFeedbackTimer);
+  ringClearFeedbackTimer = null;
+  $('ring-clear-feedback')?.classList.remove('show');
+  $('ring-clear-feedback')?.setAttribute('aria-hidden', 'true');
 }
 
 function escapeHtml(value) {
@@ -4978,8 +5025,8 @@ function physics(dt) {
         if (me.energy >= MAX_ENERGY) me.engineOverheated = false;
         rapierFlight?.boostSpeed(reward.speedGain);
         audioDirector.play('score');
-        triggerRingImpact();
       }
+      showRingClearFeedback();
     }
     me.speed = THREE.MathUtils.clamp(me.speed, 3, aeroProfile.maxSpeed);
     rapierFlight?.limitSpeed(aeroProfile.maxSpeed);

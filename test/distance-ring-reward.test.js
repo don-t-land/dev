@@ -39,7 +39,7 @@ test('ring clear badge is centered beside the craft with readable reward text', 
   assert.match(html, /\.ring-clear-effect \{[\s\S]*?font-size: 10\.5px/);
 });
 
-test('the four-second distance ring boost reuses dash camera, wind, impact, and audio feedback', () => {
+test('the three-second distance ring boost reuses dash camera, wind, impact, and audio feedback', () => {
   assert.match(html, /function isDistanceRingBoostActive\(\)/);
   assert.match(html, /ringBoostActive \? \.9 : 0/);
   assert.match(html, /speedBoostVisualActive = me\.dashing \|\| isDistanceRingBoostActive\(\)/);

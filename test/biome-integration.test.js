@@ -101,26 +101,6 @@ test('rendered terrain and both physics paths consume the same compound collider
 
 test('ground treatment follows biome palette and nearly disappears in floating islands', () => {
   assert.match(html, /biome\.id === 'floating' \? \.055/);
-  assert.match(html, /ground\.material\.color\.setHex\(biome\.terrain\.top\)/);
+  assert.match(html, /ground\.material\.color\.copy\(baseWorldPalette\.ground\)/);
   assert.match(html, /ground\.material\.opacity = THREE\.MathUtils\.lerp/);
-});
-
-test('every light applyTimeOfDay drives is bound to a reachable variable', () => {
-  // applyTimeOfDay가 읽는 조명은 전부 선언돼 있어야 합니다. 익명으로 scene.add하면
-  // 아레나 진입 경로(buildArena → clearWorld → resetBiomeDefaults)가 ReferenceError로 끊깁니다.
-  const driven = [...html.matchAll(/^\s*(\w+)\.(?:color|groundColor|intensity)\b/gm)]
-    .map(match => match[1]);
-
-  for (const name of new Set(driven)) {
-    assert.match(
-      html,
-      new RegExp(`(?:const|let|var)\\s+${name}\\b`),
-      `${name} is assigned in applyTimeOfDay but never declared`
-    );
-  }
-});
-
-test('the hemisphere light stays addressable for time-of-day updates', () => {
-  assert.match(html, /(?:const|let)\s+hemisphere\s*=\s*new THREE\.HemisphereLight\(/);
-  assert.doesNotMatch(html, /scene\.add\(new THREE\.HemisphereLight\(/);
 });

@@ -62,7 +62,7 @@
       recipe: recipes?.lava?.recipe
     },
     {
-      id: 'floating', name: '부유섬 새벽', widthScale: 1.6,
+      id: 'floating', name: '부유섬 군도', widthScale: 1.6,
       sky: { top: 0x5b3d8c, mid: 0xa87fd1, bottom: 0xf6cf7e }, fog: 0xc9aee0,
       terrain: { wall: 0x8e7d9f, wallAccent: 0xd8cfe6, spire: 0x8f7b9e, rock: 0xc6b8cf, platform: 0x887394, top: 0xb9ca8b, cloud: 0xffedf8 },
       recipe: recipes?.floating?.recipe

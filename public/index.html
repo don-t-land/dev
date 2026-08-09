@@ -376,13 +376,6 @@
     pointer-events: none;
   }
   #biome-badge.show { opacity: 1; transform: translate(-50%, 0); }
-  #time-badge {
-    position: absolute; top: 82px; left: 50%; transform: translateX(-50%);
-    padding: 5px 12px; border: 1px solid rgba(190,226,255,.25); border-radius: 999px;
-    color: #eaf7ff; background: rgba(5,15,27,.46); backdrop-filter: blur(9px);
-    font-size: 10px; font-weight: 800; letter-spacing: .18em; text-shadow: 0 0 10px rgba(121,198,255,.75);
-  }
-
   #results {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(10,14,20,.72); backdrop-filter: blur(3px);
@@ -621,7 +614,6 @@
     #energy { bottom: 86px; }
     #center { transform: translate(-50%, -50%) scale(.88); }
     #announcement { transform-origin: top center; }
-    #time-badge { top: 70px; transform: translateX(-50%) scale(.88); transform-origin: top center; }
   }
 
   @media (hover: hover) and (pointer: fine) and (min-width: 841px) and (max-height: 720px) {
@@ -632,7 +624,6 @@
     #gauge { bottom: 14px; }
     #energy { bottom: 73px; }
     #center { transform: translate(-50%, -50%) scale(.78); }
-    #time-badge { top: 58px; transform: translateX(-50%) scale(.78); }
   }
 
   @media (hover: hover) and (pointer: fine) and (min-width: 841px) and (max-height: 620px) {
@@ -650,7 +641,6 @@
     #gauge { bottom: 9px; }
     #energy { bottom: 61px; }
     #center { transform: translate(-50%, -50%) scale(.68); }
-    #time-badge { top: 48px; transform: translateX(-50%) scale(.68); }
   }
 
   @media (max-width: 840px) {
@@ -1139,8 +1129,6 @@
       </div>
     </div>
     <div id="biome-badge"></div>
-    <div id="time-badge" aria-live="polite">현재 시간 · 낮</div>
-
     <aside id="hud-right-rail" aria-label="비행 전술 정보">
       <div id="board" aria-label="실시간 랭킹">
         <div class="board-head"><div class="h" id="b-title">실시간 랭킹</div><div class="board-count" id="b-count"></div></div>
@@ -2430,9 +2418,7 @@ const sky = new THREE.Mesh(
 );
 scene.add(sky);
 
-// applyTimeOfDay가 시간대별 색·세기를 덮어쓰므로 참조를 유지해야 합니다.
-const hemisphere = new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5);
-scene.add(hemisphere);
+scene.add(new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5));
 const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
 sun.shadow.bias = -0.00035;
 sun.shadow.normalBias = 0.035;
@@ -2611,7 +2597,7 @@ function rebuildShadowSystem() {
     });
     csm.fade = true;
     for (const light of csm.lights) {
-      light.color.set(0xfff0d8);
+      light.color.copy(sun.color);
       configureShadowFilter(light);
     }
     for (const material of csmMaterials) setupMaterialWithCsm(material);
@@ -2801,7 +2787,6 @@ let lastAppliedBiome = { a: 0, b: 0, t: -1 }; // -1 sentinel: 항상 첫 적용�
 const biomeColorA = new THREE.Color();
 const biomeColorB = new THREE.Color();
 const biomeLerpColor = new THREE.Color();
-const composedColor = new THREE.Color();
 const baseWorldPalette = {
   top: new THREE.Color(DEFAULT_BIOME.sky.top),
   mid: new THREE.Color(DEFAULT_BIOME.sky.mid),
@@ -2812,15 +2797,6 @@ const baseWorldPalette = {
   groundOpacity: biomeGroundOpacity(DEFAULT_BIOME),
   gridOpacity: .24
 };
-const TIME_LOOKS = {
-  day: { top: 0x52a8eb, mid: 0xbdeaff, bottom: 0xffefd1, fog: 0xbdd9e7, sun: 0xfff3d5, hemiSky: 0xc9e8ff, hemiGround: 0x766b54, strength: .18, sunPower: 2.6, hemiPower: 1.5, exposure: 1.1 },
-  night: { top: 0x07132d, mid: 0x172751, bottom: 0x3b4167, fog: 0x14233d, sun: 0x9ebeff, hemiSky: 0x526ba7, hemiGround: 0x121827, strength: .78, sunPower: .72, hemiPower: .68, exposure: .72 },
-  dawn: { top: 0x453d78, mid: 0xc77f92, bottom: 0xffc273, fog: 0xb88fa0, sun: 0xffbd7b, hemiSky: 0xbeb4e8, hemiGround: 0x665063, strength: .52, sunPower: 1.65, hemiPower: 1.08, exposure: .9 }
-};
-let worldTimeElapsed = 0;
-let worldTimeSeed = 0;
-let lastTimeLabel = '';
-
 // 조명 색은 팔레트의 "하늘 mid" 색을 살짝 섞어 바이옴 분위기를 낸다.
 function biomeLightColor(biome, out) {
   return out.setHex(0xfff0d8).lerp(biomeLerpColor.setHex(biome.sky.mid), 0.22);
@@ -2839,13 +2815,11 @@ function applyBiomePalette(biome) {
   baseWorldPalette.ground.setHex(biome.terrain.top);
   baseWorldPalette.groundOpacity = biomeGroundOpacity(biome);
   baseWorldPalette.gridOpacity = biome.id === 'floating' ? .035 : .24;
-  ground.material.color.setHex(biome.terrain.top);
+  applyBiomeVisuals();
 }
 
 function resetBiomeDefaults() {
   applyBiomePalette(DEFAULT_BIOME);
-  worldTimeElapsed = 0;
-  applyTimeOfDay();
   lastAppliedBiome = { a: 0, b: 0, t: -1 };
   lastBadgeBiome = -1;
   clearTimeout(biomeBadgeT);
@@ -2880,47 +2854,25 @@ function updateDistanceBiomeVisuals(z) {
   baseWorldPalette.groundOpacity = THREE.MathUtils.lerp(biomeGroundOpacity(biomeA), biomeGroundOpacity(biomeB), tQuant);
   baseWorldPalette.gridOpacity = THREE.MathUtils.lerp(biomeA.id === 'floating' ? .035 : .24, biomeB.id === 'floating' ? .035 : .24, tQuant);
   ground.material.opacity = THREE.MathUtils.lerp(biomeGroundOpacity(biomeA), biomeGroundOpacity(biomeB), tQuant);
+  applyBiomeVisuals();
 
   const dominant = tQuant < 0.5 ? s.a : s.b;
   showBiomeBadge(dominant);
 }
 
-function blendedTimeLook(from, to, t) {
-  const a = TIME_LOOKS[from.id];
-  const b = TIME_LOOKS[to.id];
-  const color = key => new THREE.Color(a[key]).lerp(composedColor.setHex(b[key]), t);
-  const number = key => THREE.MathUtils.lerp(a[key], b[key], t);
-  return {
-    top: color('top'), mid: color('mid'), bottom: color('bottom'), fog: color('fog'),
-    sun: color('sun'), hemiSky: color('hemiSky'), hemiGround: color('hemiGround'),
-    strength: number('strength'), sunPower: number('sunPower'), hemiPower: number('hemiPower'), exposure: number('exposure')
-  };
-}
-
-function applyTimeOfDay() {
-  const time = window.flightWorldState.timeOfDayAt(worldTimeSeed, worldTimeElapsed);
-  const look = blendedTimeLook(time.from, time.to, time.t);
-  sky.material.uniforms.uTop.value.copy(baseWorldPalette.top).lerp(look.top, look.strength);
-  sky.material.uniforms.uMid.value.copy(baseWorldPalette.mid).lerp(look.mid, look.strength);
-  activeSkyBottomBase.copy(baseWorldPalette.bottom).lerp(look.bottom, look.strength);
-  activeFogBase.copy(baseWorldPalette.fog).lerp(look.fog, look.strength * .72);
-  sun.color.copy(baseWorldPalette.light).lerp(look.sun, look.strength);
-  sun.intensity = look.sunPower;
+function applyBiomeVisuals() {
+  sky.material.uniforms.uTop.value.copy(baseWorldPalette.top);
+  sky.material.uniforms.uMid.value.copy(baseWorldPalette.mid);
+  activeSkyBottomBase.copy(baseWorldPalette.bottom);
+  activeFogBase.copy(baseWorldPalette.fog);
+  sun.color.copy(baseWorldPalette.light);
   for (const light of csm?.lights || []) {
     light.color.copy(sun.color);
-    light.intensity = look.sunPower;
+    light.intensity = sun.intensity;
   }
-  hemisphere.color.copy(look.hemiSky);
-  hemisphere.groundColor.copy(look.hemiGround);
-  hemisphere.intensity = look.hemiPower;
-  ground.material.color.copy(baseWorldPalette.ground).lerp(look.fog, look.strength * .16);
+  ground.material.color.copy(baseWorldPalette.ground);
   ground.material.opacity = baseWorldPalette.groundOpacity;
-  grid.material.opacity = baseWorldPalette.gridOpacity * THREE.MathUtils.lerp(1, .5, look.strength);
-  renderer.toneMappingExposure = look.exposure;
-  if (time.label !== lastTimeLabel) {
-    lastTimeLabel = time.label;
-    $('time-badge').textContent = `현재 시간 · ${time.label}`;
-  }
+  grid.material.opacity = baseWorldPalette.gridOpacity;
 }
 
 let lastBadgeBiome = -1;
@@ -3651,7 +3603,6 @@ function installBiomeLayout(layout) {
 /* ---- 멀리 날기: 시드로 7.5km 직선 협곡을 결정론적으로 생성 ---- */
 function buildDistance(seed) {
   clearWorld();
-  worldTimeSeed = Number(seed) || 0;
   scene.fog.density = fogDensityForMode(resolvedGraphics.fogDensity, 'DIST');
   const rng = mulberry32(seed);
   const { BIOMES: mgBiomes } = window.mapGen;
@@ -3680,15 +3631,11 @@ function buildDistance(seed) {
   finishLine = createFinishLine(DIST_LEN, finishHalfWidth);
   registerObjectMaterials(finishLine);
   world.add(finishLine);
-  worldTimeElapsed = 0;
-  lastTimeLabel = '';
-  applyTimeOfDay();
 }
 
 /* ---- 오래 날기: 원형 아레나 ---- */
 function buildArena(seed) {
   clearWorld();
-  worldTimeSeed = Number(seed) || 0;
   scene.fog.density = fogDensityForMode(resolvedGraphics.fogDensity, 'ARENA');
   const rng = mulberry32(seed);
   const layout = window.mapGen.buildArenaLayout(seed);
@@ -3720,9 +3667,6 @@ function buildArena(seed) {
   );
   registerObjectMaterials(arenaFlyObjects);
   world.add(arenaFlyObjects);
-  worldTimeElapsed = 0;
-  lastTimeLabel = '';
-  applyTimeOfDay();
 }
 
 /* ---- 공통 출발 연출: 모드별 스폰 지점의 옥상에서 달려 점프 ---- */
@@ -5050,7 +4994,6 @@ renderer.setAnimationLoop(timestamp => {
   if (game.phase === 'launch' && !graphicsQaFrozen) updateLaunch(performance.now());
 
   if (game.phase === 'playing') {
-    if (!graphicsQaFrozen) worldTimeElapsed += dt;
     roundClock = net.room?.phase === 'live'
       ? Math.max(0, (now - me.lifeStartedAt) / 1000)
       : Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
@@ -5174,7 +5117,6 @@ renderer.setAnimationLoop(timestamp => {
     ground.position.set(0, 0, 0);
     grid.position.set(0, 0.05, 0);
   }
-  applyTimeOfDay();
   if (!csm) {
     const lightPosition = sunPositionForTarget(followPos);
     sun.position.set(lightPosition.x, lightPosition.y, lightPosition.z);

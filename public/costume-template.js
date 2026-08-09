@@ -26,7 +26,9 @@
   const ATTACHMENT_TEMPLATES = Object.freeze({
     [TYPES.HEAD]: Object.freeze({
       flight: Object.freeze([point('center', [0, .18, .46], [0, 0, 0], .72)]),
-      standing: Object.freeze([point('center', [0, -.96, .76], [0, 0, 0], .82)])
+      // 세워진 마스코트의 종이 면은 XY, 표면 바깥쪽은 +Z다.
+      // 모자 자체의 높이축(+Y)을 +Z로 돌려 종이 표면에 수직으로 장착한다.
+      standing: Object.freeze([point('center', [0, -.96, .76], [Math.PI / 2, 0, 0], .82)])
     }),
     [TYPES.NOSE]: Object.freeze({
       flight: Object.freeze([point('center', [0, .02, -1.96], [0, 0, 0], 1)]),

@@ -10,6 +10,10 @@ const {
   consumeDartEnergy,
   dashAcceleration,
   speedFov,
+  orbitCameraOffset,
+  recenterFreeLook,
+  isFreeLookCentered,
+  LOOK_PITCH_LIMIT,
   MAX_ENERGY,
   DART_ENERGY_COST
 } = require('../public/flight-controls.js');
@@ -53,6 +57,46 @@ test('DIST and ARENA apply identical roll dynamics for both input and release', 
     const arena = updateAttitude(state, keys, 0.05, 'ARENA');
     assert.equal(dist.roll, arena.roll);
   }
+});
+
+test('aircraft control envelope scales pitch and roll input independently', () => {
+  const state = { yaw: 0, pitch: 0, roll: 0 };
+  const stable = updateAttitude(state, { KeyW: true, KeyA: true }, 0.05, 'ARENA', {
+    pitchRateScale: 1.28, rollRateScale: 1.42
+  });
+  const stealth = updateAttitude(state, { KeyW: true, KeyA: true }, 0.05, 'ARENA', {
+    pitchRateScale: .72, rollRateScale: .68
+  });
+
+  assert.ok(Math.abs(stable.pitch) > Math.abs(stealth.pitch));
+  assert.ok(Math.abs(stable.roll) > Math.abs(stealth.roll));
+  assert.ok(Math.abs(stable.roll) > Math.abs(stable.pitch));
+});
+
+test('aircraft control envelope clamps pitch and roll in both game modes', () => {
+  const envelope = {
+    maxPitchDown: .72, maxPitchUp: .5, maxRoll: .62,
+    pitchRateScale: 1, rollRateScale: 1
+  };
+  const noseDown = updateAttitude(
+    { yaw: 0, pitch: -.7, roll: .6 },
+    { KeyW: true, KeyA: true },
+    .1,
+    'DIST',
+    envelope
+  );
+  const noseUp = updateAttitude(
+    { yaw: 0, pitch: .48, roll: -.6 },
+    { KeyS: true, KeyD: true },
+    .1,
+    'ARENA',
+    envelope
+  );
+
+  assert.equal(noseDown.pitch, -.72);
+  assert.equal(noseDown.roll, .62);
+  assert.equal(noseUp.pitch, .5);
+  assert.equal(noseUp.roll, -.62);
 });
 
 test('mouse free-look rotates continuously and clamps only the vertical view', () => {
@@ -101,6 +145,24 @@ test('energy regenerates normally and drains continuously while dash is held', (
   const depleted = updateEnergy(1, 0.1, true);
   assert.equal(depleted.energy, 0);
   assert.ok(depleted.dashRatio > 0 && depleted.dashRatio < 1);
+  assert.equal(depleted.overheated, true);
+});
+
+test('an overheated engine ignores held dash until energy is fully restored', () => {
+  let state = { energy: 0, overheated: true };
+  for (let step = 0; step < 49; step++) {
+    state = updateEnergy(state.energy, 0.1, true, state.overheated);
+    assert.equal(state.dashRatio, 0);
+    assert.equal(state.overheated, true);
+  }
+  state = updateEnergy(state.energy, 0.1, true, state.overheated);
+  assert.equal(state.energy, MAX_ENERGY);
+  assert.equal(state.dashRatio, 0);
+  assert.equal(state.overheated, false);
+
+  const resumed = updateEnergy(state.energy, 0.1, true, state.overheated);
+  assert.equal(resumed.dashRatio, 1);
+  assert.ok(resumed.energy < MAX_ENERGY);
 });
 
 test('darts consume the shared energy pool and fail without enough energy', () => {
@@ -116,4 +178,99 @@ test('dash acceleration eases at high physical speeds and speed widens the camer
   assert.ok(dashAcceleration(22) > dashAcceleration(60));
   assert.ok(speedFov(60, false) > speedFov(22, false));
   assert.ok(speedFov(60, true) > speedFov(60, false));
+});
+
+test('orbit camera keeps a constant radius from the craft at every look angle', () => {
+  const radius = 16;
+  // 자유 시점 전 범위를 훑어 기체까지의 거리가 흔들리지 않는지 확인합니다.
+  for (let pitch = -LOOK_PITCH_LIMIT; pitch <= LOOK_PITCH_LIMIT; pitch += 0.15) {
+    for (let yaw = -Math.PI; yaw <= Math.PI; yaw += 0.4) {
+      const offset = orbitCameraOffset(yaw, pitch, radius);
+      const distance = Math.hypot(offset.x, offset.y, offset.z);
+      assert.ok(
+        Math.abs(distance - radius) < 1e-9,
+        `pitch ${pitch.toFixed(2)} yaw ${yaw.toFixed(2)} produced radius ${distance}`
+      );
+    }
+  }
+});
+
+test('orbit camera sits level with the craft when the player has not looked around', () => {
+  const level = orbitCameraOffset(0, 0, 16);
+
+  // 위/아래 시야가 대칭이려면 기준면이 기체와 같은 높이여야 합니다.
+  assert.ok(Math.abs(level.y) < 1e-9, `default height ${level.y} must be level with the craft`);
+});
+
+test('orbit camera mirrors looking up and looking down exactly', () => {
+  const radius = 16;
+  for (const angle of [0.2, 0.5, 0.9, LOOK_PITCH_LIMIT]) {
+    const up = orbitCameraOffset(0, angle, radius);
+    const down = orbitCameraOffset(0, -angle, radius);
+
+    // 같은 크기의 입력은 위아래로 같은 높이만큼, 같은 수평거리에서 움직여야 합니다.
+    assert.ok(Math.abs(up.y + down.y) < 1e-9, `asymmetric height at ${angle}: ${up.y} vs ${down.y}`);
+    assert.ok(Math.abs(up.z - down.z) < 1e-9, `asymmetric horizontal reach at ${angle}`);
+    assert.ok(Math.abs(up.x - down.x) < 1e-9, `asymmetric horizontal reach at ${angle}`);
+  }
+});
+
+test('orbit camera yaw sweeps a full circle in the horizontal plane', () => {
+  const radius = 16;
+  const front = orbitCameraOffset(0, 0, radius);
+  const back = orbitCameraOffset(Math.PI, 0, radius);
+  const side = orbitCameraOffset(Math.PI / 2, 0, radius);
+
+  // 정확한 구라면 yaw만 바뀔 때 높이는 그대로여야 합니다.
+  assert.ok(Math.abs(front.y - back.y) < 1e-9, 'yaw must not change height');
+  assert.ok(Math.abs(front.y - side.y) < 1e-9, 'yaw must not change height');
+  assert.ok(Math.abs(front.z - radius) < 1e-9);
+  assert.ok(Math.abs(back.z + radius) < 1e-9);
+  assert.ok(Math.abs(side.x - radius) < 1e-9);
+});
+
+test('recentering eases the free look back toward the craft heading', () => {
+  const state = { yaw: 1.2, pitch: -0.8 };
+  const next = recenterFreeLook(state, 0.016);
+
+  assert.ok(Math.abs(next.yaw) < Math.abs(state.yaw), 'yaw should shrink toward zero');
+  assert.ok(Math.abs(next.pitch) < Math.abs(state.pitch), 'pitch should shrink toward zero');
+  // 한 프레임에 끝내지 않고 부드럽게 이동해야 합니다.
+  assert.ok(Math.abs(next.yaw) > 0, 'a single frame must not snap the view');
+  assert.equal(Math.sign(next.yaw), Math.sign(state.yaw), 'recentering must not overshoot past zero');
+  assert.equal(Math.sign(next.pitch), Math.sign(state.pitch), 'recentering must not overshoot past zero');
+});
+
+test('recentering converges to dead center and then reports completion', () => {
+  let state = { yaw: -2.4, pitch: LOOK_PITCH_LIMIT };
+  for (let i = 0; i < 240; i++) state = recenterFreeLook(state, 0.016);
+
+  assert.ok(isFreeLookCentered(state), `did not settle: ${JSON.stringify(state)}`);
+  assert.ok(Math.abs(state.yaw) < 1e-3);
+  assert.ok(Math.abs(state.pitch) < 1e-3);
+});
+
+test('recentering takes the short way around instead of unwinding the long arc', () => {
+  // 3.0rad은 -π 쪽 경계 근처라, 반대 방향으로 감으면 화면이 한 바퀴 도는 것처럼 보입니다.
+  const state = { yaw: 3.0, pitch: 0 };
+  const next = recenterFreeLook(state, 0.016);
+
+  assert.ok(next.yaw < state.yaw, `yaw ${next.yaw} should ease down toward 0, not wrap past π`);
+  assert.ok(next.yaw > 0, 'the short way to 0 from 3.0rad stays positive');
+});
+
+test('recentering is frame-rate independent over the same elapsed time', () => {
+  const start = { yaw: 1.5, pitch: 0.9 };
+  let fine = start;
+  for (let i = 0; i < 8; i++) fine = recenterFreeLook(fine, 0.0125);
+  const coarse = recenterFreeLook(start, 0.1);
+
+  assert.ok(Math.abs(fine.yaw - coarse.yaw) < 1e-9, `${fine.yaw} vs ${coarse.yaw}`);
+  assert.ok(Math.abs(fine.pitch - coarse.pitch) < 1e-9, `${fine.pitch} vs ${coarse.pitch}`);
+});
+
+test('a centered view is reported as centered and a turned one is not', () => {
+  assert.equal(isFreeLookCentered({ yaw: 0, pitch: 0 }), true);
+  assert.equal(isFreeLookCentered({ yaw: 0.4, pitch: 0 }), false);
+  assert.equal(isFreeLookCentered({ yaw: 0, pitch: -0.4 }), false);
 });

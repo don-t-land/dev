@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import './costume-template.js';
 
 const COSTUME_NAME = 'planeCostume';
+const costumeTemplates = globalThis.costumeTemplates;
 
 const palette = Object.freeze({
   red: 0xe93645,
@@ -119,34 +121,12 @@ function makeJetEngine() {
   return engine;
 }
 
-function makeTwinJetEngines(anchors) {
-  const pair = new THREE.Group();
-  for (const side of ['left', 'right']) {
-    const engine = makeJetEngine();
-    engine.name = `${side}JetEngine`;
-    engine.position.fromArray(anchors[side].position);
-    engine.scale.setScalar(anchors[side].scale);
-    pair.add(engine);
-  }
-  return pair;
-}
-
-const FLIGHT_ANCHORS = Object.freeze({
-  hat: Object.freeze({ position: [0, .22, -.72], scale: .72 }),
-  nose: Object.freeze({ position: [0, .02, -1.96], scale: 1 }),
-  wings: Object.freeze({
-    left: Object.freeze({ position: [-.76, -.06, .48], scale: 1 }),
-    right: Object.freeze({ position: [.76, -.06, .48], scale: 1 })
-  })
-});
-
-const STANDING_ANCHORS = Object.freeze({
-  hat: Object.freeze({ position: [0, 3.02, -.15], scale: .82 }),
-  nose: Object.freeze({ position: [0, 3.52, -.2], scale: 1.18 }),
-  wings: Object.freeze({
-    left: Object.freeze({ position: [-1.16, .32, .24], scale: 1.12 }),
-    right: Object.freeze({ position: [1.16, .32, .24], scale: 1.12 })
-  })
+const COSTUME_FACTORIES = Object.freeze({
+  santa: makeSantaHat,
+  magic: makeMagicHat,
+  police: makePoliceLight,
+  rudolph: makeRudolphNose,
+  jet: makeJetEngine
 });
 
 function normalizeCostume(value) {
@@ -157,34 +137,37 @@ function normalizeCostume(value) {
   };
 }
 
+function createCostumeItem(itemId, layout) {
+  const template = costumeTemplates?.ITEMS?.[itemId];
+  const factory = template && COSTUME_FACTORIES[template.mesh];
+  if (!template || !factory) return null;
+
+  const group = new THREE.Group();
+  group.name = template.slot === 'wings' ? 'wingCostume' : `${template.slot}Costume`;
+  group.userData.costumeId = template.id;
+  group.userData.costumeType = template.type;
+
+  for (const attachment of costumeTemplates.resolveAttachments(itemId, layout)) {
+    const object = factory();
+    object.name = attachment.name;
+    object.position.fromArray(attachment.position);
+    object.rotation.fromArray(attachment.rotation);
+    object.scale.multiplyScalar(attachment.scale);
+    group.add(object);
+  }
+  return group;
+}
+
 function createCostumeGroup(value, layout = 'flight') {
   const costume = normalizeCostume(value);
-  const anchors = layout === 'standing' ? STANDING_ANCHORS : FLIGHT_ANCHORS;
   const root = new THREE.Group();
   root.name = COSTUME_NAME;
   root.userData.costume = costume;
 
-  const hat = costume.hat === 'santa' ? makeSantaHat()
-    : costume.hat === 'magic' ? makeMagicHat()
-      : costume.hat === 'police' ? makePoliceLight() : null;
-  if (hat) {
-    hat.name = 'hatCostume';
-    hat.position.fromArray(anchors.hat.position);
-    hat.scale.setScalar(anchors.hat.scale);
-    root.add(hat);
-  }
-
-  if (costume.nose === 'rudolph') {
-    const nose = makeRudolphNose();
-    nose.name = 'noseCostume';
-    nose.position.fromArray(anchors.nose.position);
-    nose.scale.multiplyScalar(anchors.nose.scale);
-    root.add(nose);
-  }
-  if (costume.wings === 'twin-jets') {
-    const wings = makeTwinJetEngines(anchors.wings);
-    wings.name = 'wingCostume';
-    root.add(wings);
+  for (const slot of costumeTemplates?.SLOT_ORDER || ['hat', 'nose', 'wings']) {
+    if (costume[slot] === 'none') continue;
+    const item = createCostumeItem(costume[slot], layout);
+    if (item) root.add(item);
   }
   return root;
 }
@@ -201,13 +184,16 @@ function disposeCostume(root) {
 function setCostumeOnObject(owner, value, layout = 'flight') {
   if (!owner) return null;
   const costume = normalizeCostume(value);
-  const key = `${layout}:${costume.hat}:${costume.nose}:${costume.wings}`;
-  const current = owner.getObjectByName(COSTUME_NAME);
+  const key = `${layout}:${(costumeTemplates?.SLOT_ORDER || ['hat', 'nose', 'wings']).map(slot => costume[slot]).join(':')}`;
+  const target = layout === 'standing' && owner.userData?.costumeMount?.isObject3D
+    ? owner.userData.costumeMount
+    : owner;
+  const current = target.getObjectByName(COSTUME_NAME);
   if (current?.userData.costumeKey === key) return current;
   disposeCostume(current);
   const group = createCostumeGroup(costume, layout);
   group.userData.costumeKey = key;
-  owner.add(group);
+  target.add(group);
   return group;
 }
 
@@ -227,9 +213,9 @@ function animateCostumes(root, seconds) {
 }
 
 export {
-  FLIGHT_ANCHORS,
-  STANDING_ANCHORS,
+  costumeTemplates,
   animateCostumes,
   createCostumeGroup,
+  createCostumeItem,
   setCostumeOnObject
 };

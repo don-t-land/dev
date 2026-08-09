@@ -14,10 +14,30 @@
   // 재현하기 위한 프리셋 보정값. 정확히 같은 커맨드 키에만 적용되므로
   // 사용자가 직접 조정한 기체는 아래 보정 없이 기하에서 공력을 계산한다.
   const PRESET_FLIGHT_TUNING = Object.freeze({
-    dart: Object.freeze({ liftScale: .6, dragScale: .65, stallSpeed: 15, pitchBias: .04 }),
-    stable: Object.freeze({ liftScale: 1.1, dragScale: 2.2, stallSpeed: 11.441551, pitchBias: .02 }),
-    stealth: Object.freeze({ liftScale: 1.2, dragScale: 2.2, stallSpeed: 10.954451, pitchBias: .03 }),
-    jet: Object.freeze({ liftScale: .85, dragScale: 1.5, stallSpeed: 13.015827, pitchBias: .035 })
+    // 기준형: 모든 능력치의 중간점. 이후 프리셋은 이 envelope와 비교해 역할을 갖는다.
+    dart: Object.freeze({
+      liftScale: .9, dragScale: 1, stallSpeed: 13, pitchBias: .025,
+      maxSpeed: 58, maxPitchDown: .9, maxPitchUp: .7, maxRoll: .85,
+      pitchRateScale: 1, rollRateScale: 1
+    }),
+    // 저속 고기동형: 속도는 낮지만 가장 큰 자세 범위와 가장 빠른 선회 반응.
+    stable: Object.freeze({
+      liftScale: 1.15, dragScale: 1.7, stallSpeed: 9.5, pitchBias: .02,
+      maxSpeed: 45, maxPitchDown: 1.08, maxPitchUp: .88, maxRoll: 1.18,
+      pitchRateScale: 1.5, rollRateScale: 1.65
+    }),
+    // 저속 활공형: 실속에는 가장 강하지만 자세 범위와 선회 반응은 가장 낮다.
+    stealth: Object.freeze({
+      liftScale: 1.3, dragScale: 2.2, stallSpeed: 8.5, pitchBias: .035,
+      maxSpeed: 42, maxPitchDown: .72, maxPitchUp: .5, maxRoll: .62,
+      pitchRateScale: .72, rollRateScale: .68
+    }),
+    // 고속형: 최고속도는 가장 높고 선회 반응은 기준형보다 한 단계만 높다.
+    jet: Object.freeze({
+      liftScale: .8, dragScale: .72, stallSpeed: 14.5, pitchBias: .04,
+      maxSpeed: 72, maxPitchDown: 1.02, maxPitchUp: .8, maxRoll: .98,
+      pitchRateScale: 1.12, rollRateScale: 1.18
+    })
   });
   let presetTuningByCommandKey = null;
 
@@ -149,6 +169,8 @@
         aspectRatio: 1, massCenterX: 0, massCenterY: 0, pressureCenterX: 0,
         pressureCenterY: 0, asymmetry: 0, liftScale: .15, dragScale: 2.2,
         stallSpeed: 42, stability: .2, rollBias: 0, pitchBias: 0,
+        maxSpeed: 38, maxPitchDown: .65, maxPitchUp: .45, maxRoll: .55,
+        pitchRateScale: .7, rollRateScale: .65,
         dihedral: 0, foldCount: 0, layerCount: 1
       };
     }
@@ -188,6 +210,13 @@
     );
     const rollBias = clamp(normalizedX * .8, -.65, .65);
     const pitchBias = clamp(normalizedZ * .65, -.55, .55);
+    const maneuverability = clamp(1.08 - stability * .28 + aspectRatio * .08, .65, 1.25);
+    const maxSpeed = clamp(62 - dragScale * 9 + aspectRatio * 2, 38, 68);
+    const maxPitchDown = clamp(.72 + maneuverability * .18, .62, 1.05);
+    const maxPitchUp = clamp(.48 + maneuverability * .16, .42, .82);
+    const maxRoll = clamp(.58 + maneuverability * .3, .52, 1.05);
+    const pitchRateScale = clamp(maneuverability, .65, 1.25);
+    const rollRateScale = clamp(maneuverability * 1.04, .65, 1.3);
     const tuning = presetFlightTuning(model);
 
     return {
@@ -208,6 +237,12 @@
       stability: round(stability),
       rollBias: round(rollBias),
       pitchBias: round(tuning?.pitchBias ?? pitchBias),
+      maxSpeed: round(tuning?.maxSpeed ?? maxSpeed),
+      maxPitchDown: round(tuning?.maxPitchDown ?? maxPitchDown),
+      maxPitchUp: round(tuning?.maxPitchUp ?? maxPitchUp),
+      maxRoll: round(tuning?.maxRoll ?? maxRoll),
+      pitchRateScale: round(tuning?.pitchRateScale ?? pitchRateScale),
+      rollRateScale: round(tuning?.rollRateScale ?? rollRateScale),
       dihedral: round(dihedral),
       foldCount,
       layerCount

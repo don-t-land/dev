@@ -49,8 +49,8 @@
 .home-mode-card { --mode-accent: #59d9ff; --mode-accent-rgb: 89,217,255; position: relative; isolation: isolate; display: grid; grid-template-columns: 58px 1fr 34px; align-items: center; width: 100%; min-height: 76px; padding: 8px 18px 8px 10px; overflow: hidden; border: 1px solid rgba(var(--mode-accent-rgb),.52); border-left: 5px solid var(--mode-accent); color: #f8fbff; background: linear-gradient(96deg, rgba(var(--mode-accent-rgb),.18), rgba(10,22,55,.94) 20%, rgba(6,13,38,.91) 78%, rgba(var(--mode-accent-rgb),.12)); box-shadow: 0 7px 0 rgba(3,9,30,.4), 0 15px 28px rgba(0,0,0,.26), inset 0 0 24px rgba(var(--mode-accent-rgb),.05); clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 50%, calc(100% - 22px) 100%, 0 100%); cursor: pointer; font: inherit; text-align: left; transition: transform .2s cubic-bezier(.2,.8,.2,1), border-color .2s ease, box-shadow .2s ease, filter .2s ease; }
 .home-mode-card::before { content: ""; position: absolute; z-index: -1; inset: 0 auto 0 0; width: 29%; opacity: .4; background: repeating-linear-gradient(-25deg, rgba(var(--mode-accent-rgb),.22) 0 2px, transparent 2px 9px); mask-image: linear-gradient(90deg, #000, transparent); }
 .home-mode-card::after { content: ""; position: absolute; z-index: 2; top: 0; right: 23px; width: 62px; height: 3px; background: var(--mode-accent); box-shadow: 0 0 14px rgba(var(--mode-accent-rgb),.8); }
-.home-mode-distance { --mode-accent: #ffd95a; --mode-accent-rgb: 255,217,90; }
-.home-mode-survival { --mode-accent: #59d9ff; --mode-accent-rgb: 89,217,255; }
+.home-mode-distance { --mode-accent: #59d9ff; --mode-accent-rgb: 89,217,255; }
+.home-mode-survival { --mode-accent: #ffd95a; --mode-accent-rgb: 255,217,90; }
 .home-mode-costume { --mode-accent: #c27aff; --mode-accent-rgb: 194,122,255; }
 .home-mode-card:hover, .home-mode-card:focus-visible { transform: translateX(12px) scale(1.012); border-color: var(--mode-accent); box-shadow: -7px 7px 0 rgba(var(--mode-accent-rgb),.17), 0 18px 38px rgba(0,0,0,.34), 0 0 25px rgba(var(--mode-accent-rgb),.17), inset 0 0 32px rgba(var(--mode-accent-rgb),.11); filter: brightness(1.1); outline: none; }
 .home-mode-card:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
@@ -61,7 +61,7 @@
 .home-mode-arrow { display: grid; place-items: center; width: 29px; height: 29px; color: #06102a; background: var(--mode-accent); border-radius: 50%; font-family: Arial, sans-serif; font-size: 27px; line-height: 1; box-shadow: 0 0 15px rgba(var(--mode-accent-rgb),.38); transition: transform .2s ease; }
 .home-mode-card:hover .home-mode-arrow, .home-mode-card:focus-visible .home-mode-arrow { transform: translateX(3px); }
 
-#costume-panel { position: fixed; z-index: 42; inset: 0; display: grid; place-items: center; padding: 22px; color: #f7f8ff; font-family: "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; }
+#costume-panel { position: fixed; z-index: 42; inset: 0; display: grid; place-items: center; padding: clamp(10px, 2.4vmin, 22px); color: #f7f8ff; font-family: "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; }
 .costume-backdrop { position: absolute; inset: 0; background: rgba(3,7,24,.76); backdrop-filter: blur(8px); }
 .costume-dialog { position: relative; width: min(760px, 100%); max-height: calc(100vh - 44px); overflow: auto; padding: 30px; border: 1px solid rgba(194,122,255,.56); border-radius: 24px 8px 24px 8px; background: linear-gradient(145deg, rgba(21,29,70,.97), rgba(8,13,38,.98)); box-shadow: 0 30px 90px rgba(0,0,0,.58), inset 0 0 45px rgba(152,90,255,.07); }
 .costume-dialog::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; border-radius: inherit; background: linear-gradient(90deg, #b96dff, #65dfff 65%, transparent); }
@@ -114,6 +114,8 @@
 /* 3D costume showroom */
 .costume-dialog {
   width: min(1180px, 100%);
+  max-height: calc(100vh - 44px);
+  max-height: calc(100dvh - 44px);
   padding: 24px;
   overflow: hidden;
   background: linear-gradient(145deg, rgba(14, 24, 43, .98), rgba(5, 12, 25, .99));
@@ -140,16 +142,57 @@
 .costume-wardrobe .costume-actions { position: sticky; bottom: 0; z-index: 2; margin-top: 17px; padding: 14px 0 3px; background: linear-gradient(transparent, #08101e 34%); }
 
 @media (max-width: 900px) {
-  .costume-dialog { max-height: calc(100vh - 20px); padding: 22px 14px 14px; overflow: auto; }
+  .costume-dialog { max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); padding: 22px 14px 14px; overflow: auto; }
   .costume-showroom-layout { grid-template-columns: 1fr; }
-  .costume-showroom-stage { min-height: 390px; }
+  .costume-showroom-stage { min-height: clamp(250px, 45dvh, 390px); }
   .costume-wardrobe { max-height: none; overflow: visible; }
   .costume-wardrobe .costume-section { margin-top: 18px; }
 }
 
 @media (max-width: 620px) {
-  .costume-showroom-stage { min-height: 310px; }
+  .costume-showroom-stage { min-height: clamp(230px, 42dvh, 310px); }
   .showroom-material-chips { display: none; }
   .costume-wardrobe .costume-option { min-height: 96px; }
   .costume-wardrobe .costume-actions { margin: 14px -14px -14px; padding: 18px 14px 14px; }
+}
+
+/* 노트북처럼 폭은 넓지만 세로가 짧은 화면에서는 쇼룸 전체를 함께 축소한다. */
+@media (min-width: 901px) and (max-height: 820px) {
+  .costume-dialog {
+    width: min(1080px, 100%);
+    max-height: calc(100dvh - 24px);
+    padding: clamp(13px, 2dvh, 18px);
+  }
+  .costume-dialog h2 { margin-top: 3px; font-size: clamp(24px, 4dvh, 29px); }
+  .costume-description { margin: 2px 0 clamp(8px, 1.5dvh, 12px); font-size: 11px; }
+  .costume-close { top: 10px; right: 11px; width: 32px; height: 32px; font-size: 21px; }
+  .costume-showroom-layout { grid-template-columns: minmax(0, 1.5fr) minmax(292px, .85fr); gap: 12px; }
+  .costume-showroom-stage {
+    min-height: 0;
+    height: clamp(350px, calc(100vh - 142px), 535px);
+    height: clamp(350px, calc(100dvh - 142px), 535px);
+  }
+  .costume-wardrobe {
+    height: clamp(350px, calc(100vh - 142px), 535px);
+    height: clamp(350px, calc(100dvh - 142px), 535px);
+    max-height: none;
+  }
+  .costume-wardrobe .costume-section { margin-top: clamp(7px, 1.4dvh, 11px); }
+  .costume-section legend { margin-bottom: clamp(5px, 1dvh, 9px); font-size: 15px; }
+  .costume-wardrobe .costume-options { gap: 7px; }
+  .costume-wardrobe .costume-option { min-height: clamp(76px, 13dvh, 96px); padding: 7px 6px 6px; gap: 4px; }
+  .costume-preview-3d { width: clamp(70px, 10dvh, 86px); height: clamp(48px, 7.5dvh, 58px); }
+  .costume-wardrobe .costume-actions { margin-top: 10px; padding-top: 10px; }
+  .costume-actions button { min-width: 94px; padding: 10px 13px; }
+  .showroom-plaque { left: 11px; top: 11px; padding: 8px 10px; }
+  .showroom-material-chips { right: 10px; bottom: 10px; }
+}
+
+@media (min-width: 901px) and (max-height: 650px) {
+  .costume-kicker, .costume-description, .showroom-material-chips { display: none; }
+  .costume-dialog h2 { margin: 0 0 7px; font-size: 23px; }
+  .costume-showroom-stage,
+  .costume-wardrobe { height: calc(100vh - 90px); height: calc(100dvh - 90px); }
+  .costume-wardrobe .costume-option { min-height: 70px; }
+  .costume-preview-3d { width: 68px; height: 44px; }
 }

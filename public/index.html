@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>종이비행기 온라인</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&display=swap">
 <link rel="stylesheet" href="./home-screen.css">
 <link rel="stylesheet" href="./multiplayer-flow.css">
 <style>
@@ -125,19 +128,41 @@
   #board .row:nth-child(2) .rank { background:#b9c8d8; color:#22303d; }
   #board .row:nth-child(3) .rank { background:#ca8c60; color:#2f190d; }
 
-  #gauge { position: absolute; bottom: 26px; left: 22px; width: 190px; }
-  #gauge .track { height: 5px; background: rgba(255,255,255,.13); border-radius: 3px; overflow: hidden; position: relative; }
-  #gauge .stallzone { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: rgba(255,90,80,.35); }
-  #gauge .fill { height: 100%; background: #8fe3c4; border-radius: 3px; }
-  #gauge .fill.stall { background: #ff6b5e; }
-  #gauge .lbl { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 10px; letter-spacing: .1em; color: #90a2ba; }
-
-  #energy { position: absolute; bottom: 62px; left: 22px; width: 190px; }
-  #energy .lbl { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 10px; letter-spacing: .1em; color: #ffd889; }
-  #energy .track { height: 7px; overflow: hidden; border-radius: 4px; background: rgba(255,255,255,.14); }
-  #energy .fill { height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffc861, #ffe8a6); box-shadow: 0 0 10px rgba(255,200,97,.38); }
-  #energy.dashing .fill { background: linear-gradient(90deg, #ff9f57, #fff0a0); box-shadow: 0 0 15px rgba(255,174,80,.72); }
-  #energy.low .fill { background: #ff7368; }
+  #gauge, #energy {
+    position: absolute; left: 22px; width: 270px; padding: 9px 13px 11px;
+    background: linear-gradient(112deg, rgba(4,15,26,.91), rgba(8,30,44,.78));
+    border: 1px solid currentColor; border-radius: 4px 14px 4px 14px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.28), inset 0 0 20px rgba(50,180,220,.05);
+    backdrop-filter: blur(10px); overflow: hidden;
+  }
+  #gauge { bottom: 26px; color: #43dcff; }
+  #energy { bottom: 91px; color: #ffc449; }
+  #gauge::before, #energy::before { content: ""; position: absolute; top: 0; left: 0; width: 48px; height: 2px; background: currentColor; box-shadow: 0 0 9px currentColor; }
+  #gauge .lbl, #energy .lbl { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+  .bar-value { font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .bar-value small { margin-left: 3px; font-size: 8px; opacity: .7; }
+  #gauge .track, #energy .track { position: relative; height: 13px; padding: 2px; overflow: hidden; transform: skewX(-12deg); background: rgba(1,8,14,.86); border: 1px solid currentColor; box-shadow: inset 0 0 7px rgba(0,0,0,.85), 0 0 8px currentColor; }
+  /* 격자는 눈금 역할이라 게이지를 덮되, 색이 탁해지지 않게 옅게 얹습니다. */
+  #gauge .track::after, #energy .track::after { content: ""; position: absolute; z-index: 3; inset: 2px; pointer-events: none; opacity: .55; background: repeating-linear-gradient(108deg, transparent 0 8px, rgba(1,10,17,.74) 8px 11px); }
+  #gauge .fill, #energy .fill { position: relative; z-index: 2; height: 100%; transition: width .12s linear, filter .18s; box-shadow: 0 0 12px currentColor; }
+  #gauge .fill { background: linear-gradient(90deg, #0879dd, #19c8ef 58%, #8ef7ff); }
+  #gauge .fill.stall { color: #ff655d; background: linear-gradient(90deg, #d92e47, #ff765b); }
+  /* 실속 구간은 게이지 뒤에 깔리는 위험 영역입니다. 속도 막대가 그 위를 지나가야
+     현재 속도와 실속 경계를 한눈에 비교할 수 있습니다. */
+  #gauge .stallzone {
+    position: absolute; z-index: 1; left: 2px; top: 2px; bottom: 2px;
+    background: repeating-linear-gradient(114deg, rgba(255,92,74,.5) 0 3px, rgba(255,92,74,.16) 3px 7px);
+    border-right: 1px solid #ff7161; box-shadow: 0 0 8px rgba(255,98,78,.55);
+    transition: width .12s linear;
+  }
+  #energy .fill { width: 100%; background: linear-gradient(90deg, #ff8b2b, #ffd83d 66%, #fff4a5); }
+  #energy.dashing .fill { animation: barPulse .45s ease-in-out infinite alternate; }
+  #energy.low { color: #ff615c; }
+  #energy.low .fill { background: linear-gradient(90deg, #c9273d, #ff6a54); }
+  #energy.overheated { color: #ff4c45; }
+  #energy.overheated .fill { background: linear-gradient(90deg, #a9142c, #ff5147, #ffb13d); animation: overheatPulse .55s ease-in-out infinite alternate; }
+  @keyframes barPulse { to { filter: saturate(1.35) brightness(1.4); } }
+  @keyframes overheatPulse { to { filter: brightness(1.45); box-shadow: 0 0 20px currentColor; } }
 
   #thermal-vortex {
     position: absolute; inset: 0; --thermal-force: 0; opacity: var(--thermal-force);
@@ -162,6 +187,91 @@
     18% { opacity: .9; }
     82% { opacity: .75; }
     100% { opacity: 0; transform: rotate(var(--angle)) translateX(5vmax) scaleX(.16); }
+  }
+
+  #dash-vortex {
+    position: absolute; inset: 0; z-index: 2; --dash-force: 0;
+    opacity: var(--dash-force); overflow: hidden; pointer-events: none; mix-blend-mode: screen;
+    transition: opacity .08s linear;
+  }
+  #dash-vortex::before {
+    content: ""; position: absolute; inset: -8%;
+    background: radial-gradient(circle at 50% 50%, transparent 0 24%, rgba(111,229,255,.04) 45%, rgba(55,156,255,.18) 78%, rgba(255,210,93,.2) 100%);
+    box-shadow: inset 0 0 13vmax rgba(60,183,255,.2);
+    transform: scale(calc(1.08 - var(--dash-force) * .08));
+  }
+  #dash-vortex::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 14vmin; height: 14vmin;
+    border: 2px solid rgba(199,246,255,.84); border-radius: 50%; opacity: 0;
+    transform: translate(-50%, -50%) scale(.25); box-shadow: 0 0 22px rgba(83,204,255,.72);
+  }
+  #dash-vortex.burst::after { animation: dash-impact .48s cubic-bezier(.13,.62,.25,1) both; }
+  #dash-vortex .dash-streak {
+    position: absolute; left: 50%; top: 50%; width: clamp(68px, 10vw, 180px); height: 2px;
+    transform-origin: 0 50%; border-radius: 999px; opacity: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,.92), rgba(88,218,255,.72) 34%, transparent);
+    box-shadow: 0 0 8px rgba(69,191,255,.62);
+    animation: dash-rush var(--speed, .68s) linear infinite; animation-delay: var(--delay);
+    animation-play-state: paused; will-change: transform, opacity;
+  }
+  #dash-vortex.active .dash-streak { animation-play-state: running; }
+  #dash-callout {
+    position: absolute; left: 50%; top: 68%; display: grid; justify-items: center;
+    color: #f3fbff; opacity: calc(var(--dash-force) * .94);
+    transform: translate(-50%, calc(-50% + (1 - var(--dash-force)) * 12px)) scale(calc(.88 + var(--dash-force) * .12));
+    text-align: center; text-shadow: 0 0 9px #36c8ff, 0 0 22px rgba(44,146,255,.9);
+  }
+  #dash-callout strong { font-size: clamp(17px, 2vw, 27px); font-style: italic; letter-spacing: .22em; }
+  #dash-callout strong::before { content: "» "; color: #ffd65c; }
+  #dash-callout strong::after { content: " «"; color: #ffd65c; }
+  #dash-callout small { margin-top: 2px; color: #8fe8ff; font-size: 9px; font-weight: 900; letter-spacing: .3em; }
+  @keyframes dash-rush {
+    0% { opacity: 0; transform: rotate(var(--angle)) translateX(6vmax) scaleX(.12); }
+    16% { opacity: .95; }
+    76% { opacity: .72; }
+    100% { opacity: 0; transform: rotate(var(--angle)) translateX(70vmax) scaleX(2.7); }
+  }
+  @keyframes dash-impact {
+    0% { opacity: .95; transform: translate(-50%, -50%) scale(.25); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(8); }
+  }
+
+  #overheat-vortex {
+    position: absolute; inset: 0; z-index: 3; --overheat-force: 0;
+    opacity: var(--overheat-force); overflow: hidden; pointer-events: none;
+    transition: opacity .1s linear;
+  }
+  #overheat-vortex::before {
+    content: ""; position: absolute; inset: 0;
+    border: clamp(3px, .45vw, 7px) solid rgba(255,72,50,.78);
+    background:
+      linear-gradient(180deg, rgba(255,50,31,.2), transparent 22%),
+      radial-gradient(circle at 50% 50%, transparent 0 42%, rgba(255,58,31,.09) 70%, rgba(255,39,24,.25) 100%);
+    box-shadow: inset 0 0 11vmax rgba(255,48,26,.24), 0 0 24px rgba(255,69,36,.48);
+  }
+  #overheat-vortex::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 15vmin; height: 15vmin;
+    border: 2px solid rgba(255,179,88,.9); border-radius: 50%; opacity: 0;
+    transform: translate(-50%, -50%) scale(.25); box-shadow: 0 0 24px rgba(255,62,33,.82);
+  }
+  #overheat-vortex.burst::after { animation: overheat-impact .52s cubic-bezier(.13,.62,.25,1) both; }
+  #overheat-vortex.active::before { animation: overheat-frame-pulse .72s ease-in-out infinite alternate; }
+  #overheat-callout {
+    position: absolute; left: 50%; top: 68%; display: grid; justify-items: center;
+    min-width: min(280px, 72vw); color: #fff7ed;
+    transform: translate(-50%, calc(-50% + (1 - var(--overheat-force)) * 12px)) scale(calc(.88 + var(--overheat-force) * .12));
+    text-align: center; text-shadow: 0 0 9px #ff3d29, 0 0 24px rgba(255,54,29,.92);
+  }
+  #overheat-callout strong { font-size: clamp(17px, 2vw, 27px); font-style: italic; letter-spacing: .18em; }
+  #overheat-callout strong::before { content: "» "; color: #ffcf57; }
+  #overheat-callout strong::after { content: " «"; color: #ffcf57; }
+  #overheat-callout small { margin-top: 3px; color: #ffb66b; font-size: 9px; font-weight: 900; letter-spacing: .24em; }
+  #overheat-cooling-track { width: min(220px, 56vw); height: 7px; margin-top: 8px; padding: 1px; transform: skewX(-12deg); border: 1px solid rgba(255,177,83,.78); background: rgba(35,5,5,.82); box-shadow: 0 0 12px rgba(255,66,35,.55); }
+  #overheat-cooling-fill { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #ff372b, #ff8c32 58%, #ffe167); box-shadow: 0 0 10px rgba(255,118,48,.72); transition: width .12s linear; }
+  @keyframes overheat-frame-pulse { to { filter: brightness(1.4); } }
+  @keyframes overheat-impact {
+    0% { opacity: .98; transform: translate(-50%, -50%) scale(.25); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(8.4); }
   }
 
   #keys {
@@ -265,6 +375,12 @@
     pointer-events: none;
   }
   #biome-badge.show { opacity: 1; transform: translate(-50%, 0); }
+  #time-badge {
+    position: absolute; top: 82px; left: 50%; transform: translateX(-50%);
+    padding: 5px 12px; border: 1px solid rgba(190,226,255,.25); border-radius: 999px;
+    color: #eaf7ff; background: rgba(5,15,27,.46); backdrop-filter: blur(9px);
+    font-size: 10px; font-weight: 800; letter-spacing: .18em; text-shadow: 0 0 10px rgba(121,198,255,.75);
+  }
 
   #results {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -364,12 +480,9 @@
   #timer { top: 28px; padding: 10px 18px; border-radius: 999px; background: rgba(9,18,29,.55); backdrop-filter: blur(12px); font-size: 26px; }
   #board { top: 28px; right: 30px; padding: 15px; }
   #board .h { font-size: 11px; }
-  #gauge { bottom: 32px; left: 30px; width: 250px; padding: 14px 16px; border-radius: 14px; background: rgba(9,18,29,.82); }
-  #gauge .track { height: 8px; }
-  #gauge .lbl { color: #d3e2ef; font-size: 12px; }
-  #energy { bottom: 104px; left: 30px; width: 250px; padding: 12px 16px; border-radius: 14px; background: rgba(9,18,29,.82); }
-  #energy .track { height: 8px; }
-  #energy .lbl { font-size: 12px; }
+  #gauge, #energy { left: 30px; width: 300px; }
+  #gauge { bottom: 32px; }
+  #energy { bottom: 105px; }
   #center .msg { font-size: 19px; }
   #center .sub2 { font-size: 14px; }
   #results, .modal-layer { position: absolute; z-index: 60; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto; background: rgba(7,16,27,.68); backdrop-filter: blur(10px); }
@@ -393,11 +506,13 @@
   .settings-modal-card {
     width: min(760px, calc(100vw - 32px)); height: min(780px, calc(100dvh - 32px));
     max-height: calc(100dvh - 32px); overflow: hidden;
-    padding: 22px;
-    display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px;
+    display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 18px;
+    font-family: "Noto Sans KR", sans-serif; font-synthesis: none;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   }
-  .settings-header { display: grid; gap: 6px; }
-  .settings-layout { display: grid; grid-template-columns: 156px minmax(0, 1fr); gap: 12px; min-height: 0; }
+  .settings-modal-card button, .settings-modal-card input, .settings-modal-card select { font-family: inherit; }
+  .settings-header { display: grid; gap: 8px; }
+  .settings-layout { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 18px; min-height: 0; }
   .settings-sidebar {
     display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 6px;
     border: 1px solid rgba(174,215,255,.14); border-radius: 14px;
@@ -409,7 +524,8 @@
     border-radius: 10px; color: #9db2c5; background: transparent; text-align: left;
     font: inherit; cursor: pointer;
   }
-  .settings-tab .settings-tab-icon { display: grid; place-items: center; font-size: 16px; }
+  .settings-tab .settings-tab-icon { display: grid; place-items: center; }
+  .settings-tab-icon .ui-icon { width: 20px; height: 20px; }
   .settings-tab strong { display: block; color: inherit; font-size: 12px; }
   .settings-tab small { display: block; margin-top: 2px; color: #718ca5; font-size: 9px; }
   .settings-tab:hover { color: #eaf5ff; background: rgba(124,197,255,.08); }
@@ -426,14 +542,37 @@
   .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; padding: 11px; border-radius: 12px; background: rgba(255,255,255,.06); cursor: pointer; }
   .setting-row b, .setting-row small { display: block; }
   .setting-row b { font-size: 14px; }
-  .setting-row small { margin-top: 3px; color: #9db2c5; font-size: 11px; }
-  .setting-row input { width: 20px; height: 20px; accent-color: #0a8cff; }
+  .setting-row small { margin-top: 4px; color: #9db2c5; font-size: 11px; }
+  .setting-row input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none; flex: 0 0 22px; width: 22px; height: 22px;
+    border: 1px solid #55758f; border-radius: 7px; background: #102a40;
+    background-position: center; background-repeat: no-repeat; cursor: pointer;
+    transition: border-color .15s, background-color .15s, box-shadow .15s;
+  }
+  .setting-row input[type="checkbox"]:checked {
+    border-color: #66dcb9; background-color: #0a8cff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3.2 8.3 3 3 6.6-7' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    box-shadow: 0 0 12px rgba(10,140,255,.36);
+  }
+  .setting-row input[type="checkbox"]:focus-visible { outline: 2px solid #7cc5ff; outline-offset: 3px; }
   .graphics-settings, .audio-settings { margin: 0; padding: 0; border: 0; }
   .graphics-settings .setting-row, .audio-settings .setting-row { cursor: default; }
-  .audio-settings input[type="range"] { width: 136px; height: 20px; accent-color: #0a8cff; }
+  .audio-settings input[type="range"] {
+    appearance: none; -webkit-appearance: none; width: 146px; height: 24px;
+    border: 0; background: transparent; cursor: pointer;
+  }
+  .audio-settings input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, #0a8cff, #65e1bd); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+  .audio-settings input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border: 3px solid #dff8ff; border-radius: 50%; background: #0a8cff; box-shadow: 0 2px 8px rgba(0,0,0,.42), 0 0 10px rgba(10,140,255,.45); }
+  .audio-settings input[type="range"]::-moz-range-track { height: 6px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #0a8cff, #65e1bd); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+  .audio-settings input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid #dff8ff; border-radius: 50%; background: #0a8cff; box-shadow: 0 2px 8px rgba(0,0,0,.42), 0 0 10px rgba(10,140,255,.45); }
+  .audio-settings input[type="range"]:focus-visible { outline: 2px solid #7cc5ff; outline-offset: 3px; border-radius: 999px; }
   .setting-row select {
-    flex: 0 0 136px; min-height: 34px; padding: 6px 28px 6px 10px; border: 1px solid #46627d;
-    border-radius: 9px; color: #eff7ff; background: #18334d; font: inherit; font-size: 12px;
+    flex: 0 0 146px; min-height: 38px; padding: 7px 28px 7px 10px; border: 1px solid #46627d;
+    appearance: none; -webkit-appearance: none; border-radius: 9px; color: #eff7ff;
+    background-color: #18334d;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%239edfff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 9px center; background-repeat: no-repeat; background-size: 16px;
+    font: inherit; font-size: 12px;
   }
   .setting-row select:focus-visible { outline: 2px solid #7cc5ff; outline-offset: 2px; }
   #graphics-summary { display: block; margin-top: 8px; color: #9db2c5; font-size: 11px; line-height: 1.4; }
@@ -463,6 +602,57 @@
     #hud-right-rail > #board { grid-column: 2; grid-row: 1; }
     #hud-right-rail > #keys { grid-column: 1; grid-row: 1 / 3; align-self: center; width: 100%; }
     #hud-right-rail > #minimap { grid-column: 2; grid-row: 2; width: min(220px, 100%); }
+  }
+
+  /* 폭이 넓어도 세로가 짧은 노트북 화면에서는 HUD 전체 비율을 함께 낮춘다. */
+  @media (hover: hover) and (pointer: fine) and (min-width: 841px) and (max-height: 820px) {
+    #stats {
+      top: 18px; left: 20px;
+      transform: scale(.88); transform-origin: top left;
+    }
+    #timer {
+      top: 18px;
+      transform: translateX(-50%) scale(.88); transform-origin: top center;
+    }
+    #hud-right-rail {
+      top: 18px; right: 20px; bottom: 18px;
+      transform: scale(.88); transform-origin: top right;
+    }
+    #gauge, #energy { left: 20px; transform: scale(.88); transform-origin: bottom left; }
+    #gauge { bottom: 20px; }
+    #energy { bottom: 86px; }
+    #center { transform: translate(-50%, -50%) scale(.88); }
+    #announcement { transform-origin: top center; }
+    #time-badge { top: 70px; transform: translateX(-50%) scale(.88); transform-origin: top center; }
+  }
+
+  @media (hover: hover) and (pointer: fine) and (min-width: 841px) and (max-height: 720px) {
+    #stats { top: 13px; left: 15px; transform: scale(.78); }
+    #timer { top: 13px; transform: translateX(-50%) scale(.78); }
+    #hud-right-rail { top: 13px; right: 15px; bottom: 13px; transform: scale(.78); }
+    #gauge, #energy { left: 15px; transform: scale(.78); }
+    #gauge { bottom: 14px; }
+    #energy { bottom: 73px; }
+    #center { transform: translate(-50%, -50%) scale(.78); }
+    #time-badge { top: 58px; transform: translateX(-50%) scale(.78); }
+  }
+
+  @media (hover: hover) and (pointer: fine) and (min-width: 841px) and (max-height: 620px) {
+    #stats { top: 9px; left: 10px; transform: scale(.68); }
+    #timer { top: 9px; transform: translateX(-50%) scale(.68); }
+    #hud-right-rail {
+      top: 9px; right: 10px; bottom: 9px; width: min(340px, calc(100vw - 32px));
+      grid-template-columns: 1fr; grid-template-rows: minmax(82px, 1fr) auto;
+      transform: scale(.68);
+    }
+    #hud-right-rail > #board { grid-column: 1; grid-row: 1; }
+    #hud-right-rail > #keys { display: none; }
+    #hud-right-rail > #minimap { grid-column: 1; grid-row: 2; width: min(210px, 100%); }
+    #gauge, #energy { left: 10px; transform: scale(.68); }
+    #gauge { bottom: 9px; }
+    #energy { bottom: 61px; }
+    #center { transform: translate(-50%, -50%) scale(.68); }
+    #time-badge { top: 48px; transform: translateX(-50%) scale(.68); }
   }
 
   @media (max-width: 840px) {
@@ -562,20 +752,29 @@
     #board .state { display: none; }
     #timer { top: 8px; left: 50%; right: auto; transform: translateX(-50%); font-size: 17px; }
   }
-  #audio-quick-toggle {
+  #audio-quick-toggle, #settings-quick-toggle {
     position: fixed; z-index: 80; top: max(14px, env(safe-area-inset-top));
     right: max(14px, env(safe-area-inset-right)); width: 46px; height: 46px;
     display: grid; place-items: center; border: 1px solid rgba(174,215,255,.28);
     border-radius: 50%; color: #eef7ff; background: rgba(7,16,28,.74);
     box-shadow: 0 8px 24px rgba(0,0,0,.22); backdrop-filter: blur(10px);
-    font-size: 18px; cursor: pointer; transition: opacity .15s, border-color .15s, transform .15s;
+    cursor: pointer; transition: opacity .15s, border-color .15s, transform .15s;
   }
-  #audio-quick-toggle:hover { border-color: #8fe3c4; transform: translateY(-1px); }
-  #audio-quick-toggle:focus-visible { outline: 3px solid #8fe3c4; outline-offset: 3px; }
+  .ui-icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+  .ui-icon { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  #audio-quick-toggle .audio-icon-off { display: none; }
+  #audio-quick-toggle[aria-pressed="true"] .audio-icon-on { display: none; }
+  #audio-quick-toggle[aria-pressed="true"] .audio-icon-off { display: block; }
+  #settings-quick-toggle { right: calc(max(14px, env(safe-area-inset-right)) + 56px); }
+  #audio-quick-toggle:hover, #settings-quick-toggle:hover { border-color: #8fe3c4; transform: translateY(-1px); }
+  #audio-quick-toggle:focus-visible, #settings-quick-toggle:focus-visible { outline: 3px solid #8fe3c4; outline-offset: 3px; }
   #audio-quick-toggle[aria-pressed="true"] { color: #ff9d93; border-color: rgba(255,139,126,.5); }
+  #pause-menu { position: fixed; z-index: 90; }
   @media (prefers-reduced-motion: reduce) {
     .lobby-plane, .cloud { animation: none; }
     #thermal-vortex .wind-streak { animation: none; opacity: 0; }
+    #dash-vortex .dash-streak, #dash-vortex::after { animation: none; opacity: 0; }
+    #overheat-vortex::before, #overheat-vortex::after { animation: none; }
     #announcement { transition: none; }
     #announcement.show, #announcement.show .announcement-frame::before { animation: none; }
     #announcement.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
@@ -584,8 +783,17 @@
 </head>
 <body>
 
+<svg class="ui-icon-sprite" aria-hidden="true" focusable="false">
+  <symbol id="ui-icon-volume-on" viewBox="0 0 24 24"><path d="M11 5 6.8 8.5H3.5v7h3.3L11 19z"/><path d="M15 8.2a5 5 0 0 1 0 7.6M17.8 5.6a8.7 8.7 0 0 1 0 12.8"/></symbol>
+  <symbol id="ui-icon-volume-off" viewBox="0 0 24 24"><path d="M11 5 6.8 8.5H3.5v7h3.3L11 19z"/><path d="m15.3 9.3 5.4 5.4m0-5.4-5.4 5.4"/></symbol>
+  <symbol id="ui-icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1-2.8 2.8-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.7v.2H10v-.2a1.8 1.8 0 0 0-1.1-1.7 1.8 1.8 0 0 0-2 .4l-.1.1L4 17.1l.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.7-1.1h-.2V10h.2a1.8 1.8 0 0 0 1.7-1.1 1.8 1.8 0 0 0-.4-2L4 6.8 6.8 4l.1.1a1.8 1.8 0 0 0 2 .4A1.8 1.8 0 0 0 10 2.8v-.2h3.9v.2A1.8 1.8 0 0 0 15 4.5a1.8 1.8 0 0 0 2-.4l.1-.1 2.8 2.8-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.7 1.1h.2v3.9h-.2a1.8 1.8 0 0 0-1.7 1.1Z"/></symbol>
+  <symbol id="ui-icon-controls" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h.01M11 9h.01M15 9h.01M18 9h.01M7 13h.01M11 13h.01M15 13h3M7 16h8"/></symbol>
+  <symbol id="ui-icon-graphics" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3M7 13l3-3 2.5 2.5L16 8l3 3"/></symbol>
+  <symbol id="ui-icon-audio" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M5 13h2v7H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Zm14 0h-2v7h2a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2Z"/></symbol>
+</svg>
 <canvas id="c" tabindex="-1" aria-label="3D 종이비행기 비행 장면"></canvas>
-<button id="audio-quick-toggle" type="button" aria-label="전체 음소거" aria-pressed="false" title="오디오 켜기/끄기">🔊</button>
+<button id="audio-quick-toggle" type="button" aria-label="전체 음소거" aria-pressed="false" title="오디오 켜기/끄기"><svg class="ui-icon audio-icon-on" aria-hidden="true"><use href="#ui-icon-volume-on"></use></svg><svg class="ui-icon audio-icon-off" aria-hidden="true"><use href="#ui-icon-volume-off"></use></svg></button>
+<button id="settings-quick-toggle" type="button" aria-label="오디오 설정 열기" title="설정"><svg class="ui-icon" aria-hidden="true"><use href="#ui-icon-settings"></use></svg></button>
 
 <section id="home-screen" aria-labelledby="home-title">
   <div class="home-aurora" aria-hidden="true"></div>
@@ -665,7 +873,7 @@
 
       <div class="costume-wardrobe">
         <fieldset class="costume-section">
-          <legend><span>01</span> 모자 <small>종이비행기 기수 위</small></legend>
+          <legend><span>01</span> 머리 <small>중앙 날개 뒤쪽</small></legend>
           <div class="costume-options">
             <button class="costume-option" type="button" data-costume-slot="hat" data-costume-id="none">
               <span class="costume-preview costume-preview-none" aria-hidden="true">—</span><b>없음</b>
@@ -869,13 +1077,13 @@
     <div id="timer">--:--</div>
 
 
-    <div id="energy">
-      <div class="lbl"><span>에너지</span><span id="s-energy">100</span></div>
+    <div id="energy" role="meter" aria-label="에너지" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+      <div class="lbl"><span id="energy-label">ENERGY · 에너지</span><span class="bar-value"><span id="s-energy">100</span><small>%</small></span></div>
       <div class="track"><div class="fill" id="energy-fill"></div></div>
     </div>
 
-    <div id="gauge">
-      <div class="lbl"><span>속도</span><span id="s-spd">0</span></div>
+    <div id="gauge" role="meter" aria-label="속도" aria-valuemin="0" aria-valuemax="252" aria-valuenow="0">
+      <div class="lbl"><span>SPEED · 속도</span><span class="bar-value"><span id="s-spd">0</span><small>KM/H</small></span></div>
       <div class="track"><div class="stallzone" id="s-stall"></div><div class="fill" id="s-fill"></div></div>
     </div>
 
@@ -897,6 +1105,36 @@
       <i class="wind-streak" style="--angle:315deg;--delay:-.39s"></i>
       <i class="wind-streak" style="--angle:337.5deg;--delay:-.77s"></i>
     </div>
+    <div id="dash-vortex" aria-hidden="true">
+      <i class="dash-streak" style="--angle:0deg;--delay:-.04s;--speed:.58s"></i>
+      <i class="dash-streak" style="--angle:18deg;--delay:-.31s;--speed:.72s"></i>
+      <i class="dash-streak" style="--angle:36deg;--delay:-.55s;--speed:.64s"></i>
+      <i class="dash-streak" style="--angle:54deg;--delay:-.17s;--speed:.77s"></i>
+      <i class="dash-streak" style="--angle:72deg;--delay:-.46s;--speed:.61s"></i>
+      <i class="dash-streak" style="--angle:90deg;--delay:-.68s;--speed:.7s"></i>
+      <i class="dash-streak" style="--angle:108deg;--delay:-.23s;--speed:.56s"></i>
+      <i class="dash-streak" style="--angle:126deg;--delay:-.51s;--speed:.74s"></i>
+      <i class="dash-streak" style="--angle:144deg;--delay:-.09s;--speed:.66s"></i>
+      <i class="dash-streak" style="--angle:162deg;--delay:-.39s;--speed:.79s"></i>
+      <i class="dash-streak" style="--angle:180deg;--delay:-.6s;--speed:.62s"></i>
+      <i class="dash-streak" style="--angle:198deg;--delay:-.27s;--speed:.71s"></i>
+      <i class="dash-streak" style="--angle:216deg;--delay:-.49s;--speed:.57s"></i>
+      <i class="dash-streak" style="--angle:234deg;--delay:-.13s;--speed:.76s"></i>
+      <i class="dash-streak" style="--angle:252deg;--delay:-.43s;--speed:.65s"></i>
+      <i class="dash-streak" style="--angle:270deg;--delay:-.7s;--speed:.73s"></i>
+      <i class="dash-streak" style="--angle:288deg;--delay:-.2s;--speed:.59s"></i>
+      <i class="dash-streak" style="--angle:306deg;--delay:-.53s;--speed:.78s"></i>
+      <i class="dash-streak" style="--angle:324deg;--delay:-.34s;--speed:.63s"></i>
+      <i class="dash-streak" style="--angle:342deg;--delay:-.65s;--speed:.69s"></i>
+      <span id="dash-callout"><strong>DASH BOOST</strong><small>WIND RUSH</small></span>
+    </div>
+    <div id="overheat-vortex" role="status" aria-live="assertive" aria-atomic="true" aria-hidden="true">
+      <span id="overheat-callout">
+        <strong>ENGINE OVERHEAT</strong>
+        <small aria-hidden="true">COOLING · 냉각 <span id="overheat-cooling-value">0</span>%</small>
+        <span id="overheat-cooling-track" aria-hidden="true"><i id="overheat-cooling-fill"></i></span>
+      </span>
+    </div>
     <div id="announcement" role="status" aria-live="polite" aria-atomic="true">
       <div class="announcement-frame">
         <span id="announcement-kicker" class="announcement-kicker"></span>
@@ -905,6 +1143,7 @@
       </div>
     </div>
     <div id="biome-badge"></div>
+    <div id="time-badge" aria-live="polite">현재 시간 · 낮</div>
 
     <aside id="hud-right-rail" aria-label="비행 전술 정보">
       <div id="board" aria-label="실시간 랭킹">
@@ -914,7 +1153,7 @@
 
       <div id="keys">
         <span id="keys-fly"><kbd>W</kbd><kbd>S</kbd> 피치 · <kbd>A</kbd><kbd>D</kbd> 롤/선회 · <kbd>Shift</kbd> 대시</span><br>
-        <span><kbd>마우스</kbd> 자유 시점 · <kbd>ESC</kbd> 설정</span><br>
+        <span><kbd>마우스</kbd> 자유 시점 · <kbd>C</kbd> 시점 초기화 · <kbd>ESC</kbd> 설정</span><br>
         <span><kbd>N</kbd> 주변 지도</span><br>
         <span id="keys-fire" class="hide"><kbd>Space</kbd> 다트 발사</span>
       </div>
@@ -936,7 +1175,7 @@
         <button type="button" class="touch-control touch-right" data-flight-key="KeyD" aria-label="오른쪽으로 기울이기" aria-pressed="false"><span aria-hidden="true">▶<small>우회전</small></span></button>
       </div>
       <div class="touch-pad touch-actions" role="group" aria-label="비행 액션">
-        <button type="button" class="touch-control touch-menu" id="touch-menu" aria-label="비행 설정">⚙</button>
+        <button type="button" class="touch-control touch-menu" id="touch-menu" aria-label="비행 설정"><svg class="ui-icon" aria-hidden="true"><use href="#ui-icon-settings"></use></svg></button>
         <button type="button" class="touch-control touch-action touch-dash" data-flight-key="ShiftLeft" aria-label="대시" aria-pressed="false">DASH</button>
         <button type="button" class="touch-control touch-action touch-fire" id="touch-fire" data-flight-key="Space" aria-label="다트 발사" aria-pressed="false">FIRE</button>
       </div>
@@ -951,20 +1190,20 @@
     <div id="pause-menu" class="modal-layer hide" role="dialog" aria-modal="true" aria-labelledby="pause-title">
       <div class="modal-card settings-modal-card">
         <header class="settings-header">
-          <div class="modal-kicker">FLIGHT SETTINGS</div>
+          <div id="settings-kicker" class="modal-kicker">FLIGHT SETTINGS</div>
           <h2 id="pause-title">비행 설정</h2>
-          <p>온라인 경기는 메뉴를 연 동안에도 계속 진행됩니다.</p>
+          <p id="settings-context">온라인 경기는 메뉴를 연 동안에도 계속 진행됩니다.</p>
         </header>
         <div class="settings-layout">
           <nav class="settings-sidebar" role="tablist" aria-label="설정 섹션" aria-orientation="vertical">
             <button id="settings-tab-controls" data-settings-tab="controls" role="tab" aria-selected="true" aria-controls="settings-panel-controls" class="settings-tab" type="button">
-              <span class="settings-tab-icon" aria-hidden="true">⌨</span><span><strong>조작</strong><small>HUD · 시야 설정</small></span>
+              <span class="settings-tab-icon" aria-hidden="true"><svg class="ui-icon"><use href="#ui-icon-controls"></use></svg></span><span><strong>조작</strong><small>HUD · 시야 설정</small></span>
             </button>
             <button id="settings-tab-graphics" data-settings-tab="graphics" role="tab" aria-selected="false" aria-controls="settings-panel-graphics" class="settings-tab" type="button" tabindex="-1">
-              <span class="settings-tab-icon" aria-hidden="true">◈</span><span><strong>그래픽</strong><small>화질 · 성능 설정</small></span>
+              <span class="settings-tab-icon" aria-hidden="true"><svg class="ui-icon"><use href="#ui-icon-graphics"></use></svg></span><span><strong>그래픽</strong><small>화질 · 성능 설정</small></span>
             </button>
             <button id="settings-tab-audio" data-settings-tab="audio" role="tab" aria-selected="false" aria-controls="settings-panel-audio" class="settings-tab" type="button" tabindex="-1">
-              <span class="settings-tab-icon" aria-hidden="true">♪</span><span><strong>오디오</strong><small>음량 · 효과 설정</small></span>
+              <span class="settings-tab-icon" aria-hidden="true"><svg class="ui-icon"><use href="#ui-icon-audio"></use></svg></span><span><strong>오디오</strong><small>음량 · 효과 설정</small></span>
             </button>
           </nav>
           <div class="settings-panels">
@@ -1167,27 +1406,29 @@
   }
 }
 </script>
-<script src="./input-policy.js?v=1.7.7"></script>
-<script src="./hud-policy.js?v=1.7.7"></script>
+<script src="./input-policy.js?v=1.8.1"></script>
+<script src="./hud-policy.js?v=1.8.1"></script>
 <script src="./mobile-controls.js"></script>
 
 <script src="./room-state.js"></script>
-<script src="./flight-controls.js"></script>
+<script src="./flight-controls.js?v=1.8.1"></script>
+<script src="./costume-template.js"></script>
 <script src="./costume-state.js"></script>
 <script src="./waiting-room-state.js"></script>
-<script src="./paper-fold-model.js"></script>
-<script src="./paper-aero-profile.js"></script>
-<script src="./fold-stats-view.js"></script>
+<script src="./paper-fold-model.js?v=1.8.1"></script>
+<script src="./paper-aero-profile.js?v=1.8.1"></script>
+<script src="./fold-stats-view.js?v=1.8.1"></script>
 <script src="./paper-fold-ui.js"></script>
 <script src="./launch-transition.js"></script>
 <script src="./home-screen.js"></script>
-<script src="./biomes/helpers.js?v=1.7.7"></script>
+<script src="./flight-world-state.js"></script>
+<script src="./biomes/helpers.js?v=1.8.1"></script>
 <script src="./biomes/desert.js"></script>
 <script src="./biomes/pillars.js"></script>
 <script src="./biomes/glacier.js"></script>
 <script src="./biomes/lava.js"></script>
 <script src="./biomes/floating.js"></script>
-<script src="./map-gen.js?v=1.7.7"></script>
+<script src="./map-gen.js?v=1.8.1"></script>
 <script type="module" src="./home-plane-3d.js"></script>
 <script type="module" src="./costume-preview-3d.js"></script>
 <script type="module" src="./costume-showroom-3d.js"></script>
@@ -1202,6 +1443,7 @@ import { makeStandingPlaneMascot } from './home-plane-3d.js';
 import { animateCostumes, setCostumeOnObject } from './costume-3d.js';
 import { createFoldEditor } from './fold-editor-3d.mjs';
 import { buildBiomeEnvironment, terrainCollisionAtPoint } from './biome-visuals.js';
+import { animateArenaFlyObjects, createArenaFlyObjects, createFinishLine } from './flight-world-decor.js';
 const { getLaunchPose, getLaunchMotion, getLaunchCameraPlan, localDeadline, getLaunchLayoutKey } = window.launchTransition;
 import { CSM } from 'three/addons/csm/CSM.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -1217,7 +1459,7 @@ const {
 } = window.inputPolicy;
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
-  approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
+  approachThermalIntensity, approachDashIntensity, announcementSpec, enqueueBoundedAnnouncement,
   respawnPresentation, authoritativeCrashAction, advancePaperFragment,
   createRespawnRetryController
 } = window.hudPolicy;
@@ -1225,7 +1467,8 @@ const { createCombinedKeyState, createTouchKeyState, createTouchLookState } = wi
 
 const { getLocalRoundRole, shouldShowResults } = window.roomStatePolicy;
 const {
-  updateAttitude, updateFreeLook, normalizeAngle, keyGuideVisibleFromStorage,
+  updateAttitude, updateFreeLook, orbitCameraOffset, recenterFreeLook, isFreeLookCentered,
+  normalizeAngle, keyGuideVisibleFromStorage,
   mouseInvertYFromStorage, updateEnergy, consumeDartEnergy, dashAcceleration, speedFov,
   MAX_ENERGY, DART_ENERGY_COST
 } = window.flightControls;
@@ -1249,6 +1492,7 @@ const game = {
    유틸
    ============================================================ */
 const $ = id => document.getElementById(id);
+document.body.appendChild($('pause-menu'));
 const audioDirector = window.createAudioDirector?.({ scene: 'HOME' }) || {
   setScene() {}, phaseSnapshot() {}, updateDeadline() {}, setFlight() {}, play() {},
   setSettings() {}, getSettings() { return {}; }
@@ -1581,10 +1825,12 @@ function handle(m) {
         me.yaw = Math.atan2(-center.x, -center.z);
         me.pitch = -0.05; me.roll = 0; me.speed = 22;
         freeLook = { yaw: 0, pitch: 0 };
+        recenteringView = false;
         me.alive = true;
-        me.dist = 0; me.surv = 0; me.lifeStartedAt = Date.now();
+        me.dist = 0; me.surv = 0; me.finished = false; me.lifeStartedAt = Date.now();
         me.energy = MAX_ENERGY;
         me.dashing = false;
+        me.engineOverheated = false;
         game.frozen = false;
         craft.visible = true;
         craft.rotation.set(me.pitch, me.yaw, -me.roll);
@@ -1682,6 +1928,24 @@ function handle(m) {
       break;
     }
 
+    case 'finished': {
+      if (m.id === net.id) {
+        me.finished = true;
+        me.dist = Number(m.score) || DIST_LEN;
+        me.alive = false;
+        showCenter(null, '결승선 통과!', `${me.dist.toLocaleString()}m 완주 · 결과를 집계하고 있습니다`);
+      } else {
+        const player = net.players.get(m.id);
+        if (player) {
+          player.alive = false;
+          player.score = Number(m.score) || DIST_LEN;
+          player.remote.group.visible = false;
+        }
+      }
+      refreshBoard();
+      break;
+    }
+
     case 'left':
       net.room = null;
       net.leaderboard = [];
@@ -1722,6 +1986,7 @@ function enterHome(msg) {
   audioDirector.setScene('HOME');
   clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
+  $('settings-quick-toggle').classList.remove('hide');
   $('home-screen').classList.remove('hide');
   $('room-entry').classList.add('hide');
   $('lobby').classList.add('hide');
@@ -1773,6 +2038,7 @@ function enterLobby(msg) {
   audioDirector.setScene('HOME');
   clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
+  $('settings-quick-toggle').classList.remove('hide');
   game.phase = 'lobby';
   game.frozen = true;
   closePauseMenu();
@@ -1794,6 +2060,7 @@ function enterRoomLobby(room, resultsPending = false) {
   audioDirector.setScene('WAITING');
   clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
+  $('settings-quick-toggle').classList.remove('hide');
   $('home-screen').classList.add('hide');
   $('room-entry').classList.add('hide');
   game.phase = room.phase;
@@ -1849,6 +2116,7 @@ function enterFolding() {
   audioDirector.setScene('FOLDING');
   clearAnnouncements();
   $('audio-quick-toggle').classList.remove('hide');
+  $('settings-quick-toggle').classList.remove('hide');
   closePauseMenu();
   releaseFlightPointerLock();
   $('home-screen').classList.add('hide');
@@ -1863,6 +2131,7 @@ function enterFolding() {
 
 function enterGame() {
   $('audio-quick-toggle').classList.add('hide');
+  $('settings-quick-toggle').classList.add('hide');
   closePauseMenu();
   $('home-screen').classList.add('hide');
   $('room-entry').classList.add('hide');
@@ -2081,7 +2350,6 @@ $('audio-reduced').checked = Boolean(audioSettings.reducedAudio);
 function updateAudioQuickToggle() {
   const muted = Boolean(audioDirector.getSettings().muted);
   const button = $('audio-quick-toggle');
-  button.textContent = muted ? '🔇' : '🔊';
   button.setAttribute('aria-pressed', String(muted));
   button.setAttribute('aria-label', muted ? '오디오 켜기' : '전체 음소거');
   button.title = muted ? '오디오 켜기' : '오디오 끄기';
@@ -2106,6 +2374,7 @@ $('audio-quick-toggle').addEventListener('click', () => {
   $('audio-muted').checked = muted;
   updateAudioQuickToggle();
 });
+$('settings-quick-toggle').addEventListener('click', () => openSettingsMenu('audio'));
 updateAudioQuickToggle();
 document.addEventListener('click', event => {
   if (event.target.closest('button, [role="button"]')) audioDirector.play('uiClick');
@@ -2179,7 +2448,9 @@ const sky = new THREE.Mesh(
 );
 scene.add(sky);
 
-scene.add(new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5));
+// applyTimeOfDay가 시간대별 색·세기를 덮어쓰므로 참조를 유지해야 합니다.
+const hemisphere = new THREE.HemisphereLight(0xbcd6f2, 0x6b5f4e, 1.5);
+scene.add(hemisphere);
 const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
 sun.shadow.bias = -0.00035;
 sun.shadow.normalBias = 0.035;
@@ -2542,6 +2813,25 @@ let lastAppliedBiome = { a: 0, b: 0, t: -1 }; // -1 sentinel: 항상 첫 적용�
 const biomeColorA = new THREE.Color();
 const biomeColorB = new THREE.Color();
 const biomeLerpColor = new THREE.Color();
+const composedColor = new THREE.Color();
+const baseWorldPalette = {
+  top: new THREE.Color(DEFAULT_BIOME.sky.top),
+  mid: new THREE.Color(DEFAULT_BIOME.sky.mid),
+  bottom: new THREE.Color(DEFAULT_BIOME.sky.bottom),
+  fog: new THREE.Color(DEFAULT_BIOME.fog),
+  light: new THREE.Color(0xfff0d8),
+  ground: new THREE.Color(DEFAULT_BIOME.terrain.top),
+  groundOpacity: biomeGroundOpacity(DEFAULT_BIOME),
+  gridOpacity: .24
+};
+const TIME_LOOKS = {
+  day: { top: 0x52a8eb, mid: 0xbdeaff, bottom: 0xffefd1, fog: 0xbdd9e7, sun: 0xfff3d5, hemiSky: 0xc9e8ff, hemiGround: 0x766b54, strength: .18, sunPower: 2.6, hemiPower: 1.5, exposure: 1.1 },
+  night: { top: 0x07132d, mid: 0x172751, bottom: 0x3b4167, fog: 0x14233d, sun: 0x9ebeff, hemiSky: 0x526ba7, hemiGround: 0x121827, strength: .78, sunPower: .72, hemiPower: .68, exposure: .72 },
+  dawn: { top: 0x453d78, mid: 0xc77f92, bottom: 0xffc273, fog: 0xb88fa0, sun: 0xffbd7b, hemiSky: 0xbeb4e8, hemiGround: 0x665063, strength: .52, sunPower: 1.65, hemiPower: 1.08, exposure: .9 }
+};
+let worldTimeElapsed = 0;
+let worldTimeSeed = 0;
+let lastTimeLabel = '';
 
 // 조명 색은 팔레트의 "하늘 mid" 색을 살짝 섞어 바이옴 분위기를 낸다.
 function biomeLightColor(biome, out) {
@@ -2553,29 +2843,21 @@ function biomeGroundOpacity(biome) {
 }
 
 function applyBiomePalette(biome) {
-  activeFogBase.setHex(biome.fog);
-  scene.fog.color.copy(activeFogBase);
-  sky.material.uniforms.uTop.value.setHex(biome.sky.top);
-  sky.material.uniforms.uMid.value.setHex(biome.sky.mid);
-  activeSkyBottomBase.setHex(biome.sky.bottom);
-  sky.material.uniforms.uBottom.value.copy(activeSkyBottomBase);
-  sun.color.copy(biomeLightColor(biome, biomeColorA));
+  baseWorldPalette.fog.setHex(biome.fog);
+  baseWorldPalette.top.setHex(biome.sky.top);
+  baseWorldPalette.mid.setHex(biome.sky.mid);
+  baseWorldPalette.bottom.setHex(biome.sky.bottom);
+  baseWorldPalette.light.copy(biomeLightColor(biome, biomeColorA));
+  baseWorldPalette.ground.setHex(biome.terrain.top);
+  baseWorldPalette.groundOpacity = biomeGroundOpacity(biome);
+  baseWorldPalette.gridOpacity = biome.id === 'floating' ? .035 : .24;
   ground.material.color.setHex(biome.terrain.top);
-  ground.material.opacity = biomeGroundOpacity(biome);
-  grid.material.opacity = biome.id === 'floating' ? .035 : .24;
 }
 
 function resetBiomeDefaults() {
-  activeFogBase.setHex(DEFAULT_BIOME.fog);
-  scene.fog.color.copy(activeFogBase);
-  sky.material.uniforms.uTop.value.setHex(DEFAULT_BIOME.sky.top);
-  sky.material.uniforms.uMid.value.setHex(DEFAULT_BIOME.sky.mid);
-  activeSkyBottomBase.setHex(DEFAULT_BIOME.sky.bottom);
-  sky.material.uniforms.uBottom.value.copy(activeSkyBottomBase);
-  sun.color.setHex(0xfff0d8);
-  ground.material.color.setHex(DEFAULT_BIOME.terrain.top);
-  ground.material.opacity = biomeGroundOpacity(DEFAULT_BIOME);
-  grid.material.opacity = .24;
+  applyBiomePalette(DEFAULT_BIOME);
+  worldTimeElapsed = 0;
+  applyTimeOfDay();
   lastAppliedBiome = { a: 0, b: 0, t: -1 };
   lastBadgeBiome = -1;
   clearTimeout(biomeBadgeT);
@@ -2592,28 +2874,65 @@ function updateDistanceBiomeVisuals(z) {
   const biomeB = window.mapGen.BIOMES[s.b];
 
   biomeColorA.setHex(biomeA.fog).lerp(biomeColorB.setHex(biomeB.fog), tQuant);
-  activeFogBase.copy(biomeColorA);
-  scene.fog.color.copy(activeFogBase);
+  baseWorldPalette.fog.copy(biomeColorA);
 
   biomeColorA.setHex(biomeA.sky.top).lerp(biomeColorB.setHex(biomeB.sky.top), tQuant);
-  sky.material.uniforms.uTop.value.copy(biomeColorA);
+  baseWorldPalette.top.copy(biomeColorA);
   biomeColorA.setHex(biomeA.sky.mid).lerp(biomeColorB.setHex(biomeB.sky.mid), tQuant);
-  sky.material.uniforms.uMid.value.copy(biomeColorA);
+  baseWorldPalette.mid.copy(biomeColorA);
   biomeColorA.setHex(biomeA.sky.bottom).lerp(biomeColorB.setHex(biomeB.sky.bottom), tQuant);
-  activeSkyBottomBase.copy(biomeColorA);
-  sky.material.uniforms.uBottom.value.copy(activeSkyBottomBase);
+  baseWorldPalette.bottom.copy(biomeColorA);
 
   biomeLightColor(biomeA, biomeColorA);
   biomeLightColor(biomeB, biomeColorB);
-  sun.color.copy(biomeColorA.lerp(biomeColorB, tQuant));
+  baseWorldPalette.light.copy(biomeColorA.lerp(biomeColorB, tQuant));
 
   biomeColorA.setHex(biomeA.terrain.top).lerp(biomeColorB.setHex(biomeB.terrain.top), tQuant);
-  ground.material.color.copy(biomeColorA);
+  baseWorldPalette.ground.copy(biomeColorA);
+  baseWorldPalette.groundOpacity = THREE.MathUtils.lerp(biomeGroundOpacity(biomeA), biomeGroundOpacity(biomeB), tQuant);
+  baseWorldPalette.gridOpacity = THREE.MathUtils.lerp(biomeA.id === 'floating' ? .035 : .24, biomeB.id === 'floating' ? .035 : .24, tQuant);
   ground.material.opacity = THREE.MathUtils.lerp(biomeGroundOpacity(biomeA), biomeGroundOpacity(biomeB), tQuant);
-  grid.material.opacity = THREE.MathUtils.lerp(biomeA.id === 'floating' ? .035 : .24, biomeB.id === 'floating' ? .035 : .24, tQuant);
 
   const dominant = tQuant < 0.5 ? s.a : s.b;
   showBiomeBadge(dominant);
+}
+
+function blendedTimeLook(from, to, t) {
+  const a = TIME_LOOKS[from.id];
+  const b = TIME_LOOKS[to.id];
+  const color = key => new THREE.Color(a[key]).lerp(composedColor.setHex(b[key]), t);
+  const number = key => THREE.MathUtils.lerp(a[key], b[key], t);
+  return {
+    top: color('top'), mid: color('mid'), bottom: color('bottom'), fog: color('fog'),
+    sun: color('sun'), hemiSky: color('hemiSky'), hemiGround: color('hemiGround'),
+    strength: number('strength'), sunPower: number('sunPower'), hemiPower: number('hemiPower'), exposure: number('exposure')
+  };
+}
+
+function applyTimeOfDay() {
+  const time = window.flightWorldState.timeOfDayAt(worldTimeSeed, worldTimeElapsed);
+  const look = blendedTimeLook(time.from, time.to, time.t);
+  sky.material.uniforms.uTop.value.copy(baseWorldPalette.top).lerp(look.top, look.strength);
+  sky.material.uniforms.uMid.value.copy(baseWorldPalette.mid).lerp(look.mid, look.strength);
+  activeSkyBottomBase.copy(baseWorldPalette.bottom).lerp(look.bottom, look.strength);
+  activeFogBase.copy(baseWorldPalette.fog).lerp(look.fog, look.strength * .72);
+  sun.color.copy(baseWorldPalette.light).lerp(look.sun, look.strength);
+  sun.intensity = look.sunPower;
+  for (const light of csm?.lights || []) {
+    light.color.copy(sun.color);
+    light.intensity = look.sunPower;
+  }
+  hemisphere.color.copy(look.hemiSky);
+  hemisphere.groundColor.copy(look.hemiGround);
+  hemisphere.intensity = look.hemiPower;
+  ground.material.color.copy(baseWorldPalette.ground).lerp(look.fog, look.strength * .16);
+  ground.material.opacity = baseWorldPalette.groundOpacity;
+  grid.material.opacity = baseWorldPalette.gridOpacity * THREE.MathUtils.lerp(1, .5, look.strength);
+  renderer.toneMappingExposure = look.exposure;
+  if (time.label !== lastTimeLabel) {
+    lastTimeLabel = time.label;
+    $('time-badge').textContent = `현재 시간 · ${time.label}`;
+  }
 }
 
 let lastBadgeBiome = -1;
@@ -2711,7 +3030,8 @@ let rapierFlight = null;
 function updateAeroHud() {
   const engine = rapierFlight ? ' · Rapier' : '';
   $('s-aero').textContent = `양력 ${Math.round(aeroProfile.liftScale * 100)}% · 항력 ${Math.round(aeroProfile.dragScale * 100)}%${engine}`;
-  $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / 70 * 100)}%`;
+  // 실속 구간은 속도 막대와 같은 최대속도 기준이라야 두 눈금이 겹쳐 읽힙니다.
+  $('s-stall').style.width = `${Math.min(100, aeroProfile.stallSpeed / aeroProfile.maxSpeed * 100)}%`;
 }
 
 function syncRapierMap() {
@@ -2734,7 +3054,7 @@ function syncRapierFromCraft() {
    다시 켜려면 USE_RAPIER_PHYSICS를 true로 변경하세요. */
 const USE_RAPIER_PHYSICS = false;
 if (USE_RAPIER_PHYSICS) {
-  void import('./flight-physics-rapier.mjs')
+  void import('./flight-physics-rapier.mjs?v=1.8.1')
     .then(async api => {
       rapierApi = api;
       rapierFlight = await api.createPaperFlightPhysics();
@@ -2851,7 +3171,9 @@ function setCraftFromFoldModel(model, authoritativeProfile = null, commandKey = 
   const derivedProfile = window.PaperAeroProfile.deriveAerodynamicProfile(sourceModel);
   const requiredAeroFields = [
     'liftScale', 'dragScale', 'stallSpeed', 'stability',
-    'rollBias', 'pitchBias', 'span', 'chord'
+    'rollBias', 'pitchBias', 'span', 'chord',
+    'maxSpeed', 'maxPitchDown', 'maxPitchUp', 'maxRoll',
+    'pitchRateScale', 'rollRateScale'
   ];
   const serverProfileIsValid = authoritativeProfile
     && requiredAeroFields.every(field => Number.isFinite(authoritativeProfile[field]));
@@ -2859,9 +3181,10 @@ function setCraftFromFoldModel(model, authoritativeProfile = null, commandKey = 
   activePaperModel = sourceModel;
   craft.userData.aeroProfile = aeroProfile;
   updateAeroHud();
-  if (rapierFlight && rapierApi && craft.userData.physicsCommandKey !== commandKey) {
+  const physicsProfileKey = `${commandKey}:${requiredAeroFields.map(field => aeroProfile[field]).join(',')}`;
+  if (rapierFlight && rapierApi && craft.userData.physicsCommandKey !== physicsProfileKey) {
     rapierFlight.configure(aeroProfile, rapierApi.makeColliderVertices(sourceModel));
-    craft.userData.physicsCommandKey = commandKey;
+    craft.userData.physicsCommandKey = physicsProfileKey;
   }
   setFoldedCraftVisual(craft, baseCraftVisual, model, new THREE.Color(0xfdfcf7), commandKey);
 }
@@ -2900,7 +3223,7 @@ function applyCraftSnapshots(crafts) {
 const GRAVITY = 21, DRAG = 0.0038, MAX_ALT = window.mapGen.FLIGHT_CEILING;
 const me = {
   yaw: 0, pitch: -0.08, roll: 0, speed: 22, alive: false,
-  dist: 0, surv: 0, energy: MAX_ENERGY, dashing: false, lifeStartedAt: 0
+  dist: 0, surv: 0, energy: MAX_ENERGY, dashing: false, engineOverheated: false, lifeStartedAt: 0, finished: false
 };
 
 /* ============================================================
@@ -3036,6 +3359,8 @@ scene.add(world);
 let spires = [], rocks = [], platforms = [], terrainColliders = [], thermals = [], ringsArr = [];
 let biomeEnvironment = null;
 let distanceWidthNoise = null;
+let arenaFlyObjects = null;
+let finishLine = null;
 
 const minimapCanvas = $('minimap-canvas');
 const minimapContext = minimapCanvas.getContext('2d');
@@ -3047,11 +3372,48 @@ let minimapMode = 'full';
 let minimapLastDraw = -Infinity;
 let thermalVisualTarget = 0;
 let thermalVisualStrength = 0;
+let dashVisualTarget = 0;
+let dashVisualStrength = 0;
+let overheatVisualTarget = 0;
+let overheatVisualStrength = 0;
 
 function updateThermalScreenEffect(dt) {
   thermalVisualStrength = approachThermalIntensity(thermalVisualStrength, thermalVisualTarget, dt);
   const vortex = $('thermal-vortex');
   vortex.style.setProperty('--thermal-force', thermalVisualStrength.toFixed(3));
+}
+
+function updateDashScreenEffect(dt) {
+  dashVisualStrength = approachDashIntensity(dashVisualStrength, dashVisualTarget, dt);
+  const vortex = $('dash-vortex');
+  vortex.style.setProperty('--dash-force', dashVisualStrength.toFixed(3));
+  vortex.classList.toggle('active', dashVisualStrength > 0.02);
+}
+
+function triggerDashImpact() {
+  const vortex = $('dash-vortex');
+  vortex.classList.remove('burst');
+  void vortex.offsetWidth;
+  vortex.classList.add('burst');
+}
+
+function updateOverheatScreenEffect(dt) {
+  overheatVisualStrength = approachDashIntensity(overheatVisualStrength, overheatVisualTarget, dt);
+  const vortex = $('overheat-vortex');
+  const active = overheatVisualTarget > 0;
+  const coolingPercent = Math.round(THREE.MathUtils.clamp(me.energy / MAX_ENERGY, 0, 1) * 100);
+  vortex.style.setProperty('--overheat-force', overheatVisualStrength.toFixed(3));
+  vortex.classList.toggle('active', active);
+  vortex.setAttribute('aria-hidden', String(!active));
+  $('overheat-cooling-value').textContent = String(coolingPercent);
+  $('overheat-cooling-fill').style.width = `${coolingPercent}%`;
+}
+
+function triggerOverheatImpact() {
+  const vortex = $('overheat-vortex');
+  vortex.classList.remove('burst');
+  void vortex.offsetWidth;
+  vortex.classList.add('burst');
 }
 
 function updateMinimapModeLabel() {
@@ -3232,7 +3594,8 @@ const thermalMat = new THREE.ShaderMaterial({
     }`
 });
 const thermalRingMat = new THREE.MeshBasicMaterial({ color: 0x4fd6a4, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
-const ringMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 2.4, roughness: 0.4 }));
+const distanceRingMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x1d4ed8, emissiveIntensity: 2.4, roughness: 0.4 }));
+const survivalRingMat = registerLitMaterial(new THREE.MeshStandardMaterial({ color: 0xffc861, emissive: 0xff9c3c, emissiveIntensity: 2.4, roughness: 0.4 }));
 
 function clearWorld() {
   clearDarts();
@@ -3242,6 +3605,8 @@ function clearWorld() {
     clearLaunchTowers();
   }
   const previousEnvironment = biomeEnvironment;
+  detachObjectMaterials(arenaFlyObjects);
+  detachObjectMaterials(finishLine);
   detachObjectMaterials(previousEnvironment);
   previousEnvironment?.userData.dispose?.();
   world.traverse(o => {
@@ -3251,6 +3616,8 @@ function clearWorld() {
   spires = []; rocks = []; platforms = []; terrainColliders = []; thermals = []; ringsArr = [];
   biomeEnvironment = null;
   distanceWidthNoise = null;
+  arenaFlyObjects = null;
+  finishLine = null;
   // 바이옴 팔레트 기본값 복원 — buildDistance/buildArena는 이 직후 자신의 팔레트를
   // 다시 적용하므로(동기 호출) 로비 경로(enterHome/enterLobby/enterRoomLobby)에서만
   // 이 기본값이 실제로 유지된다.
@@ -3271,8 +3638,8 @@ function addThermal(x, z, strength = 1) {
   thermals.push(g);
 }
 
-function addRing(x, y, z, rng) {
-  const m = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.65, 10, 36), ringMat);
+function addRing(x, y, z, rng, material) {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.65, 10, 36), material);
   m.position.set(x, y, z);
   m.rotation.y = (rng() - 0.5) * 0.6;
   m.userData.taken = false;
@@ -3294,6 +3661,7 @@ function installBiomeLayout(layout) {
 /* ---- 멀리 날기: 시드로 7.5km 직선 협곡을 결정론적으로 생성 ---- */
 function buildDistance(seed) {
   clearWorld();
+  worldTimeSeed = Number(seed) || 0;
   scene.fog.density = fogDensityForMode(resolvedGraphics.fogDensity, 'DIST');
   const rng = mulberry32(seed);
   const { BIOMES: mgBiomes } = window.mapGen;
@@ -3307,7 +3675,7 @@ function buildDistance(seed) {
 
   // 상승기류 · 부스트 링
   layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z, thermal.strength));
-  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng));
+  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng, distanceRingMat));
 
   // 중앙선
   const line = new THREE.Mesh(
@@ -3317,11 +3685,20 @@ function buildDistance(seed) {
   line.rotation.x = -Math.PI / 2;
   line.position.set(0, 0.12, -DIST_LEN / 2);
   world.add(line);
+
+  const finishHalfWidth = DIST_HALF * window.mapGen.widthScaleAt(-DIST_LEN, distanceWidthNoise);
+  finishLine = createFinishLine(DIST_LEN, finishHalfWidth);
+  registerObjectMaterials(finishLine);
+  world.add(finishLine);
+  worldTimeElapsed = 0;
+  lastTimeLabel = '';
+  applyTimeOfDay();
 }
 
 /* ---- 오래 날기: 원형 아레나 ---- */
 function buildArena(seed) {
   clearWorld();
+  worldTimeSeed = Number(seed) || 0;
   scene.fog.density = fogDensityForMode(resolvedGraphics.fogDensity, 'ARENA');
   const rng = mulberry32(seed);
   const layout = window.mapGen.buildArenaLayout(seed);
@@ -3333,7 +3710,7 @@ function buildArena(seed) {
 
   installBiomeLayout(layout);
   layout.thermals.forEach(thermal => addThermal(thermal.x, thermal.z, thermal.strength));
-  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng));
+  layout.rings.forEach(ring => addRing(ring.x, ring.y, ring.z, rng, survivalRingMat));
 
   // 경계 표시 링
   const bound = new THREE.Mesh(
@@ -3343,6 +3720,13 @@ function buildArena(seed) {
   bound.rotation.x = -Math.PI / 2;
   bound.position.y = 0.15;
   world.add(bound);
+
+  arenaFlyObjects = createArenaFlyObjects(window.flightWorldState.buildArenaFlyObjects(seed, ARENA_R));
+  registerObjectMaterials(arenaFlyObjects);
+  world.add(arenaFlyObjects);
+  worldTimeElapsed = 0;
+  lastTimeLabel = '';
+  applyTimeOfDay();
 }
 
 /* ---- 공통 출발 연출: 모드별 스폰 지점의 옥상에서 달려 점프 ---- */
@@ -3908,10 +4292,12 @@ function spawnSelf() {
   }
   me.pitch = -0.05; me.roll = 0; me.speed = 22;
   freeLook = { yaw: 0, pitch: 0 };
+  recenteringView = false;
   me.alive = false;          // playing 페이즈에서 true
-  me.dist = 0; me.surv = 0;
+  me.dist = 0; me.surv = 0; me.finished = false;
   me.energy = MAX_ENERGY;
   me.dashing = false;
+  me.engineOverheated = false;
   game.frozen = true;
   craft.visible = true;
   craft.rotation.set(me.pitch, me.yaw, -me.roll);
@@ -3930,6 +4316,25 @@ function dieLocal(report = true) {
     return;
   }
   showCenter(null, '추락', '관전 중 — 라운드 종료를 기다립니다');
+}
+
+function finishLocal() {
+  if (!me.alive || game.mode !== 'DIST' || me.finished) return;
+  me.finished = true;
+  me.dist = DIST_LEN;
+  craft.position.z = -DIST_LEN;
+  me.alive = false;
+  me.dashing = false;
+  send({
+    t: 's',
+    p: [+craft.position.x.toFixed(1), +craft.position.y.toFixed(1), -DIST_LEN],
+    r: [+me.pitch.toFixed(2), +me.yaw.toFixed(2), +me.roll.toFixed(2)],
+    d: DIST_LEN,
+    e: +me.energy.toFixed(1)
+  });
+  send({ t: 'finish' });
+  audioDirector.play('score');
+  showCenter(null, '결승선 통과!', `${DIST_LEN.toLocaleString()}m 완주 · 결과를 기다리는 중`);
 }
 
 function showRespawnOverlay(byName) {
@@ -4008,6 +4413,7 @@ function escapeHtml(value) {
 function showResults(results) {
   audioDirector.setScene('RESULTS');
   $('audio-quick-toggle').classList.remove('hide');
+  $('settings-quick-toggle').classList.remove('hide');
   clearFlightKeys();
   const unit = game.mode === 'ARENA' ? 's' : 'm';
   const readyButton = $('results-ready-btn');
@@ -4060,8 +4466,10 @@ const keys = createCombinedKeyState(keyboardKeys, touchKeys);
 let touchFlightKeys = null;
 let touchLook = null;
 let freeLook = { yaw: 0, pitch: 0 };
+let recenteringView = false;
 let mouseInvertY = mouseInvertYFromStorage(localStorage.getItem('pp_mouse_invert_y'));
 let pauseReturnFocus = null;
+let settingsOpenedFromFlight = false;
 let resultsReturnFocus = null;
 let escapeKeyDown = false;
 let suppressPauseOnPointerUnlock = false;
@@ -4082,6 +4490,10 @@ function setUnderlyingGameUiInert(inert, activeModalId = null) {
   for (const child of $('hud').children) {
     if (modalIds.has(child.id)) child.inert = inert && child.id !== activeModalId;
     else child.inert = inert;
+  }
+  for (const id of ['home-screen', 'folding-screen', 'room-entry', 'lobby', 'room-lobby']) {
+    const screen = $(id);
+    if (screen) screen.inert = inert;
   }
 }
 
@@ -4221,21 +4633,36 @@ function releaseFlightPointerLock() {
     document.exitPointerLock();
 }
 
-function openPauseMenu() {
-  if (game.phase !== 'playing' && game.phase !== 'countdown') return;
-  clearFlightKeys();
+function openSettingsMenu(section = 'audio') {
+  const openedFromFlight = game.phase === 'playing' || game.phase === 'countdown';
+  if (openedFromFlight) clearFlightKeys();
+  settingsOpenedFromFlight = openedFromFlight;
   pauseReturnFocus = document.activeElement;
   $('pause-menu').classList.remove('hide');
   setUnderlyingGameUiInert(true, 'pause-menu');
-  releaseFlightPointerLock();
-  setSettingsSection('controls');
-  $('settings-tab-controls').focus();
+  if (openedFromFlight) releaseFlightPointerLock();
+  $('settings-kicker').textContent = openedFromFlight ? 'FLIGHT SETTINGS' : 'GAME SETTINGS';
+  $('pause-title').textContent = openedFromFlight ? '비행 설정' : '게임 설정';
+  $('settings-context').textContent = openedFromFlight
+    ? '온라인 경기는 메뉴를 연 동안에도 계속 진행됩니다.'
+    : '음소거와 음량을 원하는 수준으로 조절하세요.';
+  $('resume-btn').textContent = openedFromFlight ? '비행 계속하기' : '설정 닫기';
+  $('pause-leave-btn').classList.toggle('hide', !openedFromFlight);
+  setSettingsSection(section);
+  $(`settings-tab-${section}`)?.focus();
+}
+
+function openPauseMenu() {
+  if (game.phase !== 'playing' && game.phase !== 'countdown') return;
+  openSettingsMenu('controls');
 }
 
 function resumeFlight() {
+  const shouldResumePointerLock = settingsOpenedFromFlight;
   suppressPauseOnPointerUnlock = true;
   closePauseMenu();
-  if (game.phase === 'playing' || game.phase === 'countdown') requestFlightPointerLock();
+  settingsOpenedFromFlight = false;
+  if (shouldResumePointerLock && (game.phase === 'playing' || game.phase === 'countdown')) requestFlightPointerLock();
 }
 
 touchFlightKeys = createTouchKeyState(touchKeys, {
@@ -4291,6 +4718,7 @@ $('mouse-invert-y-toggle').checked = mouseInvertY;
 const canvas = $('c');
 touchLook = createTouchLookState({
   onMove: (movementX, movementY) => {
+    recenteringView = false;
     freeLook = updateFreeLook(freeLook, movementX, movementY, 0.004, mouseInvertY);
   }
 });
@@ -4325,6 +4753,8 @@ canvas.addEventListener('click', event => {
 
 document.addEventListener('mousemove', event => {
   if (document.pointerLockElement !== $('c')) return;
+  // 직접 시점을 움직이면 복귀 중이던 애니메이션을 즉시 놓아줍니다.
+  if (event.movementX || event.movementY) recenteringView = false;
   freeLook = updateFreeLook(freeLook, event.movementX, event.movementY, 0.0022, mouseInvertY);
 });
 
@@ -4352,6 +4782,11 @@ addEventListener('keydown', e => {
       trapModalFocus(e, $('results'))) return;
 
   const pauseOpen = isPauseMenuOpen();
+  if (pauseOpen && e.code === 'Escape' && !e.repeat) {
+    e.preventDefault();
+    resumeFlight();
+    return;
+  }
   if (!$('respawn-overlay').classList.contains('hide')) return;
   const pauseAction = pauseMenuAction({
     code: e.code,
@@ -4372,6 +4807,7 @@ addEventListener('keydown', e => {
   if (!shouldCaptureGameKey(e)) return;
   keyboardKeys[e.code] = true;
   e.preventDefault();
+  if (e.code === 'KeyC' && !e.repeat) recenteringView = !isFreeLookCentered(freeLook);
   if (e.code === 'KeyN' && !e.repeat) {
     minimapMode = toggleMinimapMode(minimapMode);
     updateMinimapModeLabel();
@@ -4406,6 +4842,7 @@ let sendAcc = 0, roundClock = 0;
 
 function physics(dt) {
   const wasDashing = me.dashing;
+  const wasOverheated = me.engineOverheated;
   let inTh = 0;
   for (const thermal of thermals) {
     const distance = Math.hypot(
@@ -4422,11 +4859,21 @@ function physics(dt) {
   const energyStep = updateEnergy(
     me.energy,
     dt,
-    keys.ShiftLeft || keys.ShiftRight
+    keys.ShiftLeft || keys.ShiftRight,
+    me.engineOverheated
   );
   me.energy = energyStep.energy;
   me.dashing = energyStep.dashRatio > 0;
-  if (!wasDashing && me.dashing) audioDirector.play('dash');
+  me.engineOverheated = energyStep.overheated;
+  overheatVisualTarget = me.engineOverheated ? 1 : 0;
+  dashVisualTarget = me.dashing
+    ? THREE.MathUtils.clamp(.58 + energyStep.dashRatio * .42, 0, 1)
+    : 0;
+  if (!wasDashing && me.dashing) {
+    audioDirector.play('dash');
+    triggerDashImpact();
+  }
+  if (!wasOverheated && me.engineOverheated) triggerOverheatImpact();
   const dashSpeedDelta = dashAcceleration(me.speed) * dt * energyStep.dashRatio;
 
   if (rapierFlight) {
@@ -4444,7 +4891,7 @@ function physics(dt) {
     me.speed = Math.max(3, state.speed);
   } else {
     const controlAuthority = THREE.MathUtils.clamp(1.35 - aeroProfile.stability * .25, .9, 1.3);
-    Object.assign(me, updateAttitude(me, keys, dt * controlAuthority, game.mode));
+    Object.assign(me, updateAttitude(me, keys, dt * controlAuthority, game.mode, aeroProfile));
 
     const stabilityRate = THREE.MathUtils.clamp(aeroProfile.stability, .2, 1.25);
     if (!keys.KeyA && !keys.KeyD) {
@@ -4461,18 +4908,15 @@ function physics(dt) {
       me.pitch += (pitchTarget - me.pitch) * (1 - Math.pow(.35, dt * stabilityRate));
     }
 
-    me.pitch = game.mode === 'DIST'
-      ? normalizeAngle(me.pitch)
-      : THREE.MathUtils.clamp(me.pitch, -.95, .75);
-    me.roll = THREE.MathUtils.clamp(me.roll, -.95, .95);
-
     const dragCoefficient = DRAG * aeroProfile.dragScale;
     me.speed += dashSpeedDelta;
     me.speed += (-Math.sin(me.pitch) * GRAVITY - dragCoefficient * me.speed * me.speed) * dt;
-    me.speed = Math.max(me.speed, 3);
+    me.speed = THREE.MathUtils.clamp(me.speed, 3, aeroProfile.maxSpeed);
     if (me.speed < aeroProfile.stallSpeed) {
       me.pitch -= (aeroProfile.stallSpeed - me.speed) * .34 * dt;
     }
+    me.pitch = THREE.MathUtils.clamp(me.pitch, -aeroProfile.maxPitchDown, aeroProfile.maxPitchUp);
+    me.roll = THREE.MathUtils.clamp(me.roll, -aeroProfile.maxRoll, aeroProfile.maxRoll);
 
     dir.set(
       -Math.sin(me.yaw) * Math.cos(me.pitch),
@@ -4497,8 +4941,8 @@ function physics(dt) {
         rapierFlight.addAngularVelocity({ x: 0, y: -Math.sign(craft.position.x) * 1.2 * dt, z: 0 });
       }
     }
-    me.dist = Math.max(me.dist, -craft.position.z);
-    if (-craft.position.z > DIST_LEN - 60) craft.position.z = -(DIST_LEN - 60); // 코스 끝
+    me.dist = Math.max(me.dist, Math.min(DIST_LEN, -craft.position.z));
+    if (window.flightWorldState.isFinishCrossed(craft.position.z, DIST_LEN)) return finishLocal();
   } else {
     const r = Math.hypot(craft.position.x, craft.position.z);
     if (r > ARENA_R - 6) {
@@ -4543,6 +4987,8 @@ function physics(dt) {
         rapierFlight?.boostSpeed(6);
       }
     }
+    me.speed = THREE.MathUtils.clamp(me.speed, 3, aeroProfile.maxSpeed);
+    rapierFlight?.limitSpeed(aeroProfile.maxSpeed);
   }
 }
 
@@ -4554,11 +5000,16 @@ renderer.setAnimationLoop(timestamp => {
   if (!graphicsQaFrozen) {
     thermalMat.uniforms.uTime.value = elapsed;
     animateCostumes(scene, elapsed);
+    animateArenaFlyObjects(arenaFlyObjects, elapsed);
   }
 
   if (game.phase === 'lobby') {
     thermalVisualTarget = 0;
+    dashVisualTarget = 0;
+    overheatVisualTarget = 0;
     updateThermalScreenEffect(dt);
+    updateDashScreenEffect(dt);
+    updateOverheatScreenEffect(dt);
     renderScene(dt);
     return;
   }
@@ -4572,13 +5023,20 @@ renderer.setAnimationLoop(timestamp => {
   if (game.phase === 'launch' && !graphicsQaFrozen) updateLaunch(performance.now());
 
   if (game.phase === 'playing') {
+    if (!graphicsQaFrozen) worldTimeElapsed += dt;
     roundClock = net.room?.phase === 'live'
       ? Math.max(0, (now - me.lifeStartedAt) / 1000)
       : Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
     if (me.alive && !graphicsQaFrozen) physics(dt);
   }
-  if (game.phase !== 'playing' || !me.alive) thermalVisualTarget = 0;
+  if (game.phase !== 'playing' || !me.alive) {
+    thermalVisualTarget = 0;
+    dashVisualTarget = 0;
+    overheatVisualTarget = 0;
+  }
   updateThermalScreenEffect(dt);
+  updateDashScreenEffect(dt);
+  updateOverheatScreenEffect(dt);
 
   if (!graphicsQaFrozen) {
     stepDarts(dt);
@@ -4640,15 +5098,22 @@ renderer.setAnimationLoop(timestamp => {
     );
     camera.lookAt(lookAt);
   } else {
-    fwdH.set(-Math.sin(followYaw), 0, -Math.cos(followYaw));
+    if (recenteringView) {
+      freeLook = recenterFreeLook(freeLook, dt);
+      if (isFreeLookCentered(freeLook)) {
+        freeLook = { yaw: 0, pitch: 0 };
+        recenteringView = false;
+      }
+    }
     const orbitYaw = followYaw + freeLook.yaw;
     const speedCameraAmount = THREE.MathUtils.clamp((me.speed - 22) / 48, 0, 1);
-    const orbitRadius = 16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0);
-    const orbitHorizontal = Math.cos(freeLook.pitch) * orbitRadius;
+    const orbitRadius = (16 + speedCameraAmount * 3 + (me.dashing ? 1.2 : 0)) * 1.3;
+    // 기체를 구의 중심에 두어 어느 방향으로 돌려도 거리와 상하 대칭이 유지됩니다.
+    const orbitOffset = orbitCameraOffset(orbitYaw, freeLook.pitch, orbitRadius);
     camPos.set(
-      followPos.x + Math.sin(orbitYaw) * orbitHorizontal,
-      followPos.y + 4.8 + Math.sin(freeLook.pitch) * orbitRadius,
-      followPos.z + Math.cos(orbitYaw) * orbitHorizontal
+      followPos.x + orbitOffset.x,
+      followPos.y + orbitOffset.y,
+      followPos.z + orbitOffset.z
     );
     if (graphicsQaFrozen) {
       camera.position.copy(camPos);
@@ -4657,8 +5122,8 @@ renderer.setAnimationLoop(timestamp => {
       camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
       camera.up.lerp(tmpV.set(0, 1, 0), 1 - Math.pow(0.02, dt));
     }
-    lookAt.copy(followPos).addScaledVector(fwdH, 2.5);
-    lookAt.y += 1.2;
+    // 주시점은 궤도 중심과 같아야 기체가 화면 정중앙에 고정됩니다.
+    lookAt.copy(followPos);
     camera.lookAt(lookAt);
   }
   const targetFov = speedFov(me.speed, me.dashing && me.alive);
@@ -4682,6 +5147,7 @@ renderer.setAnimationLoop(timestamp => {
     ground.position.set(0, 0, 0);
     grid.position.set(0, 0.05, 0);
   }
+  applyTimeOfDay();
   if (!csm) {
     const lightPosition = sunPositionForTarget(followPos);
     sun.position.set(lightPosition.x, lightPosition.y, lightPosition.z);
@@ -4707,14 +5173,22 @@ renderer.setAnimationLoop(timestamp => {
   /* ---- HUD ---- */
   $('s-main').textContent = game.mode === 'ARENA' ? Math.floor(me.surv) : Math.floor(me.dist);
   $('s-alt').textContent = Math.floor(craft.position.y);
-  $('s-spd').textContent = Math.floor(me.speed * 3.6);
+  const speedKmh = Math.floor(me.speed * 3.6);
+  const maxSpeedKmh = Math.floor(aeroProfile.maxSpeed * 3.6);
+  $('s-spd').textContent = speedKmh;
   const fill = $('s-fill');
-  fill.style.width = Math.min(100, (me.speed / 70) * 100) + '%';
+  fill.style.width = Math.min(100, (me.speed / aeroProfile.maxSpeed) * 100) + '%';
   fill.classList.toggle('stall', me.speed < aeroProfile.stallSpeed);
   $('s-energy').textContent = Math.ceil(me.energy);
   $('energy-fill').style.width = `${me.energy}%`;
   $('energy').classList.toggle('dashing', me.dashing);
   $('energy').classList.toggle('low', me.energy < DART_ENERGY_COST);
+  $('energy').classList.toggle('overheated', me.engineOverheated);
+  $('energy-label').textContent = me.engineOverheated ? 'ENGINE OVERHEAT · 냉각 중' : 'ENERGY · 에너지';
+  $('energy').setAttribute('aria-label', me.engineOverheated ? '엔진 과열, 냉각 중' : '에너지');
+  $('energy').setAttribute('aria-valuenow', String(Math.ceil(me.energy)));
+  $('gauge').setAttribute('aria-valuemax', String(maxSpeedKmh));
+  $('gauge').setAttribute('aria-valuenow', String(Math.min(maxSpeedKmh, speedKmh)));
   audioDirector.setFlight({ speed: me.speed, dashing: me.dashing, alive: me.alive && game.phase === 'playing' });
   drawMinimap(timestamp);
 

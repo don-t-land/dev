@@ -1,13 +1,16 @@
 (function exposeCostumeState(root, factory) {
-  const api = factory();
+  const templates = typeof module === 'object' && module.exports
+    ? require('./costume-template.js')
+    : root?.costumeTemplates;
+  const api = factory(templates);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.costumeState = api;
-})(typeof globalThis === 'object' ? globalThis : this, () => {
+})(typeof globalThis === 'object' ? globalThis : this, templates => {
   const STORAGE_KEY = 'pp_costume';
-  const HATS = Object.freeze(['none', 'santa', 'magic', 'police']);
-  const NOSES = Object.freeze(['none', 'rudolph']);
-  const WINGS = Object.freeze(['none', 'twin-jets']);
-  const DEFAULT_COSTUME = Object.freeze({ hat: 'none', nose: 'none', wings: 'none' });
+  const HATS = templates?.OPTIONS_BY_SLOT?.hat || Object.freeze(['none', 'santa', 'magic', 'police']);
+  const NOSES = templates?.OPTIONS_BY_SLOT?.nose || Object.freeze(['none', 'rudolph']);
+  const WINGS = templates?.OPTIONS_BY_SLOT?.wings || Object.freeze(['none', 'twin-jets']);
+  const DEFAULT_COSTUME = templates?.DEFAULT_COSTUME || Object.freeze({ hat: 'none', nose: 'none', wings: 'none' });
 
   function normalize(value) {
     let candidate = value;

@@ -1,6 +1,6 @@
 {
   "name": "paper-plane-multi",
-  "version": "1.7.7",
+  "version": "1.8.1",
   "private": true,
   "description": "Three.js and WebSocket multiplayer paper-plane game",
   "main": "server.js",

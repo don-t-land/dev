@@ -5,6 +5,7 @@ const test = require('node:test');
 
 const projectRoot = path.join(__dirname, '..');
 const costumeState = require('../public/costume-state.js');
+const costumeTemplates = require('../public/costume-template.js');
 
 test('costumes use independent head, nose, and paired-wing slots with safe persisted values', () => {
   assert.deepEqual(costumeState.HATS, ['none', 'santa', 'magic', 'police']);
@@ -30,7 +31,7 @@ test('the home costume panel exposes every requested item and three body-part gr
   assert.match(html, /data-costume-slot="hat"/);
   assert.match(html, /data-costume-slot="nose"/);
   assert.match(html, /data-costume-slot="wings"/);
-  assert.match(html, /기수 위/);
+  assert.match(html, /중앙 날개 뒤쪽/);
   assert.match(html, /양쪽 날개/);
   assert.match(html, /비행기 가장 앞부분/);
   assert.equal((html.match(/class="costume-preview-3d"/g) || []).length, 5);
@@ -39,22 +40,39 @@ test('the home costume panel exposes every requested item and three body-part gr
   assert.match(css, /@media \(max-width: 620px\)/);
 });
 
-test('procedural 3d costumes anchor hats at the head and jet engines to both wings', () => {
+test('costume templates define typed attachment transforms for flight and standing showrooms', () => {
   const source = fs.readFileSync(path.join(projectRoot, 'public', 'costume-3d.js'), 'utf8');
-  assert.match(source, /hat: Object\.freeze\(\{ position: \[0, \.22, -\.72\]/);
-  assert.match(source, /nose: Object\.freeze\(\{ position: \[0, \.02, -1\.96\]/);
+  assert.equal(costumeTemplates.ITEMS.santa.type, 'head');
+  assert.equal(costumeTemplates.ITEMS.rudolph.type, 'nose');
+  assert.equal(costumeTemplates.ITEMS['twin-jets'].type, 'wing');
+  const standingHead = costumeTemplates.resolveAttachments('santa', 'standing')[0];
+  assert.deepEqual(standingHead.position, [0, -.96, .76]);
+  assert.deepEqual(standingHead.rotation, [Math.PI / 2, 0, 0]);
+  assert.deepEqual(costumeTemplates.resolveAttachments('rudolph', 'standing')[0].position, [0, 3.52, -.2]);
+  const standingWings = costumeTemplates.resolveAttachments('twin-jets', 'standing');
+  assert.equal(standingWings.length, 2);
+  assert.deepEqual(standingWings.map(point => point.rotation), [
+    [Math.PI / 2, 0, 0], [Math.PI / 2, 0, 0]
+  ]);
+  assert.match(source, /costumeTemplates\.resolveAttachments\(itemId, layout\)/);
   assert.match(source, /function makeSantaHat\(/);
   assert.match(source, /function makeRudolphNose\(/);
   assert.match(source, /function makeMagicHat\(/);
   assert.match(source, /function makePoliceLight\(/);
-  assert.match(source, /function makeTwinJetEngines\(/);
-  assert.match(source, /left: Object\.freeze\(\{ position: \[-\.76, -\.06, \.48\]/);
-  assert.match(source, /right: Object\.freeze\(\{ position: \[\.76, -\.06, \.48\]/);
+  assert.match(source, /function makeJetEngine\(/);
+});
+
+test('standing costumes use the animated paper body as their shared attachment frame', () => {
+  const mascotSource = fs.readFileSync(path.join(projectRoot, 'public', 'home-plane-3d.js'), 'utf8');
+  const costumeSource = fs.readFileSync(path.join(projectRoot, 'public', 'costume-3d.js'), 'utf8');
+  assert.match(mascotSource, /costumeMount:\s*body/);
+  assert.match(costumeSource, /layout === 'standing'[\s\S]*owner\.userData\?\.costumeMount\?\.isObject3D/);
+  assert.match(costumeSource, /target\.add\(group\)/);
 });
 
 test('selection cards render the same procedural costume meshes as rotating 3d previews', () => {
   const source = fs.readFileSync(path.join(projectRoot, 'public', 'costume-preview-3d.js'), 'utf8');
-  assert.match(source, /import \{ animateCostumes, createCostumeGroup \} from '\.\/costume-3d\.js'/);
+  assert.match(source, /import \{ animateCostumes, costumeTemplates, createCostumeGroup \} from '\.\/costume-3d\.js'/);
   assert.match(source, /createCostumeGroup\(selectionFor\(id\)\)/);
   assert.match(source, /preview\.object\.rotation\.y = seconds/);
   assert.match(source, /preview\.renderer\.render\(preview\.scene, preview\.camera\)/);

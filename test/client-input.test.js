@@ -6,13 +6,36 @@ const { test } = require('node:test');
 const projectRoot = path.join(__dirname, '..');
 const packageJson = require('../package.json');
 
+test('active flight loop applies authoritative aircraft control envelope and maximum speed', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  for (const field of [
+    'maxSpeed', 'maxPitchDown', 'maxPitchUp', 'maxRoll',
+    'pitchRateScale', 'rollRateScale'
+  ]) {
+    assert.match(html, new RegExp(`requiredAeroFields[\\s\\S]*['\"]${field}['\"]`));
+  }
+  assert.match(html, /updateAttitude\(me,\s*keys,\s*dt\s*\*\s*controlAuthority,\s*game\.mode,\s*aeroProfile\)/);
+  assert.match(html, /me\.pitch\s*=\s*THREE\.MathUtils\.clamp\(me\.pitch,\s*-aeroProfile\.maxPitchDown,\s*aeroProfile\.maxPitchUp\)/);
+  assert.match(html, /me\.roll\s*=\s*THREE\.MathUtils\.clamp\(me\.roll,\s*-aeroProfile\.maxRoll,\s*aeroProfile\.maxRoll\)/);
+  assert.match(html, /me\.speed\s*=\s*THREE\.MathUtils\.clamp\(me\.speed,\s*3,\s*aeroProfile\.maxSpeed\)/);
+  assert.match(html, /me\.speed\s*\+=\s*6;[\s\S]*me\.speed\s*=\s*THREE\.MathUtils\.clamp\(me\.speed,\s*3,\s*aeroProfile\.maxSpeed\)/);
+  const assetVersionPattern = packageJson.version.replace(/\./g, '\\.');
+  for (const asset of [
+    'flight-controls.js', 'paper-fold-model.js', 'paper-aero-profile.js', 'fold-stats-view.js'
+  ]) {
+    assert.match(html, new RegExp(`<script src="\\./${asset.replace('.', '\\.') }\\?v=${assetVersionPattern}"><\\/script>`));
+  }
+  assert.match(html, new RegExp(`import\\('\\./flight-physics-rapier\\.mjs\\?v=${assetVersionPattern}'\\)`));
+});
+
 test('flight keys remain editable inside nickname inputs', () => {
   const { shouldCaptureGameKey, isEditableTarget } = require('../public/input-policy.js');
   const input = { tagName: 'INPUT', isContentEditable: false };
 
   assert.equal(isEditableTarget(input), true);
 
-  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyN', 'Space', 'ShiftLeft', 'ShiftRight']) {
+  for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyN', 'Space', 'ShiftLeft', 'ShiftRight']) {
     assert.equal(shouldCaptureGameKey({ code, target: input }), false, `${code} should reach the input`);
   }
 });
@@ -24,6 +47,7 @@ test('game controls are still captured outside editable fields', () => {
   assert.equal(shouldCaptureGameKey({ code: 'KeyW', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'ShiftLeft', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'KeyN', target: canvas }), true);
+  assert.equal(shouldCaptureGameKey({ code: 'KeyC', target: canvas }), true);
   assert.equal(shouldCaptureGameKey({ code: 'Escape', target: canvas }), false);
 });
 
@@ -281,7 +305,7 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
     assert.match(html, new RegExp(`id="settings-tab-${section}"[^>]*data-settings-tab="${section}"[^>]*role="tab"`));
     assert.match(html, new RegExp(`id="settings-panel-${section}"[^>]*data-settings-panel="${section}"[^>]*role="tabpanel"`));
   }
-  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*156px\s+minmax\(0,\s*1fr\)[^}]*min-height:\s*0/s);
+  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*176px\s+minmax\(0,\s*1fr\)[^}]*min-height:\s*0/s);
   assert.match(html, /\.settings-panels\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(html, /\.settings-panels\s*\{[^}]*min-height:\s*0/s);
   assert.match(html, /@media\s*\(max-width:\s*640px\)[\s\S]*\.settings-layout\s*\{[^}]*grid-template-columns:\s*1fr[^}]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)/s);
@@ -289,30 +313,35 @@ test('settings modal groups controls, graphics, and audio behind a responsive si
   assert.match(html, /panel\.hidden\s*=\s*panel\.dataset\.settingsPanel\s*!==\s*section/);
   assert.match(html, /tab\.setAttribute\('aria-selected',\s*String\(selected\)\)/);
   assert.match(html, /document\.querySelectorAll\('\[data-settings-tab\]'\)/);
-  assert.match(html, /openPauseMenu\(\)[\s\S]*setSettingsSection\('controls'\)[\s\S]*\$\('settings-tab-controls'\)\.focus\(\)/s);
+  assert.match(html, /function openPauseMenu\(\)[\s\S]*openSettingsMenu\('controls'\)/s);
+  assert.match(html, /settings-quick-toggle'\)\.addEventListener\('click',[\s\S]*openSettingsMenu\('audio'\)/);
 });
 
-test('ESC settings modal stays centered at a content-fit width with compact controls', () => {
+test('ESC settings modal stays centered at a content-fit width with unified production controls', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
   assert.match(html, /#pause-menu\s*\{[^}]*align-items:\s*center[^}]*padding-block:\s*16px/s);
-  assert.match(html, /\.settings-modal-card\s*\{[^}]*width:\s*min\(760px,[^}]*height:\s*min\(780px,[^}]*padding:\s*22px[^}]*gap:\s*12px/s);
-  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*156px\s+minmax\(0,\s*1fr\)[^}]*gap:\s*12px/s);
+  assert.match(html, /\.settings-modal-card\s*\{[^}]*width:\s*min\(760px,[^}]*height:\s*min\(780px,[^}]*gap:\s*18px[^}]*font-family:\s*"Noto Sans KR"/s);
+  assert.match(html, /\.settings-layout\s*\{[^}]*grid-template-columns:\s*176px\s+minmax\(0,\s*1fr\)[^}]*gap:\s*18px/s);
   assert.match(html, /\.settings-tab\s*\{[^}]*min-height:\s*44px[^}]*padding:\s*8px\s+10px/s);
   assert.match(html, /\.setting-row\s*\{[^}]*margin-top:\s*8px[^}]*padding:\s*11px/s);
+  assert.match(html, /\.setting-row input\[type="checkbox"\]\s*\{[^}]*appearance:\s*none[^}]*width:\s*22px/s);
+  assert.match(html, /\.audio-settings input\[type="range"\]\s*\{[^}]*width:\s*146px/s);
   assert.match(html, /@media\s*\(max-width:\s*420px\)[\s\S]*\.settings-panel\s+\.setting-row\s*\{[^}]*flex-direction:\s*column/s);
 });
 
 test('the client loads free-flight controls and exposes the ESC settings menu', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
 
-  assert.match(html, /<script\s+src=['"]\.\/flight-controls\.js['"]><\/script>/);
+  assert.match(html, /<script\s+src=['"]\.\/flight-controls\.js(?:\?v=\d+\.\d+\.\d+)?['"]><\/script>/);
   assert.match(html, /id="pause-menu"/);
   assert.match(html, /id="resume-btn"/);
   assert.match(html, /id="pause-leave-btn"/);
   assert.match(html, /id="key-guide-toggle"/);
   assert.match(html, /requestPointerLock\(/);
   assert.match(html, /movementX/);
+  assert.match(html, /const\s*\{[^}]*recenterFreeLook[^}]*isFreeLookCentered[^}]*\}\s*=\s*window\.flightControls/s);
+  assert.match(html, /e\.code\s*===\s*'KeyC'[\s\S]*isFreeLookCentered\(freeLook\)/s);
   assert.doesNotMatch(html, /const DIST_HALF = 155, DIST_LEN = 7500, YAW_LIMIT/);
 });
 
@@ -454,8 +483,8 @@ test('ARENA death releases the mouse and offers a direct lobby exit', () => {
   assert.match(html, /respawn-leave-btn'\)\.addEventListener\('click',[\s\S]{0,220}requestRoundLeave\(\)/);
   assert.match(html, /function showRespawnOverlay\(byName\) \{[\s\S]*clearFlightKeys\(\);[\s\S]*releaseFlightPointerLock\(\);/);
   assert.match(html, /pointerlockchange[\s\S]{0,420}respawn-overlay'\)\.classList\.contains\('hide'\)/);
-  assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,400}respawn-overlay'\)\.classList\.add\('hide'\)/);
-  assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);\s*if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*const pauseAction = pauseMenuAction\(/);
+  assert.match(html, /function enterHome\(msg\) \{[\s\S]{0,420}respawn-overlay'\)\.classList\.add\('hide'\)/);
+  assert.match(html, /const pauseOpen = isPauseMenuOpen\(\);[\s\S]{0,260}if \(!\$\('respawn-overlay'\)\.classList\.contains\('hide'\)\) return;\s*const pauseAction = pauseMenuAction\(/);
   assert.match(flowCss, /#respawn-leave-btn\s*\{[^}]*flex-basis:\s*100%/s);
 });
 
@@ -481,11 +510,11 @@ test('pause and result overlays isolate focus and suspend flight input', () => {
   assert.match(html, /function hideResults\([\s\S]*resultsReturnFocus\s*!==\s*document\.body/);
   assert.match(html, /function trapModalFocus\(/);
   assert.match(html, /const focusable = \[\.\.\.layer\.querySelectorAll\([\s\S]*\.filter\(element => element\.tabIndex >= 0 && !element\.closest\('\[hidden\]'\) && !element\.closest\('\.hide'\)\)/);
-  assert.match(html, /function openPauseMenu\([\s\S]*setSettingsSection\('controls'\)/);
-  assert.match(html, /\$\(['"]settings-tab-controls['"]\)\.focus\(\)/);
+  assert.match(html, /function openSettingsMenu\([\s\S]*setSettingsSection\(section\)/);
+  assert.match(html, /function openPauseMenu\(\)[\s\S]*openSettingsMenu\('controls'\)/);
   assert.match(html, /function enterLobby\([\s\S]*\$\(['"]lob-name['"]\)\.focus\(\)/);
   assert.match(html, /id="results"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="r-title"/);
-  assert.match(html, /if\s*\(pauseOpen\)\s*return/);
+  assert.match(html, /if\s*\(pauseOpen\s*&&\s*e\.code\s*===\s*'Escape'/);
 });
 
 test('result and mobile HUD layouts remain scrollable without overlap', () => {

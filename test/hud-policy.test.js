@@ -3,7 +3,7 @@ const test = require('node:test');
 
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
-  approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
+  approachThermalIntensity, approachDashIntensity, announcementSpec, enqueueBoundedAnnouncement,
   respawnPresentation, authoritativeCrashAction, advancePaperFragment,
   createRespawnRetryController
 } = require('../public/hud-policy.js');
@@ -103,6 +103,16 @@ test('thermal screen intensity eases toward a clamped target and decays cleanly'
   const falling = approachThermalIntensity(0.8, 0, 0.1);
   assert.ok(falling >= 0 && falling < 0.8);
   assert.equal(approachThermalIntensity(0.4, 0.8, 0), 0.4);
+});
+
+test('dash intensity snaps in faster than it releases and remains bounded', () => {
+  const rising = approachDashIntensity(0, 1, 0.1);
+  const falling = approachDashIntensity(1, 0, 0.1);
+  assert.ok(rising > 0.7 && rising < 1);
+  assert.ok(falling > 0 && falling < 0.6);
+  assert.ok(rising > 1 - falling, 'dash onset should respond faster than release');
+  assert.equal(approachDashIntensity(-2, 4, 0), 0);
+  assert.equal(approachDashIntensity(4, -2, 0), 1);
 });
 
 test('authoritative local crash reconciles an already-visible respawn modal', () => {

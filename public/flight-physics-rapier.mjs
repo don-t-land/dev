@@ -20,9 +20,12 @@ export const BETA_AERO_TUNING = Object.freeze({
 });
 const GRAVITY = 21;
 const BASE_SPEED = 22;
+const ATTITUDE_LIMIT_MARGIN = 1e-3;
 const REQUIRED_PROFILE_FIELDS = [
   'liftScale', 'dragScale', 'stallSpeed', 'stability',
-  'rollBias', 'pitchBias', 'span', 'chord'
+  'rollBias', 'pitchBias', 'span', 'chord',
+  'maxSpeed', 'maxPitchDown', 'maxPitchUp', 'maxRoll',
+  'pitchRateScale', 'rollRateScale'
 ];
 
 const finite = value => Number.isFinite(value);
@@ -85,6 +88,36 @@ function rotateVector(vector, quaternion) {
   };
 }
 
+function attitudeYXZ(quaternion) {
+  const { x, y, z, w } = quaternion;
+  const m11 = 1 - 2 * (y * y + z * z);
+  const m13 = 2 * (x * z + y * w);
+  const m21 = 2 * (x * y + z * w);
+  const m22 = 1 - 2 * (x * x + z * z);
+  const m23 = 2 * (y * z - x * w);
+  const m31 = 2 * (x * z - y * w);
+  const m33 = 1 - 2 * (x * x + y * y);
+  const pitch = Math.asin(-clamp(m23, -1, 1));
+  return Math.abs(m23) < .9999999
+    ? { pitch, yaw: Math.atan2(m13, m33), roll: Math.atan2(m21, m22) }
+    : { pitch, yaw: Math.atan2(-m31, m11), roll: 0 };
+}
+
+function quaternionFromAttitudeYXZ(pitch, yaw, roll) {
+  const pitchHalf = pitch / 2;
+  const yawHalf = yaw / 2;
+  const rollHalf = roll / 2;
+  const sx = Math.sin(pitchHalf), cx = Math.cos(pitchHalf);
+  const sy = Math.sin(yawHalf), cy = Math.cos(yawHalf);
+  const sz = Math.sin(rollHalf), cz = Math.cos(rollHalf);
+  return {
+    x: sx * cy * cz + cx * sy * sz,
+    y: cx * sy * cz - sx * cy * sz,
+    z: cx * cy * sz - sx * sy * cz,
+    w: cx * cy * cz + sx * sy * sz
+  };
+}
+
 function sanitizeProfile(profile) {
   if (!profile || !REQUIRED_PROFILE_FIELDS.every(field => finite(profile[field]))) {
     throw new TypeError('A finite server-validated aerodynamic profile is required');
@@ -98,7 +131,13 @@ function sanitizeProfile(profile) {
     rollBias: clamp(profile.rollBias, -.8, .8),
     pitchBias: clamp(profile.pitchBias, -.8, .8),
     span: clamp(profile.span, .1, 4),
-    chord: clamp(profile.chord, .1, 4)
+    chord: clamp(profile.chord, .1, 4),
+    maxSpeed: clamp(profile.maxSpeed, 20, 100),
+    maxPitchDown: clamp(profile.maxPitchDown, .35, 1.4),
+    maxPitchUp: clamp(profile.maxPitchUp, .35, 1.4),
+    maxRoll: clamp(profile.maxRoll, .35, 1.4),
+    pitchRateScale: clamp(profile.pitchRateScale, .35, 2),
+    rollRateScale: clamp(profile.rollRateScale, .35, 2)
   };
 }
 
@@ -173,6 +212,7 @@ export class PaperFlightPhysics {
     this.body.setTranslation(position, true);
     this.body.setRotation(rotation, true);
     this.body.setLinvel(velocity, true);
+    this.limitSpeed();
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.resetForces(true);
     this.body.resetTorques(true);
@@ -191,6 +231,46 @@ export class PaperFlightPhysics {
   boostSpeed(delta) {
     const velocity = this.body.linvel();
     this.body.setLinvel(add(velocity, scale(normalize(velocity), delta)), true);
+    this.limitSpeed();
+  }
+
+  limitSpeed(maxSpeed = this.profile?.maxSpeed) {
+    if (!finite(maxSpeed) || maxSpeed <= 0) return;
+    const velocity = this.body.linvel();
+    const speed = length(velocity);
+    if (speed > maxSpeed) this.body.setLinvel(scale(velocity, maxSpeed / speed), true);
+  }
+
+  limitAttitude() {
+    if (!this.profile) return;
+    const rotation = this.body.rotation();
+    const attitude = attitudeYXZ(rotation);
+    const pitch = clamp(
+      attitude.pitch,
+      -this.profile.maxPitchDown + ATTITUDE_LIMIT_MARGIN,
+      this.profile.maxPitchUp - ATTITUDE_LIMIT_MARGIN
+    );
+    const roll = clamp(
+      attitude.roll,
+      -this.profile.maxRoll + ATTITUDE_LIMIT_MARGIN,
+      this.profile.maxRoll - ATTITUDE_LIMIT_MARGIN
+    );
+    const pitchLimited = pitch !== attitude.pitch;
+    const rollLimited = roll !== attitude.roll;
+    if (!pitchLimited && !rollLimited) return;
+
+    const limitedRotation = quaternionFromAttitudeYXZ(pitch, attitude.yaw, roll);
+    this.body.setRotation(limitedRotation, true);
+    let angularVelocity = this.body.angvel();
+    if (pitchLimited) {
+      const right = rotateVector({ x: 1, y: 0, z: 0 }, limitedRotation);
+      angularVelocity = add(angularVelocity, scale(right, -dot(angularVelocity, right)));
+    }
+    if (rollLimited) {
+      const forward = rotateVector({ x: 0, y: 0, z: -1 }, limitedRotation);
+      angularVelocity = add(angularVelocity, scale(forward, -dot(angularVelocity, forward)));
+    }
+    this.body.setAngvel(angularVelocity, true);
   }
 
   addAngularVelocity(delta) {
@@ -288,10 +368,13 @@ export class PaperFlightPhysics {
     const pitchInput = clamp(Number(input.pitch) || 0, -1, 1);
     const rollInput = clamp(Number(input.roll) || 0, -1, 1);
     const controlAuthority = clamp(1.35 - this.profile.stability * .25, .9, 1.3);
-    let torque = scale(right, pitchInput * 4.8 * controlAuthority + this.profile.pitchBias * 1.9);
+    let torque = scale(
+      right,
+      pitchInput * 4.8 * controlAuthority * this.profile.pitchRateScale + this.profile.pitchBias * 1.9
+    );
     torque = add(torque, scale(
       forward,
-      -(rollInput * 5.8 * controlAuthority + this.profile.rollBias * 2.2)
+      -(rollInput * 5.8 * controlAuthority * this.profile.rollRateScale + this.profile.rollBias * 2.2)
     ));
     if (speed < this.profile.stallSpeed) {
       torque = add(torque, scale(right, -(this.profile.stallSpeed - speed) * .14));
@@ -302,6 +385,8 @@ export class PaperFlightPhysics {
     this.body.addForce(force, true);
     this.body.addTorque(torque, true);
     this.world.step();
+    this.limitAttitude();
+    this.limitSpeed();
   }
 
   advance(frameDelta, input = {}) {

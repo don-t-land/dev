@@ -1,12 +1,10 @@
 import * as THREE from 'three';
-import { animateCostumes, createCostumeGroup } from './costume-3d.js';
+import { animateCostumes, costumeTemplates, createCostumeGroup } from './costume-3d.js';
 
 const previews = [];
 
 function selectionFor(id) {
-  if (id === 'rudolph') return { hat: 'none', nose: 'rudolph', wings: 'none' };
-  if (id === 'twin-jets') return { hat: 'none', nose: 'none', wings: 'twin-jets' };
-  return { hat: id, nose: 'none', wings: 'none' };
+  return costumeTemplates.selectionForItem(id);
 }
 
 function centerObject(object) {
@@ -37,7 +35,8 @@ function mountPreview(canvas) {
   const camera = new THREE.PerspectiveCamera(30, 1, .1, 50);
   const id = canvas.dataset.costumePreview;
   const costume = createCostumeGroup(selectionFor(id));
-  const objectName = id === 'rudolph' ? 'noseCostume' : id === 'twin-jets' ? 'wingCostume' : 'hatCostume';
+  const slot = costumeTemplates.ITEMS[id]?.slot;
+  const objectName = slot === 'wings' ? 'wingCostume' : `${slot}Costume`;
   const object = costume.getObjectByName(objectName);
   if (!object) return;
   costume.remove(object);

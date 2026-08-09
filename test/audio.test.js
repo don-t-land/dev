@@ -111,7 +111,7 @@ test('client loads audio before the game module and wires scenes, cues, actions,
   const moduleIndex = html.indexOf('<script type="module">');
 
   assert.ok(policyIndex >= 0 && engineIndex > policyIndex && moduleIndex > engineIndex);
-  for (const id of ['audio-quick-toggle', 'audio-muted', 'audio-master', 'audio-music', 'audio-sfx', 'audio-reduced']) {
+  for (const id of ['audio-quick-toggle', 'settings-quick-toggle', 'audio-muted', 'audio-master', 'audio-music', 'audio-sfx', 'audio-reduced']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /function updateAudioQuickToggle/);
@@ -127,6 +127,24 @@ test('client loads audio before the game module and wires scenes, cues, actions,
   assert.match(html, /audioDirector\.play\('pickup'\)/);
   assert.match(html, /paper-plane-selected[\s\S]*audioDirector\.play\('select'\)/);
   assert.doesNotMatch(html, /function showResults\(results\) \{[\s\S]{0,220}audioDirector\.play\('result'\)/);
+});
+
+test('settings use a shared web font, vector icons, and platform-neutral form controls', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'public/index.html'), 'utf8');
+
+  assert.match(html, /fonts\.googleapis\.com\/css2\?family=Black\+Han\+Sans&family=Noto\+Sans\+KR/);
+  assert.match(html, /\.settings-modal-card\s*\{[^}]*font-family:\s*"Noto Sans KR",\s*sans-serif/s);
+  for (const icon of ['volume-on', 'volume-off', 'settings', 'controls', 'graphics', 'audio']) {
+    assert.match(html, new RegExp(`id="ui-icon-${icon}"`));
+  }
+  assert.match(html, /id="audio-quick-toggle"[\s\S]*href="#ui-icon-volume-on"/);
+  assert.doesNotMatch(html, /id="audio-quick-toggle"[^>]*>\s*[🔊🔇]/u);
+  assert.doesNotMatch(html, /id="settings-quick-toggle"[^>]*>\s*⚙/u);
+  assert.doesNotMatch(html, /button\.textContent\s*=\s*muted\s*\?\s*'🔇'/u);
+  assert.match(html, /input\[type="checkbox"\][^}]*appearance:\s*none/s);
+  assert.match(html, /input\[type="range"\]::-webkit-slider-thumb/);
+  assert.match(html, /input\[type="range"\]::-moz-range-thumb/);
+  assert.match(html, /\.setting-row select\s*\{[^}]*appearance:\s*none/s);
 });
 
 test('leaving a round silences flight ambience before the server acknowledgement', () => {

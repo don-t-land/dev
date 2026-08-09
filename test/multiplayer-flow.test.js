@@ -173,7 +173,7 @@ test('DIST and ARENA share READY and folding flow while retaining mode-specific 
 });
 
 test('fold-derived aerodynamic profile drives the actual flight loop and HUD', () => {
-  assert.match(html, /<script src="\.\/paper-aero-profile\.js"><\/script>/);
+  assert.match(html, /<script src="\.\/paper-aero-profile\.js(?:\?v=\d+\.\d+\.\d+)?"><\/script>/);
   assert.match(html, /deriveAerodynamicProfile\(sourceModel\)/);
   assert.match(html, /initialCommands:\s*selectedPlaneCommands\(\)/);
   assert.match(html, /function applyCraftSnapshots\(crafts\)/);
@@ -185,6 +185,12 @@ test('fold-derived aerodynamic profile drives the actual flight loop and HUD', (
   assert.match(html, /aeroProfile\.rollBias/);
   assert.match(html, /aeroProfile\.pitchBias/);
   assert.match(html, /id="s-aero"/);
+});
+
+test('Rapier cache identity includes the authoritative aerodynamic profile', () => {
+  assert.match(html, /requiredAeroFields\.map\(field => aeroProfile\[field\]\)\.join\(','\)/);
+  assert.match(html, /physicsCommandKey !== physicsProfileKey/);
+  assert.match(html, /physicsCommandKey = physicsProfileKey/);
 });
 
 test('ARENA hides the round timer and renders a readable live ranking', () => {
@@ -211,7 +217,7 @@ test('folded craft and server-timed rooftop launch sequence are connected to are
 });
 
 test('Rapier fixed-step physics is wired to folded colliders, forces, and map collisions', () => {
-  assert.match(html, /import\('\.\/flight-physics-rapier\.mjs'\)/);
+  assert.match(html, /import\('\.\/flight-physics-rapier\.mjs(?:\?v=\d+\.\d+\.\d+)?'\)/);
   assert.match(html, /makeColliderVertices\(activePaperModel\)/);
   assert.match(html, /rapierFlight\.advance\(dt/);
   assert.match(html, /rapierFlight\?\.setMapColliders\(\{ colliders: terrainColliders \}\)/);

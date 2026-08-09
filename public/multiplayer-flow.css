@@ -205,6 +205,9 @@
 .fold-stats .fold-stat-value { text-align:right; font-variant-numeric:tabular-nums; }
 .fold-help { display:flex; align-items:center; padding:0 4px; color:#9dafcc; font-size:11px; line-height:1.5; }
 .fold-angle-badge { position:absolute; left:50%; bottom:20px; transform:translateX(-50%); padding:9px 18px; border-radius:99px; border:1px solid rgba(134,220,245,.3); background:rgba(4,9,29,.72); color:#8ceaf4; font:900 22px/1 ui-monospace,monospace; letter-spacing:.02em; pointer-events:none; z-index:3; }
+@media (min-width:761px) {
+  .fold-top { padding-right:clamp(108px,9vw,124px); }
+}
 @media (max-width:760px) {
   .fold-preview-title { top:12px; left:16px; transform:none; font-size:14px; }
   .fold-side { top:10px; right:10px; width:158px; padding:9px; }
@@ -250,6 +253,48 @@
   .room-entry-card h2 { font-size:38px; }
   .entry-name-field { margin-top:12px; }
   #entry-room-list { max-height:94px; }
+}
+
+/* 노트북의 짧은 뷰포트에서도 기체 쇼룸과 조작 패널을 한 화면에 맞춘다. */
+@media (min-width:761px) and (max-height:820px) {
+  #folding-screen { row-gap:clamp(6px,1.2dvh,10px); padding:clamp(8px,1.7dvh,16px); }
+  .fold-top { align-items:center; }
+  .fold-kicker { font-size:8px; }
+  .fold-top h2 { margin-top:2px; font-size:clamp(24px,4.8dvh,38px); }
+  .fold-timer { min-width:76px; font-size:clamp(29px,6dvh,46px); }
+  .fold-stage { border-radius:10px 22px 10px 22px; }
+  .fold-preview-title { top:10px; padding:7px 10px; font-size:15px; }
+  .fold-showroom-plaque { left:clamp(198px,20vw,232px); top:13px; }
+  .fold-presets { inset:10px auto 10px 10px; width:clamp(180px,19vw,210px); padding:10px 7px 7px; }
+  .fold-side { top:10px; right:10px; width:clamp(190px,20vw,218px); gap:6px; padding:10px; }
+  .fold-panel-heading { gap:2px; padding-bottom:6px; }
+  .fold-panel-heading strong { font-size:13px; }
+  .fold-preset-list { gap:5px; }
+  .fold-preset-card { grid-template-columns:54px minmax(0,1fr); gap:7px; min-height:clamp(50px,9dvh,62px); padding:5px; }
+  .fold-preset-thumb { width:54px; height:35px; }
+  .fold-preset-label { font-size:11px; }
+  .fold-preset-tagline, .fold-preset-stats { font-size:9px; }
+  .fold-stats .fold-stat-row { grid-template-columns:50px 1fr 50px 12px; gap:5px; margin:3px 0; font-size:10px; }
+  .fold-help { font-size:10px; line-height:1.35; }
+  .fold-controls { gap:9px; }
+  .fold-btn { min-height:38px; padding-inline:12px; font-size:11px; }
+  .fold-hint { bottom:9px; padding:6px 10px; font-size:9px; }
+  .fold-angle-badge { bottom:12px; padding:7px 14px; font-size:17px; }
+  .fold-platform { bottom:8%; width:min(42%,410px); }
+}
+
+@media (min-width:761px) and (max-height:650px) {
+  .fold-kicker, .fold-showroom-plaque, .fold-preset-tagline, .fold-preset-stats, .fold-help { display:none; }
+  .fold-top h2 { font-size:23px; }
+  .fold-timer { font-size:29px; }
+  .fold-presets { width:174px; }
+  .fold-side { width:180px; padding:8px; }
+  .fold-preset-card { grid-template-columns:46px minmax(0,1fr); min-height:43px; }
+  .fold-preset-thumb { width:46px; height:30px; }
+  .fold-stats .fold-stat-row { margin:2px 0; font-size:9px; }
+  .fold-controls { grid-template-columns:auto 1fr auto; }
+  .fold-direction { flex-direction:row; }
+  .fold-btn { min-height:34px; }
 }
 
 #respawn-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(6,9,26,.62); backdrop-filter:blur(3px); z-index:60; pointer-events:auto; }
@@ -355,4 +400,16 @@
   .fold-showroom-plaque { display: none; }
   .fold-preview-title { padding: 7px 9px; }
   .fold-platform { bottom: 27%; width: 66%; }
+}
+
+/* 전시 테마의 후순위 규칙보다 노트북 높이 최적화를 우선한다. */
+@media (min-width:761px) and (max-height:820px) {
+  .fold-stage { border-radius:10px 22px 10px 22px; }
+  .fold-preview-title { top:10px; padding:7px 10px; font-size:15px; }
+  .fold-showroom-plaque { left:clamp(198px,20vw,232px); top:13px; }
+  .fold-platform { bottom:8%; width:min(42%,410px); }
+}
+
+@media (min-width:761px) and (max-height:650px) {
+  .fold-showroom-plaque { display:none; }
 }

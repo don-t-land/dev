@@ -23,7 +23,8 @@ const { deriveAerodynamicProfile } = require('./public/paper-aero-profile.js');
 const { normalize: normalizeCostume } = require('./public/costume-state.js');
 const {
   buildArenaLayout,
-  findArenaSpawn
+  findArenaSpawn,
+  DIST_LEN
 } = require('./public/map-gen.js');
 
 const DEFAULT_AERO_PROFILE = deriveAerodynamicProfile(createPaperModel());
@@ -509,6 +510,15 @@ function onCrash(room, player, killer) {
   checkEarlyEnd(room);
 }
 
+function onFinish(room, player) {
+  if (room.mode !== 'DIST' || room.phase !== 'playing' || !player.alive || !player.state) return;
+  if (player.state.p[2] > -(DIST_LEN - 12)) return;
+  player.score = DIST_LEN;
+  player.alive = false;
+  bcast(room, { t: 'finished', id: player.id, score: DIST_LEN });
+  checkEarlyEnd(room);
+}
+
 function checkEarlyEnd(room) {
   if (room.phase !== 'playing') return;
   const alive = room.order
@@ -921,6 +931,9 @@ wss.on('connection', (ws) => {
 
     /* -- 자체 추락 신고 -- */
     if (m.t === 'crash') { onCrash(room, me); return; }
+
+    /* -- 멀리 날기 결승선 통과 신고: 마지막 권위 위치가 결승선에 닿은 경우만 인정 -- */
+    if (m.t === 'finish') { onFinish(room, me); return; }
 
     /* -- 발사 중계 (아레나) -- */
     if (m.t === 'shoot') {

@@ -9,8 +9,10 @@
   const ROLL_BALANCED = 0.05;
 
   const ROWS = [
+    { key: 'maxSpeed', label: '최고속도', min: 38, max: 72, goodWhen: 'high' },
     { key: 'liftScale', label: '양력', min: 0.15, max: 1.8, goodWhen: 'high' },
     { key: 'dragScale', label: '항력', min: 0.25, max: 2.2, goodWhen: 'low' },
+    { key: 'rollRateScale', label: '선회력', min: 0.68, max: 1.42, goodWhen: 'high' },
     { key: 'stability', label: '안정성', min: 0.2, max: 1.25, goodWhen: 'high' },
     { key: 'stallSpeed', label: '실속속도', min: 8, max: 42, goodWhen: 'low' },
     { key: 'rollBias', label: '좌우균형', min: -0.65, max: 0.65, goodWhen: 'center' }
@@ -26,6 +28,7 @@
       const side = value < 0 ? '좌' : '우';
       return `${side} ${Math.round(Math.abs(value) / row.max * 100)}%`;
     }
+    if (row.key === 'maxSpeed') return `${Math.round(value * 3.6)} km/h`;
     if (row.key === 'stallSpeed') return `${Math.round(value)} m/s`;
     return `${Math.round(value * 100)}%`;
   }

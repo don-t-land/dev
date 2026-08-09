@@ -85,6 +85,16 @@
     return Math.abs(next - to) < 0.001 ? to : Math.min(1, Math.max(0, next));
   }
 
+  function approachDashIntensity(current, target, deltaSeconds) {
+    const from = Math.min(1, Math.max(0, finite(current, 0)));
+    const to = Math.min(1, Math.max(0, finite(target, 0)));
+    const dt = Math.max(0, finite(deltaSeconds, 0));
+    if (dt === 0) return from;
+    const response = to > from ? 14 : 7;
+    const next = from + (to - from) * (1 - Math.exp(-response * dt));
+    return Math.abs(next - to) < 0.001 ? to : Math.min(1, Math.max(0, next));
+  }
+
   function enqueueBoundedAnnouncement(queue, spec, maxLength = 6) {
     if (!Array.isArray(queue)) throw new TypeError('announcement queue must be an array');
     const limit = Math.max(1, Math.floor(finite(maxLength, 6)));
@@ -224,7 +234,7 @@
 
   return {
     toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
-    approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
+    approachThermalIntensity, approachDashIntensity, announcementSpec, enqueueBoundedAnnouncement,
     respawnPresentation, authoritativeCrashAction, advancePaperFragment,
     createRespawnRetryController
   };

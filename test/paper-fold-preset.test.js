@@ -45,6 +45,18 @@ test('프리셋은 Fold N Fly 공식 측정값과 출처를 그대로 보존한�
   });
 });
 
+test('프리셋 선택 화면은 각 기체의 메인 특장점을 명확히 표시한다', () => {
+  assert.deepStrictEqual(Object.fromEntries(ALL_PRESETS.map(name => [name, {
+    role: PRESET_INFO[name].role,
+    tagline: PRESET_INFO[name].tagline
+  }])), {
+    dart: { role: '밸런스', tagline: '균형 잡힌 비행 성능 · 밸런스' },
+    stable: { role: '기동성', tagline: '가장 빠른 피치와 롤 반응 · 기동성' },
+    stealth: { role: '저속 안정성', tagline: '낮은 실속 속도와 안정적인 활공 · 저속 안정성' },
+    jet: { role: '최대속도', tagline: '가장 높은 최고속도 · 최대속도' }
+  });
+});
+
 for (const name of ALL_PRESETS) {
   test(`${name} 프리셋은 서버에서 재생 가능한 대칭 모델이다`, () => {
     const commands = getPresetCommands(name);
@@ -115,7 +127,7 @@ test('Basic Dart는 최초 소스 기본 메시의 실루엣 비율을 재현한
   });
 });
 
-test('beta 공력은 저양력·저항력 설정의 거리·체공 순위를 재현한다', async () => {
+test('beta 공력 기준 궤적은 고속과 저실속 프리셋 역할을 재현한다', async () => {
   const { createPaperFlightPhysics, makeColliderVertices } = await import('../public/flight-physics-rapier.mjs');
   const outcomes = {};
   for (const name of ALL_PRESETS) {
@@ -137,13 +149,62 @@ test('beta 공력은 저양력·저항력 설정의 거리·체공 순위를 재
     physics.free();
   }
 
-  assert.ok(outcomes.jet.distance > outcomes.stealth.distance);
-  assert.ok(outcomes.stealth.distance > outcomes.stable.distance);
-  assert.ok(outcomes.stable.distance > outcomes.dart.distance);
-  assert.ok(outcomes.stealth.time > outcomes.dart.time);
+  assert.ok(outcomes.jet.distance > outcomes.dart.distance);
   assert.ok(outcomes.stealth.time > outcomes.stable.time);
+  assert.ok(outcomes.stable.time > outcomes.dart.time);
   assert.ok(outcomes.stable.time > outcomes.jet.time);
-  assert.ok(outcomes.jet.time > outcomes.dart.time);
+});
+
+test('프리셋은 역할별 최대속도·자세 제한·조종률 envelope를 제공한다', () => {
+  const profiles = Object.fromEntries(ALL_PRESETS.map(name => [
+    name, deriveAerodynamicProfile(createPresetModel(name))
+  ]));
+
+  assert.deepStrictEqual(Object.fromEntries(ALL_PRESETS.map(name => [name, {
+    liftScale: profiles[name].liftScale,
+    dragScale: profiles[name].dragScale,
+    stallSpeed: profiles[name].stallSpeed,
+    maxSpeed: profiles[name].maxSpeed,
+    maxPitchDown: profiles[name].maxPitchDown,
+    maxPitchUp: profiles[name].maxPitchUp,
+    maxRoll: profiles[name].maxRoll,
+    pitchRateScale: profiles[name].pitchRateScale,
+    rollRateScale: profiles[name].rollRateScale
+  }])), {
+    dart: {
+      liftScale: .9, dragScale: 1, stallSpeed: 13, maxSpeed: 58,
+      maxPitchDown: .9, maxPitchUp: .7, maxRoll: .85,
+      pitchRateScale: 1, rollRateScale: 1
+    },
+    stable: {
+      liftScale: 1.15, dragScale: 1.7, stallSpeed: 9.5, maxSpeed: 45,
+      maxPitchDown: 1.08, maxPitchUp: .88, maxRoll: 1.18,
+      pitchRateScale: 1.5, rollRateScale: 1.65
+    },
+    stealth: {
+      liftScale: 1.3, dragScale: 2.2, stallSpeed: 8.5, maxSpeed: 42,
+      maxPitchDown: .72, maxPitchUp: .5, maxRoll: .62,
+      pitchRateScale: .72, rollRateScale: .68
+    },
+    jet: {
+      liftScale: .8, dragScale: .72, stallSpeed: 14.5, maxSpeed: 72,
+      maxPitchDown: 1.02, maxPitchUp: .8, maxRoll: .98,
+      pitchRateScale: 1.12, rollRateScale: 1.18
+    }
+  });
+
+  assert.ok(profiles.jet.maxSpeed > profiles.dart.maxSpeed);
+  assert.ok(profiles.dart.maxSpeed > profiles.stable.maxSpeed);
+  assert.ok(profiles.stable.maxSpeed > profiles.stealth.maxSpeed);
+  assert.ok(profiles.stable.maxRoll > profiles.jet.maxRoll);
+  assert.ok(profiles.jet.maxRoll > profiles.dart.maxRoll);
+  assert.ok(profiles.dart.maxRoll > profiles.stealth.maxRoll);
+  assert.ok(profiles.stable.rollRateScale > profiles.jet.rollRateScale);
+  assert.ok(profiles.jet.rollRateScale > profiles.dart.rollRateScale);
+  assert.ok(profiles.dart.rollRateScale > profiles.stealth.rollRateScale);
+  assert.ok(profiles.stealth.stallSpeed < profiles.stable.stallSpeed);
+  assert.ok(profiles.stable.stallSpeed < profiles.dart.stallSpeed);
+  assert.ok(profiles.dart.stallSpeed < profiles.jet.stallSpeed);
 });
 
 test('공식 공력 보정은 프리셋 원본에만 적용되고 직접 조정하면 해제된다', () => {
@@ -154,7 +215,7 @@ test('공식 공력 보정은 프리셋 원본에만 적용되고 직접 조정�
     dragScale: tuned.dragScale,
     stallSpeed: tuned.stallSpeed,
     pitchBias: tuned.pitchBias
-  }, { liftScale: .6, dragScale: .65, stallSpeed: 15, pitchBias: .04 });
+  }, { liftScale: .9, dragScale: 1, stallSpeed: 13, pitchBias: .025 });
 
   const adjusted = require('../public/paper-fold-model.js').setFoldAngle(preset, 3, 2.9);
   const custom = deriveAerodynamicProfile(adjusted);

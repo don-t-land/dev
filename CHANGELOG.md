@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.8.1 - 2026-08-09
+
+### Changed
+
+- 최신 운영 `main`의 비행 조작, 기체별 공력·속도 envelope, finish line 시간 변화, HUD, 오디오, 코스튬과 laptop 반응형 개선을 beta 소스에 통합했습니다.
+- beta 전용 correlated respawn retry와 콘텐츠에 맞춘 `760px` 설정 modal 폭을 유지했습니다.
+- browser asset cache key를 앱 버전 `1.8.1`과 일치시켰습니다.
+
+## 1.8.0 - 2026-08-09
+
+### Added
+
+- 기체 공력 프로필에 고유 최고속도, 상승·하강 Pitch 제한, Roll 제한, Pitch/Roll 반응 배율을 추가했습니다.
+- 직접 조정한 custom fold도 형상에서 최대속도와 조종 envelope를 파생하도록 확장했습니다.
+
+### Changed
+
+- Basic Dart를 균형형 기준 기체로 두고, Jet Fighter는 최고속도형, Stealth Glider는 저속·저선회·최저 실속형, The Stable은 저속·고선회·저실속형으로 역할을 강화했습니다.
+- DIST와 ARENA 모두 서버가 검증한 기체별 Pitch/Roll 제한 및 반응 속도를 적용합니다.
+- 대시·하강·부스트 링을 포함한 모든 속도 변화가 기체별 최고속도를 넘지 않으며 HUD 속도 게이지도 현재 기체의 최고속도를 기준으로 표시합니다.
+- 비활성 Rapier 경로도 Y-X-Z 항공 자세 기준으로 yaw 방향과 무관하게 같은 조종 배율·Pitch/Roll 한계를 적용하고, fixed step이 없는 프레임의 대시·링 부스트도 즉시 기체 최고속도로 제한하도록 맞췄습니다.
+- 같은 fold command에 서버 authoritative 공력 프로필만 갱신되어도 Rapier cache identity를 변경해 최신 속도·조종 한계를 즉시 다시 적용합니다.
+- 기체 선택 화면의 역할 설명과 능력치 패널에 최고속도·선회력 비교값을 추가하고, 변경된 browser asset cache key를 앱 버전 `1.8.0`에 맞췄습니다.
+
 ## 1.7.7 - 2026-08-09
 
 ### Changed

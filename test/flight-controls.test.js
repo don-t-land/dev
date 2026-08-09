@@ -10,6 +10,8 @@ const {
   consumeDartEnergy,
   dashAcceleration,
   speedFov,
+  orbitCameraOffset,
+  LOOK_PITCH_LIMIT,
   MAX_ENERGY,
   DART_ENERGY_COST
 } = require('../public/flight-controls.js');
@@ -116,4 +118,53 @@ test('dash acceleration eases at high physical speeds and speed widens the camer
   assert.ok(dashAcceleration(22) > dashAcceleration(60));
   assert.ok(speedFov(60, false) > speedFov(22, false));
   assert.ok(speedFov(60, true) > speedFov(60, false));
+});
+
+test('orbit camera keeps a constant radius from the craft at every look angle', () => {
+  const radius = 16;
+  // 자유 시점 전 범위를 훑어 기체까지의 거리가 흔들리지 않는지 확인합니다.
+  for (let pitch = -LOOK_PITCH_LIMIT; pitch <= LOOK_PITCH_LIMIT; pitch += 0.15) {
+    for (let yaw = -Math.PI; yaw <= Math.PI; yaw += 0.4) {
+      const offset = orbitCameraOffset(yaw, pitch, radius);
+      const distance = Math.hypot(offset.x, offset.y, offset.z);
+      assert.ok(
+        Math.abs(distance - radius) < 1e-9,
+        `pitch ${pitch.toFixed(2)} yaw ${yaw.toFixed(2)} produced radius ${distance}`
+      );
+    }
+  }
+});
+
+test('orbit camera sits level with the craft when the player has not looked around', () => {
+  const level = orbitCameraOffset(0, 0, 16);
+
+  // 위/아래 시야가 대칭이려면 기준면이 기체와 같은 높이여야 합니다.
+  assert.ok(Math.abs(level.y) < 1e-9, `default height ${level.y} must be level with the craft`);
+});
+
+test('orbit camera mirrors looking up and looking down exactly', () => {
+  const radius = 16;
+  for (const angle of [0.2, 0.5, 0.9, LOOK_PITCH_LIMIT]) {
+    const up = orbitCameraOffset(0, angle, radius);
+    const down = orbitCameraOffset(0, -angle, radius);
+
+    // 같은 크기의 입력은 위아래로 같은 높이만큼, 같은 수평거리에서 움직여야 합니다.
+    assert.ok(Math.abs(up.y + down.y) < 1e-9, `asymmetric height at ${angle}: ${up.y} vs ${down.y}`);
+    assert.ok(Math.abs(up.z - down.z) < 1e-9, `asymmetric horizontal reach at ${angle}`);
+    assert.ok(Math.abs(up.x - down.x) < 1e-9, `asymmetric horizontal reach at ${angle}`);
+  }
+});
+
+test('orbit camera yaw sweeps a full circle in the horizontal plane', () => {
+  const radius = 16;
+  const front = orbitCameraOffset(0, 0, radius);
+  const back = orbitCameraOffset(Math.PI, 0, radius);
+  const side = orbitCameraOffset(Math.PI / 2, 0, radius);
+
+  // 정확한 구라면 yaw만 바뀔 때 높이는 그대로여야 합니다.
+  assert.ok(Math.abs(front.y - back.y) < 1e-9, 'yaw must not change height');
+  assert.ok(Math.abs(front.y - side.y) < 1e-9, 'yaw must not change height');
+  assert.ok(Math.abs(front.z - radius) < 1e-9);
+  assert.ok(Math.abs(back.z + radius) < 1e-9);
+  assert.ok(Math.abs(side.x - radius) < 1e-9);
 });

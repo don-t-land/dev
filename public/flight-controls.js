@@ -56,6 +56,20 @@
     return { yaw, pitch };
   }
 
+  // 기체를 정중앙에 둔 완전한 구면 궤도. 어느 각도에서든 반지름이 일정하고,
+  // 위를 볼 때와 아래를 볼 때가 정확히 대칭입니다.
+  function orbitCameraOffset(yaw, pitch, radius) {
+    const orbitYaw = Number(yaw) || 0;
+    const orbitPitch = Number(pitch) || 0;
+    const orbitRadius = Number(radius) || 0;
+    const horizontal = Math.cos(orbitPitch) * orbitRadius;
+    return {
+      x: Math.sin(orbitYaw) * horizontal,
+      y: Math.sin(orbitPitch) * orbitRadius,
+      z: Math.cos(orbitYaw) * horizontal
+    };
+  }
+
   function keyGuideVisibleFromStorage(value) {
     return value !== '0';
   }
@@ -100,6 +114,7 @@
     normalizeAngle,
     updateAttitude,
     updateFreeLook,
+    orbitCameraOffset,
     keyGuideVisibleFromStorage,
     mouseInvertYFromStorage,
     updateEnergy,

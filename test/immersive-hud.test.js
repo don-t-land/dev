@@ -59,6 +59,19 @@ test('updraft replaces text with a full-screen inward wind field driven by smoot
   assert.match(html, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*#thermal-vortex \.wind-streak\s*\{[^}]*animation:\s*none/s);
 });
 
+test('dash adds an outward speed field, impact ring, and boost feedback while accelerating', () => {
+  assert.match(html, /id="dash-vortex"[^>]*aria-hidden="true"/);
+  assert.ok((html.match(/class="dash-streak"/g) || []).length >= 18);
+  assert.match(html, /id="dash-callout"[\s\S]*DASH BOOST[\s\S]*WIND RUSH/);
+  assert.match(html, /@keyframes\s+dash-rush[\s\S]*translateX\(6vmax\)[\s\S]*translateX\(70vmax\)/);
+  assert.match(html, /@keyframes\s+dash-impact/);
+  assert.match(html, /dashVisualTarget\s*=\s*me\.dashing[\s\S]*energyStep\.dashRatio/);
+  assert.match(html, /if\s*\(!wasDashing && me\.dashing\)[\s\S]*triggerDashImpact\(\)/);
+  assert.match(html, /approachDashIntensity\(dashVisualStrength,\s*dashVisualTarget,\s*dt\)/);
+  assert.match(html, /setProperty\('--dash-force'/);
+  assert.match(html, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*#dash-vortex \.dash-streak[^}]*animation:\s*none/s);
+});
+
 test('join, kill, and death use typed, accessible impact announcements', () => {
   assert.match(html, /id="announcement"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/);
   for (const id of ['announcement-kicker', 'announcement-title', 'announcement-detail'])

@@ -178,6 +178,53 @@
     100% { opacity: 0; transform: rotate(var(--angle)) translateX(5vmax) scaleX(.16); }
   }
 
+  #dash-vortex {
+    position: absolute; inset: 0; z-index: 2; --dash-force: 0;
+    opacity: var(--dash-force); overflow: hidden; pointer-events: none; mix-blend-mode: screen;
+    transition: opacity .08s linear;
+  }
+  #dash-vortex::before {
+    content: ""; position: absolute; inset: -8%;
+    background: radial-gradient(circle at 50% 50%, transparent 0 24%, rgba(111,229,255,.04) 45%, rgba(55,156,255,.18) 78%, rgba(255,210,93,.2) 100%);
+    box-shadow: inset 0 0 13vmax rgba(60,183,255,.2);
+    transform: scale(calc(1.08 - var(--dash-force) * .08));
+  }
+  #dash-vortex::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 14vmin; height: 14vmin;
+    border: 2px solid rgba(199,246,255,.84); border-radius: 50%; opacity: 0;
+    transform: translate(-50%, -50%) scale(.25); box-shadow: 0 0 22px rgba(83,204,255,.72);
+  }
+  #dash-vortex.burst::after { animation: dash-impact .48s cubic-bezier(.13,.62,.25,1) both; }
+  #dash-vortex .dash-streak {
+    position: absolute; left: 50%; top: 50%; width: clamp(68px, 10vw, 180px); height: 2px;
+    transform-origin: 0 50%; border-radius: 999px; opacity: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,.92), rgba(88,218,255,.72) 34%, transparent);
+    box-shadow: 0 0 8px rgba(69,191,255,.62);
+    animation: dash-rush var(--speed, .68s) linear infinite; animation-delay: var(--delay);
+    animation-play-state: paused; will-change: transform, opacity;
+  }
+  #dash-vortex.active .dash-streak { animation-play-state: running; }
+  #dash-callout {
+    position: absolute; left: 50%; top: 68%; display: grid; justify-items: center;
+    color: #f3fbff; opacity: calc(var(--dash-force) * .94);
+    transform: translate(-50%, calc(-50% + (1 - var(--dash-force)) * 12px)) scale(calc(.88 + var(--dash-force) * .12));
+    text-align: center; text-shadow: 0 0 9px #36c8ff, 0 0 22px rgba(44,146,255,.9);
+  }
+  #dash-callout strong { font-size: clamp(17px, 2vw, 27px); font-style: italic; letter-spacing: .22em; }
+  #dash-callout strong::before { content: "» "; color: #ffd65c; }
+  #dash-callout strong::after { content: " «"; color: #ffd65c; }
+  #dash-callout small { margin-top: 2px; color: #8fe8ff; font-size: 9px; font-weight: 900; letter-spacing: .3em; }
+  @keyframes dash-rush {
+    0% { opacity: 0; transform: rotate(var(--angle)) translateX(6vmax) scaleX(.12); }
+    16% { opacity: .95; }
+    76% { opacity: .72; }
+    100% { opacity: 0; transform: rotate(var(--angle)) translateX(70vmax) scaleX(2.7); }
+  }
+  @keyframes dash-impact {
+    0% { opacity: .95; transform: translate(-50%, -50%) scale(.25); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(8); }
+  }
+
   #keys {
     padding: 13px 16px; text-align: right;
     color: #e5f0f8; background: rgba(9,18,29,.82); border: 1px solid rgba(200,225,245,.18);
@@ -592,6 +639,7 @@
   @media (prefers-reduced-motion: reduce) {
     .lobby-plane, .cloud { animation: none; }
     #thermal-vortex .wind-streak { animation: none; opacity: 0; }
+    #dash-vortex .dash-streak, #dash-vortex::after { animation: none; opacity: 0; }
     #announcement { transition: none; }
     #announcement.show, #announcement.show .announcement-frame::before { animation: none; }
     #announcement.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
@@ -913,6 +961,29 @@
       <i class="wind-streak" style="--angle:292.5deg;--delay:-1.02s"></i>
       <i class="wind-streak" style="--angle:315deg;--delay:-.39s"></i>
       <i class="wind-streak" style="--angle:337.5deg;--delay:-.77s"></i>
+    </div>
+    <div id="dash-vortex" aria-hidden="true">
+      <i class="dash-streak" style="--angle:0deg;--delay:-.04s;--speed:.58s"></i>
+      <i class="dash-streak" style="--angle:18deg;--delay:-.31s;--speed:.72s"></i>
+      <i class="dash-streak" style="--angle:36deg;--delay:-.55s;--speed:.64s"></i>
+      <i class="dash-streak" style="--angle:54deg;--delay:-.17s;--speed:.77s"></i>
+      <i class="dash-streak" style="--angle:72deg;--delay:-.46s;--speed:.61s"></i>
+      <i class="dash-streak" style="--angle:90deg;--delay:-.68s;--speed:.7s"></i>
+      <i class="dash-streak" style="--angle:108deg;--delay:-.23s;--speed:.56s"></i>
+      <i class="dash-streak" style="--angle:126deg;--delay:-.51s;--speed:.74s"></i>
+      <i class="dash-streak" style="--angle:144deg;--delay:-.09s;--speed:.66s"></i>
+      <i class="dash-streak" style="--angle:162deg;--delay:-.39s;--speed:.79s"></i>
+      <i class="dash-streak" style="--angle:180deg;--delay:-.6s;--speed:.62s"></i>
+      <i class="dash-streak" style="--angle:198deg;--delay:-.27s;--speed:.71s"></i>
+      <i class="dash-streak" style="--angle:216deg;--delay:-.49s;--speed:.57s"></i>
+      <i class="dash-streak" style="--angle:234deg;--delay:-.13s;--speed:.76s"></i>
+      <i class="dash-streak" style="--angle:252deg;--delay:-.43s;--speed:.65s"></i>
+      <i class="dash-streak" style="--angle:270deg;--delay:-.7s;--speed:.73s"></i>
+      <i class="dash-streak" style="--angle:288deg;--delay:-.2s;--speed:.59s"></i>
+      <i class="dash-streak" style="--angle:306deg;--delay:-.53s;--speed:.78s"></i>
+      <i class="dash-streak" style="--angle:324deg;--delay:-.34s;--speed:.63s"></i>
+      <i class="dash-streak" style="--angle:342deg;--delay:-.65s;--speed:.69s"></i>
+      <span id="dash-callout"><strong>DASH BOOST</strong><small>WIND RUSH</small></span>
     </div>
     <div id="announcement" role="status" aria-live="polite" aria-atomic="true">
       <div class="announcement-frame">
@@ -1238,7 +1309,7 @@ const {
 } = window.inputPolicy;
 const {
   toggleMinimapMode, createMinimapView, projectMinimapPoint, shouldRenderMinimap,
-  approachThermalIntensity, announcementSpec, enqueueBoundedAnnouncement,
+  approachThermalIntensity, approachDashIntensity, announcementSpec, enqueueBoundedAnnouncement,
   respawnPresentation, authoritativeCrashAction, advancePaperFragment
 } = window.hudPolicy;
 const { createCombinedKeyState, createTouchKeyState, createTouchLookState } = window.mobileControls;
@@ -3129,11 +3200,27 @@ let minimapMode = 'full';
 let minimapLastDraw = -Infinity;
 let thermalVisualTarget = 0;
 let thermalVisualStrength = 0;
+let dashVisualTarget = 0;
+let dashVisualStrength = 0;
 
 function updateThermalScreenEffect(dt) {
   thermalVisualStrength = approachThermalIntensity(thermalVisualStrength, thermalVisualTarget, dt);
   const vortex = $('thermal-vortex');
   vortex.style.setProperty('--thermal-force', thermalVisualStrength.toFixed(3));
+}
+
+function updateDashScreenEffect(dt) {
+  dashVisualStrength = approachDashIntensity(dashVisualStrength, dashVisualTarget, dt);
+  const vortex = $('dash-vortex');
+  vortex.style.setProperty('--dash-force', dashVisualStrength.toFixed(3));
+  vortex.classList.toggle('active', dashVisualStrength > 0.02);
+}
+
+function triggerDashImpact() {
+  const vortex = $('dash-vortex');
+  vortex.classList.remove('burst');
+  void vortex.offsetWidth;
+  vortex.classList.add('burst');
 }
 
 function updateMinimapModeLabel() {
@@ -4582,7 +4669,13 @@ function physics(dt) {
   me.energy = energyStep.energy;
   me.dashing = energyStep.dashRatio > 0;
   me.engineOverheated = energyStep.overheated;
-  if (!wasDashing && me.dashing) audioDirector.play('dash');
+  dashVisualTarget = me.dashing
+    ? THREE.MathUtils.clamp(.58 + energyStep.dashRatio * .42, 0, 1)
+    : 0;
+  if (!wasDashing && me.dashing) {
+    audioDirector.play('dash');
+    triggerDashImpact();
+  }
   const dashSpeedDelta = dashAcceleration(me.speed) * dt * energyStep.dashRatio;
 
   if (rapierFlight) {
@@ -4715,7 +4808,9 @@ renderer.setAnimationLoop(timestamp => {
 
   if (game.phase === 'lobby') {
     thermalVisualTarget = 0;
+    dashVisualTarget = 0;
     updateThermalScreenEffect(dt);
+    updateDashScreenEffect(dt);
     renderScene(dt);
     return;
   }
@@ -4735,8 +4830,12 @@ renderer.setAnimationLoop(timestamp => {
       : Math.max(0, (now - (game.ends - (game.mode === 'ARENA' ? 180000 : 150000))) / 1000);
     if (me.alive && !graphicsQaFrozen) physics(dt);
   }
-  if (game.phase !== 'playing' || !me.alive) thermalVisualTarget = 0;
+  if (game.phase !== 'playing' || !me.alive) {
+    thermalVisualTarget = 0;
+    dashVisualTarget = 0;
+  }
   updateThermalScreenEffect(dt);
+  updateDashScreenEffect(dt);
 
   if (!graphicsQaFrozen) {
     stepDarts(dt);

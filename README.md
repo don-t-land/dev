@@ -4,7 +4,6 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-22--24-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Version](https://img.shields.io/badge/version-1.8.0-3b82f6)](./package.json)
-[![License](https://img.shields.io/badge/license-ISC-64748b)](./package.json)
 
 [게임 플레이](https://dontland.devset.uk/) · [기술 문서](https://github.com/don-t-land/docs) · [제출 문서](https://github.com/don-t-land/report)
 
@@ -139,6 +138,6 @@ curl http://localhost:3000/healthz
 
 변경 사항은 목적별로 작게 커밋하고, 제출 전에 `npm test`를 실행합니다. 토큰, 배포 키, 개인 정보와 비공개 대화 원문은 커밋하지 않습니다. 네트워크 프로토콜이나 경기 규칙을 변경할 때는 테스트와 관련 문서도 함께 갱신합니다.
 
-## 라이선스
+## 이용 안내
 
-패키지 메타데이터는 ISC 라이선스를 선언합니다. 제3자 라이브러리와 글꼴·이미지 등 개별 자산에는 각 항목의 라이선스가 별도로 적용될 수 있습니다.
+이 저장소는 대회 심사와 프로젝트 확인을 위해 공개되어 있으며 별도의 오픈소스 이용 허락을 부여하지 않습니다. 외부 라이브러리, 글꼴과 참고 자료에는 각 항목의 라이선스와 이용 조건이 별도로 적용됩니다.
